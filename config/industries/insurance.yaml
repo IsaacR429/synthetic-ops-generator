@@ -1,0 +1,9 @@
+industry: insurance
+
+business_streams:
+  - policy_administration
+  - claims
+  - underwriting
+  - billing
+  - customer_broker
+  - document_services

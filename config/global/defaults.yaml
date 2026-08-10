@@ -1,0 +1,15 @@
+schema_version: "1.0"
+
+generator:
+  synthetic: true
+
+runtime:
+  mode: accelerated
+
+frequency:
+  metrics_interval_seconds: 5
+  normal_logs_per_second: 2
+
+defaults:
+  environment: production
+  risk: medium
