@@ -1,0 +1,38 @@
+sites:
+
+  - site_id: insurer_primary
+    name: Insurer Alpha Primary Site
+    region: region_a
+    role: primary
+
+  - site_id: insurer_secondary
+    name: Insurer Alpha Secondary Site
+    region: region_b
+    role: secondary
+
+
+service_instances:
+
+  - instance_id: claims_api_primary
+    service_id: claims_service
+    component_id: claims_api
+    site_id: insurer_primary
+    environment: production
+
+  - instance_id: claims_api_secondary
+    service_id: claims_service
+    component_id: claims_api
+    site_id: insurer_secondary
+    environment: production
+
+  - instance_id: claims_payment_primary
+    service_id: claims_payment_service
+    component_id: claims_payment_api
+    site_id: insurer_primary
+    environment: production
+
+  - instance_id: claims_payment_secondary
+    service_id: claims_payment_service
+    component_id: claims_payment_api
+    site_id: insurer_secondary
+    environment: production

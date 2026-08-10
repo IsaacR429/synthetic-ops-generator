@@ -1,0 +1,37 @@
+components:
+
+  - component_id: claims_api
+    name: Claims API
+    component_type: api
+    service_id: claims_service
+    environment: production
+
+  - component_id: claims_database
+    name: Claims Database
+    component_type: database
+    service_id: claims_service
+    environment: production
+
+  - component_id: claims_payment_api
+    name: Claims Payment API
+    component_type: api
+    service_id: claims_payment_service
+    environment: production
+
+  - component_id: broker_web
+    name: Broker Web Application
+    component_type: web
+    service_id: broker_portal
+    environment: production
+
+  - component_id: policy_api
+    name: Policy API
+    component_type: api
+    service_id: policy_service
+    environment: production
+
+  - component_id: document_worker
+    name: Document Worker
+    component_type: worker
+    service_id: document_service
+    environment: production

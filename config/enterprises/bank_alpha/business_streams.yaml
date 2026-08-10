@@ -1,0 +1,16 @@
+business_streams:
+
+  - stream_id: digital_banking
+    name: Digital Banking
+
+  - stream_id: payments
+    name: Payments
+
+  - stream_id: customer_identity
+    name: Customer & Identity
+
+  - stream_id: core_banking
+    name: Core Banking
+
+  - stream_id: lending
+    name: Lending

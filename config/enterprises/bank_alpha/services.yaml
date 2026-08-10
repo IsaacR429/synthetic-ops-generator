@@ -1,0 +1,41 @@
+services:
+
+  - service_id: payment_service
+    name: Payment Processing
+    business_stream_id: payments
+    owner: payments_operations
+    criticality: critical
+    workload_class: interactive_transactional
+    benchmark_profile_id: critical_interactive_transaction
+    baseline_profile_id: critical_interactive_nominal
+
+  - service_id: identity_service
+    name: Identity Service
+    business_stream_id: customer_identity
+    owner: identity_operations
+    criticality: critical
+    workload_class: interactive_customer_facing
+    benchmark_profile_id: critical_interactive_transaction
+
+  - service_id: account_service
+    name: Account Service
+    business_stream_id: core_banking
+    owner: core_banking_operations
+    criticality: critical
+    workload_class: interactive_transactional
+    benchmark_profile_id: critical_interactive_transaction
+
+  - service_id: mobile_banking_service
+    name: Mobile Banking
+    business_stream_id: digital_banking
+    owner: digital_banking_operations
+    criticality: high
+    workload_class: interactive_customer_facing
+    benchmark_profile_id: business_critical_interactive
+
+  - service_id: loan_service
+    name: Loan Origination
+    business_stream_id: lending
+    owner: lending_operations
+    criticality: high
+    workload_class: business_workflow

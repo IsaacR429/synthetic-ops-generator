@@ -1,0 +1,19 @@
+dependencies:
+
+  - dependency_id: dep_claims_database
+    source_id: claims_api
+    target_id: claims_database
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_claims_payment
+    source_id: claims_service
+    target_id: claims_payment_api
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_claims_documents
+    source_id: claims_service
+    target_id: document_worker
+    relationship_type: depends_on
+    criticality: medium

@@ -1,0 +1,39 @@
+services:
+
+  - service_id: claims_service
+    name: Claims Processing
+    business_stream_id: claims
+    owner: claims_operations
+    criticality: high
+    workload_class: business_workflow
+    benchmark_profile_id: business_critical_interactive
+
+  - service_id: claims_payment_service
+    name: Claims Payment
+    business_stream_id: claims
+    owner: claims_payment_operations
+    criticality: critical
+    workload_class: interactive_transactional
+    benchmark_profile_id: critical_interactive_transaction
+
+  - service_id: broker_portal
+    name: Broker Portal
+    business_stream_id: customer_broker
+    owner: broker_operations
+    criticality: high
+    workload_class: interactive_customer_facing
+    benchmark_profile_id: business_critical_interactive
+
+  - service_id: policy_service
+    name: Policy Administration
+    business_stream_id: policy_administration
+    owner: policy_operations
+    criticality: high
+    workload_class: business_workflow
+
+  - service_id: document_service
+    name: Document Service
+    business_stream_id: document_services
+    owner: document_operations
+    criticality: medium
+    workload_class: background_async

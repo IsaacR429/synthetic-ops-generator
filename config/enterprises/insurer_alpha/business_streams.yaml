@@ -1,0 +1,19 @@
+business_streams:
+
+  - stream_id: policy_administration
+    name: Policy Administration
+
+  - stream_id: claims
+    name: Claims
+
+  - stream_id: underwriting
+    name: Underwriting
+
+  - stream_id: billing
+    name: Billing
+
+  - stream_id: customer_broker
+    name: Customer & Broker
+
+  - stream_id: document_services
+    name: Document Services

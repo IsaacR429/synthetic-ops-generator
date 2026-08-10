@@ -1,0 +1,31 @@
+dependencies:
+
+  - dependency_id: dep_payment_api_database
+    source_id: payment_api
+    target_id: payment_database
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_payment_worker_database
+    source_id: payment_worker
+    target_id: payment_database
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_mobile_account
+    source_id: mobile_api
+    target_id: account_api
+    relationship_type: calls
+    criticality: high
+
+  - dependency_id: dep_account_database
+    source_id: account_api
+    target_id: account_database
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_payment_account_database
+    source_id: payment_service
+    target_id: account_database
+    relationship_type: depends_on
+    criticality: high

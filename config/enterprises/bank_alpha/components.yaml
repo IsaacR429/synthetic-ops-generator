@@ -1,0 +1,55 @@
+components:
+
+  - component_id: payment_api
+    name: Payment API
+    component_type: api
+    service_id: payment_service
+    environment: production
+
+  - component_id: payment_database
+    name: Payment Database
+    component_type: database
+    service_id: payment_service
+    environment: production
+
+  - component_id: payment_worker
+    name: Payment Worker
+    component_type: worker
+    service_id: payment_service
+    environment: production
+
+  - component_id: authentication_api
+    name: Authentication API
+    component_type: api
+    service_id: identity_service
+    environment: production
+
+  - component_id: identity_database
+    name: Identity Database
+    component_type: database
+    service_id: identity_service
+    environment: production
+
+  - component_id: account_api
+    name: Account API
+    component_type: api
+    service_id: account_service
+    environment: production
+
+  - component_id: account_database
+    name: Account Database
+    component_type: database
+    service_id: account_service
+    environment: production
+
+  - component_id: mobile_api
+    name: Mobile API
+    component_type: api
+    service_id: mobile_banking_service
+    environment: production
+
+  - component_id: loan_api
+    name: Loan API
+    component_type: api
+    service_id: loan_service
+    environment: production

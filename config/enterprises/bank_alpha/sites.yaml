@@ -1,0 +1,38 @@
+sites:
+
+  - site_id: bank_primary
+    name: Bank Alpha Primary Site
+    region: region_a
+    role: primary
+
+  - site_id: bank_secondary
+    name: Bank Alpha Secondary Site
+    region: region_b
+    role: secondary
+
+
+service_instances:
+
+  - instance_id: payment_api_primary
+    service_id: payment_service
+    component_id: payment_api
+    site_id: bank_primary
+    environment: production
+
+  - instance_id: payment_api_secondary
+    service_id: payment_service
+    component_id: payment_api
+    site_id: bank_secondary
+    environment: production
+
+  - instance_id: account_database_primary
+    service_id: account_service
+    component_id: account_database
+    site_id: bank_primary
+    environment: production
+
+  - instance_id: account_database_secondary
+    service_id: account_service
+    component_id: account_database
+    site_id: bank_secondary
+    environment: production
