@@ -100,3 +100,6 @@ def load_enterprise_configuration(directory: str | Path) -> Enterprise:
 
     validate_topology(enterprise)
     return enterprise
+
+
+load_enterprise = load_enterprise_configuration
