@@ -1,0 +1,35 @@
+references:
+
+  google_sre_slo_methodology:
+    source_id: google_sre_slo_methodology
+    source_type: external_reference
+    source_name: Google SRE - Service Level Objectives
+    source_reference: "https://sre.google/sre-book/service-level-objectives/"
+    version: "reference-2026-08"
+    retrieved_on: 2026-08-10
+    rationale: >
+      Supports explicit SLI definitions, percentile-based latency
+      evaluation, measurement windows and workload-specific SLOs.
+
+  aws_availability_design_goals:
+    source_id: aws_availability_design_goals
+    source_type: external_reference
+    source_name: AWS Well-Architected Reliability Pillar - Availability
+    source_reference: "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/availability.html"
+    version: "reference-2026-08"
+    retrieved_on: 2026-08-10
+    rationale: >
+      Provides reference availability design-goal tiers and reinforces
+      that availability objectives depend on workload purpose,
+      dependencies and business criticality.
+
+  opentelemetry_http_duration:
+    source_id: opentelemetry_http_duration
+    source_type: external_reference
+    source_name: OpenTelemetry HTTP Metric Semantic Conventions
+    source_reference: "https://opentelemetry.io/docs/specs/semconv/http/http-metrics/"
+    version: "reference-2026-08"
+    retrieved_on: 2026-08-10
+    rationale: >
+      Provides a future interoperability reference for HTTP request
+      duration telemetry in Hybrid Mode.

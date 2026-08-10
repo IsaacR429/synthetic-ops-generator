@@ -1,0 +1,149 @@
+profiles:
+
+  critical_interactive_transaction:
+    profile_id: critical_interactive_transaction
+    name: Critical Interactive Transaction
+
+    workload_class: interactive_transactional
+    criticality: critical
+
+    description: >
+      Synthetic reference profile for highly critical,
+      interactive transactional services.
+
+    metrics:
+
+      request_latency:
+        metric_definition_id: request_latency
+
+        reference_target: 300
+        warning_threshold: 500
+        blocking_threshold: 1000
+
+        provenance:
+          source_id: synthetic_metric_policy_v1
+          source_type: synthetic_reference
+          source_name: Synthetic Ops Generator Metric Policy
+          source_reference: "internal:metric-policy-v1"
+          version: "1.0"
+          rationale: >
+            Controlled synthetic reference values selected to create
+            clearly distinguishable normal, warning and blocking
+            operating regions. These values are not asserted as a
+            universal Banking or Insurance performance standard.
+
+        supporting_reference_ids:
+          - google_sre_slo_methodology
+          - opentelemetry_http_duration
+
+
+      error_rate:
+        metric_definition_id: error_rate
+
+        reference_target: 0.10
+        warning_threshold: 1.0
+        blocking_threshold: 5.0
+
+        provenance:
+          source_id: synthetic_metric_policy_v1
+          source_type: synthetic_reference
+          source_name: Synthetic Ops Generator Metric Policy
+          source_reference: "internal:metric-policy-v1"
+          version: "1.0"
+          rationale: >
+            Synthetic thresholds selected for deterministic scenario
+            differentiation rather than as a universal industry SLA.
+
+        supporting_reference_ids:
+          - google_sre_slo_methodology
+
+
+      availability:
+        metric_definition_id: availability
+
+        reference_target: 99.99
+        warning_threshold: 99.90
+        blocking_threshold: 99.00
+
+        provenance:
+          source_id: synthetic_metric_policy_v1
+          source_type: synthetic_reference
+          source_name: Synthetic Ops Generator Metric Policy
+          source_reference: "internal:metric-policy-v1"
+          version: "1.0"
+          rationale: >
+            Synthetic critical-service availability profile informed
+            by externally published availability design-goal concepts,
+            while remaining an internal configurable simulation policy.
+
+        supporting_reference_ids:
+          - aws_availability_design_goals
+
+
+  business_critical_interactive:
+    profile_id: business_critical_interactive
+    name: Business Critical Interactive
+
+    workload_class: interactive_customer_facing
+    criticality: high
+
+    description: >
+      Synthetic profile for important customer-facing
+      operational services.
+
+    metrics:
+
+      request_latency:
+        metric_definition_id: request_latency
+        reference_target: 500
+        warning_threshold: 800
+        blocking_threshold: 1500
+
+        provenance:
+          source_id: synthetic_metric_policy_v1
+          source_type: synthetic_reference
+          source_name: Synthetic Ops Generator Metric Policy
+          source_reference: "internal:metric-policy-v1"
+          version: "1.0"
+          rationale: >
+            Synthetic reference values for controlled simulation.
+
+        supporting_reference_ids:
+          - google_sre_slo_methodology
+
+      error_rate:
+        metric_definition_id: error_rate
+        reference_target: 0.50
+        warning_threshold: 2.0
+        blocking_threshold: 5.0
+
+        provenance:
+          source_id: synthetic_metric_policy_v1
+          source_type: synthetic_reference
+          source_name: Synthetic Ops Generator Metric Policy
+          source_reference: "internal:metric-policy-v1"
+          version: "1.0"
+          rationale: >
+            Synthetic reference values for controlled simulation.
+
+        supporting_reference_ids:
+          - google_sre_slo_methodology
+
+      availability:
+        metric_definition_id: availability
+        reference_target: 99.95
+        warning_threshold: 99.50
+        blocking_threshold: 99.00
+
+        provenance:
+          source_id: synthetic_metric_policy_v1
+          source_type: synthetic_reference
+          source_name: Synthetic Ops Generator Metric Policy
+          source_reference: "internal:metric-policy-v1"
+          version: "1.0"
+          rationale: >
+            Synthetic availability profile informed by external
+            reliability design-goal concepts.
+
+        supporting_reference_ids:
+          - aws_availability_design_goals

@@ -1,0 +1,41 @@
+definitions:
+
+  request_latency:
+    metric_definition_id: request_latency
+    name: Request Latency
+    description: >
+      Request processing latency for an interactive service.
+    unit: ms
+    evaluation_statistic: p95
+    direction: lower_is_better
+    aggregation_window_seconds: 300
+
+  error_rate:
+    metric_definition_id: error_rate
+    name: Error Rate
+    description: >
+      Percentage of valid requests that result in an error.
+    unit: percent
+    evaluation_statistic: rate
+    direction: lower_is_better
+    aggregation_window_seconds: 300
+
+  availability:
+    metric_definition_id: availability
+    name: Availability
+    description: >
+      Percentage of valid service requests successfully served.
+    unit: percent
+    evaluation_statistic: rate
+    direction: higher_is_better
+    aggregation_window_seconds: 300
+
+  throughput:
+    metric_definition_id: throughput
+    name: Throughput
+    description: >
+      Number of valid requests or transactions processed per second.
+    unit: requests_per_second
+    evaluation_statistic: rate
+    direction: context_dependent
+    aggregation_window_seconds: 60

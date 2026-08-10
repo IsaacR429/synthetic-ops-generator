@@ -1,0 +1,28 @@
+profile_id: critical_interactive_nominal
+name: Critical Interactive Nominal Baseline
+
+historical_window_minutes: 30
+sample_interval_seconds: 300
+
+metrics:
+
+  request_latency:
+    metric_definition_id: request_latency
+    center: 180
+    noise_stddev: 15
+    lower_bound: 100
+    upper_bound: 260
+
+  error_rate:
+    metric_definition_id: error_rate
+    center: 0.05
+    noise_stddev: 0.02
+    lower_bound: 0.0
+    upper_bound: 0.10
+
+  availability:
+    metric_definition_id: availability
+    center: 99.995
+    noise_stddev: 0.002
+    lower_bound: 99.99
+    upper_bound: 100.0

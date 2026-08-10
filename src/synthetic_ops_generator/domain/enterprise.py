@@ -4,6 +4,7 @@ from synthetic_ops_generator.domain.enums import (
     Criticality,
     Environment,
     Industry,
+    WorkloadClass,
 )
 
 
@@ -20,6 +21,11 @@ class Service(BaseModel):
 
     owner: str = Field(min_length=1)
     criticality: Criticality
+
+    workload_class: WorkloadClass | None = None
+
+    benchmark_profile_id: str | None = None
+    baseline_profile_id: str | None = None
 
 
 class Component(BaseModel):

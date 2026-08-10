@@ -26,6 +26,14 @@ class Criticality(StrEnum):
     CRITICAL = "critical"
 
 
+class WorkloadClass(StrEnum):
+    INTERACTIVE_TRANSACTIONAL = "interactive_transactional"
+    INTERACTIVE_CUSTOMER_FACING = "interactive_customer_facing"
+    BUSINESS_WORKFLOW = "business_workflow"
+    BATCH_PROCESSING = "batch_processing"
+    BACKGROUND_ASYNC = "background_async"
+
+
 class OperationalState(StrEnum):
     INITIALISING = "initialising"
     NORMAL = "normal"
