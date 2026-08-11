@@ -3,11 +3,26 @@ import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 
+from synthetic_ops_generator.baselines.models import (
+    BaselineProfile,
+)
+from synthetic_ops_generator.benchmarks.models import (
+    BenchmarkCatalogue,
+)
+from synthetic_ops_generator.benchmarks.resolver import (
+    resolve_benchmark,
+)
 from synthetic_ops_generator.config.enterprise_loader import (
     load_enterprise_configuration,
 )
+from synthetic_ops_generator.config.loader import (
+    load_yaml_model,
+)
 from synthetic_ops_generator.core.clock import ManualSimulationClock
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.core.randomness import (
+    SimulationRandom,
+)
 from synthetic_ops_generator.generators.application_test import (
     ApplicationTestGenerator,
 )
@@ -19,6 +34,12 @@ from synthetic_ops_generator.generators.infrastructure_test import (
     InfrastructureTestGenerator,
 )
 from synthetic_ops_generator.generators.itsm import ITSMGenerator
+from synthetic_ops_generator.generators.metric import (
+    MetricGenerator,
+)
+from synthetic_ops_generator.metrics.models import (
+    MetricCatalogue,
+)
 from synthetic_ops_generator.publishers.memory import InMemoryPublisher
 from synthetic_ops_generator.scenarios.loader import load_scenario
 from synthetic_ops_generator.scenarios.models import (
@@ -75,6 +96,7 @@ def build_supported_generators(
     scenario: ScenarioDefinition,
     enterprise,
     ids: IdFactory,
+    random_source: SimulationRandom,
 ) -> list[SourceGenerator]:
     generators: list[SourceGenerator] = []
 
@@ -82,6 +104,103 @@ def build_supported_generators(
         scenario,
         enterprise,
     )
+
+    metric_definitions = None
+    metric_baseline_profile = None
+    resolved_metric_benchmarks = None
+    metric_benchmark_profile_id = None
+
+    has_metric_behaviour = any(
+        behaviour.source == SourceDomain.METRIC
+        for behaviour in scenario.behaviours
+    )
+
+    if has_metric_behaviour:
+        if service.benchmark_profile_id is None:
+            raise ValueError(
+                f"Service {service.service_id} does not define "
+                "a Benchmark profile."
+            )
+
+        if service.baseline_profile_id is None:
+            raise ValueError(
+                f"Service {service.service_id} does not define "
+                "a Baseline profile."
+            )
+
+        metric_catalogue = load_yaml_model(
+            "config/metrics/definitions.yaml",
+            MetricCatalogue,
+        )
+
+        benchmark_catalogue = load_yaml_model(
+            "config/benchmarks/synthetic_defaults.yaml",
+            BenchmarkCatalogue,
+        )
+
+        baseline_profile = load_yaml_model(
+            "config/baselines/synthetic_defaults.yaml",
+            BaselineProfile,
+        )
+
+        if (
+            baseline_profile.profile_id
+            != service.baseline_profile_id
+        ):
+            raise ValueError(
+                "Configured Baseline profile does not match "
+                f"Service {service.service_id}: "
+                f"{service.baseline_profile_id}"
+            )
+
+        benchmark_profile = (
+            benchmark_catalogue.profiles.get(
+                service.benchmark_profile_id
+            )
+        )
+
+        if benchmark_profile is None:
+            raise ValueError(
+                "Configured Benchmark profile was not found: "
+                f"{service.benchmark_profile_id}"
+            )
+
+        resolved_benchmarks = {}
+
+        for metric_id in baseline_profile.metrics:
+            definition = metric_catalogue.definitions.get(
+                metric_id
+            )
+
+            if definition is None:
+                raise ValueError(
+                    "Baseline references unknown Metric Definition: "
+                    f"{metric_id}"
+                )
+
+            base_policy = benchmark_profile.metrics.get(
+                metric_id
+            )
+
+            if base_policy is None:
+                raise ValueError(
+                    "Benchmark profile does not define Metric: "
+                    f"{metric_id}"
+                )
+
+            resolved_benchmarks[metric_id] = (
+                resolve_benchmark(
+                    definition,
+                    base_policy,
+                )
+            )
+
+        metric_definitions = metric_catalogue.definitions
+        metric_baseline_profile = baseline_profile
+        resolved_metric_benchmarks = resolved_benchmarks
+        metric_benchmark_profile_id = (
+            benchmark_profile.profile_id
+        )
 
     for behaviour in scenario.behaviours:
         if behaviour.source == SourceDomain.ITSM:
@@ -93,6 +212,36 @@ def build_supported_generators(
                     component_ids=(
                         scenario.target.component_ids
                     ),
+                )
+            )
+
+        elif behaviour.source == SourceDomain.METRIC:
+            if (
+                metric_definitions is None
+                or metric_baseline_profile is None
+                or resolved_metric_benchmarks is None
+                or metric_benchmark_profile_id is None
+            ):
+                raise RuntimeError(
+                    "Metric runtime configuration "
+                    "was not resolved."
+                )
+
+            generators.append(
+                MetricGenerator(
+                    ids=ids,
+                    behaviour=behaviour,
+                    definitions=metric_definitions,
+                    baseline_profile=(
+                        metric_baseline_profile
+                    ),
+                    benchmarks=(
+                        resolved_metric_benchmarks
+                    ),
+                    benchmark_profile_id=(
+                        metric_benchmark_profile_id
+                    ),
+                    random_source=random_source,
                 )
             )
 
@@ -190,12 +339,17 @@ async def run(
         random_seed=42,
     )
 
+    random_source = SimulationRandom(
+        context.random_seed
+    )
+
     publisher = InMemoryPublisher()
 
     generators = build_supported_generators(
         scenario=scenario,
         enterprise=enterprise,
         ids=ids,
+        random_source=random_source,
     )
 
     visited_states = await runner.execute(
@@ -260,7 +414,7 @@ async def run(
 
     print(
         "Supported Sources Executed: "
-        "ITSM, Infrastructure Test, "
+        "ITSM, Metric, Infrastructure Test, "
         "Deployment, Application Test"
     )
 

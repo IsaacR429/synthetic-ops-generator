@@ -2,11 +2,26 @@ import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 
+from synthetic_ops_generator.baselines.models import (
+    BaselineProfile,
+)
+from synthetic_ops_generator.benchmarks.models import (
+    BenchmarkCatalogue,
+)
+from synthetic_ops_generator.benchmarks.resolver import (
+    resolve_benchmark,
+)
 from synthetic_ops_generator.config.enterprise_loader import (
     load_enterprise_configuration,
 )
+from synthetic_ops_generator.config.loader import (
+    load_yaml_model,
+)
 from synthetic_ops_generator.core.clock import ManualSimulationClock
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.core.randomness import (
+    SimulationRandom,
+)
 from synthetic_ops_generator.generators.application_test import (
     ApplicationTestGenerator,
 )
@@ -17,6 +32,12 @@ from synthetic_ops_generator.generators.infrastructure_test import (
     InfrastructureTestGenerator,
 )
 from synthetic_ops_generator.generators.itsm import ITSMGenerator
+from synthetic_ops_generator.generators.metric import (
+    MetricGenerator,
+)
+from synthetic_ops_generator.metrics.models import (
+    MetricCatalogue,
+)
 from synthetic_ops_generator.publishers.memory import InMemoryPublisher
 from synthetic_ops_generator.scenarios.loader import load_scenario
 from synthetic_ops_generator.scenarios.models import SourceDomain
@@ -58,6 +79,26 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         if behaviour.source == SourceDomain.ITSM
     )
 
+    metric_behaviours = [
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.METRIC
+    ]
+
+    assert len(metric_behaviours) == 2
+
+    baseline_metric_behaviour = next(
+        behaviour
+        for behaviour in metric_behaviours
+        if behaviour.profile_id == "healthy_baseline"
+    )
+
+    post_change_metric_behaviour = next(
+        behaviour
+        for behaviour in metric_behaviours
+        if behaviour.profile_id == "healthy_post_change"
+    )
+
     infrastructure_behaviour = next(
         behaviour
         for behaviour in scenario.behaviours
@@ -85,6 +126,34 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
     assert scenario.trigger.artifact is not None
     assert scenario.trigger.version is not None
 
+    metric_catalogue = load_yaml_model(
+        "config/metrics/definitions.yaml",
+        MetricCatalogue,
+    )
+
+    benchmark_catalogue = load_yaml_model(
+        "config/benchmarks/synthetic_defaults.yaml",
+        BenchmarkCatalogue,
+    )
+
+    baseline_profile = load_yaml_model(
+        "config/baselines/synthetic_defaults.yaml",
+        BaselineProfile,
+    )
+
+    assert service.benchmark_profile_id is not None
+    benchmark_profile = benchmark_catalogue.profiles[
+        service.benchmark_profile_id
+    ]
+
+    resolved_benchmarks = {
+        metric_id: resolve_benchmark(
+            metric_catalogue.definitions[metric_id],
+            benchmark_profile.metrics[metric_id],
+        )
+        for metric_id in baseline_profile.metrics
+    }
+
     ids = IdFactory()
 
     clock = ManualSimulationClock(
@@ -109,6 +178,10 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         random_seed=42,
     )
 
+    random_source = SimulationRandom(
+        context.random_seed
+    )
+
     publisher = InMemoryPublisher()
 
     generators = [
@@ -117,6 +190,17 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
             behaviour=itsm_behaviour,
             service_owner=service.owner,
             component_ids=scenario.target.component_ids,
+        ),
+        MetricGenerator(
+            ids=ids,
+            behaviour=baseline_metric_behaviour,
+            definitions=metric_catalogue.definitions,
+            baseline_profile=baseline_profile,
+            benchmarks=resolved_benchmarks,
+            benchmark_profile_id=(
+                benchmark_profile.profile_id
+            ),
+            random_source=random_source,
         ),
         InfrastructureTestGenerator(
             ids=ids,
@@ -131,6 +215,17 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         ApplicationTestGenerator(
             ids=ids,
             behaviour=application_behaviour,
+        ),
+        MetricGenerator(
+            ids=ids,
+            behaviour=post_change_metric_behaviour,
+            definitions=metric_catalogue.definitions,
+            baseline_profile=baseline_profile,
+            benchmarks=resolved_benchmarks,
+            benchmark_profile_id=(
+                benchmark_profile.profile_id
+            ),
+            random_source=random_source,
         ),
     ]
 
@@ -152,7 +247,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "completed",
     ]
 
-    assert len(publisher.events) == 17
+    assert len(publisher.events) == 23
 
     assert [
         event.event_type
@@ -160,6 +255,9 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
     ] == [
         "itsm.change.created",
         "itsm.approval.approved",
+        "metric.observed",
+        "metric.observed",
+        "metric.observed",
         "infrastructure_test.planned",
         "infrastructure_test.passed",
         "infrastructure_test.planned",
@@ -175,6 +273,9 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "application_test.passed",
         "application_test.planned",
         "application_test.passed",
+        "metric.observed",
+        "metric.observed",
+        "metric.observed",
     ]
 
     assert {
@@ -205,7 +306,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
     assert [
         event.sequence_number
         for event in publisher.events
-    ] == list(range(1, 18))
+    ] == list(range(1, 24))
 
     event_times = [
         event.event_time
@@ -214,7 +315,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
 
     assert event_times == sorted(event_times)
 
-    assert len(set(event_times)) == 17
+    assert len(set(event_times)) == 23
 
     source_systems = {
         event.source_system
@@ -223,6 +324,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
 
     assert source_systems == {
         "synthetic_itsm",
+        "synthetic_observability",
         "synthetic_infrastructure_test",
         "synthetic_deployment",
         "synthetic_application_test",
@@ -252,6 +354,79 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "TST0000005",
         "TST0000006",
     }
+
+    metric_events = [
+        event
+        for event in publisher.events
+        if event.event_type == "metric.observed"
+    ]
+
+    assert len(metric_events) == 6
+
+    metric_ids = [
+        event.data["metric"]["metric_definition_id"]
+        for event in metric_events
+    ]
+
+    assert metric_ids.count("request_latency") == 2
+    assert metric_ids.count("error_rate") == 2
+    assert metric_ids.count("availability") == 2
+
+    assert {
+        event.data["metric"]["classification"]
+        for event in metric_events
+    } == {"normal"}
+
+    assert {
+        event.data["metric"]["behaviour_profile_id"]
+        for event in metric_events
+    } == {
+        "healthy_baseline",
+        "healthy_post_change",
+    }
+
+    assert {
+        event.data["metric"]["scenario_state"]
+        for event in metric_events
+    } == {
+        "normal",
+        "observing",
+    }
+
+    for metric_id in (
+        "request_latency",
+        "error_rate",
+        "availability",
+    ):
+        observations = [
+            event.data["metric"]
+            for event in metric_events
+            if (
+                event.data["metric"][
+                    "metric_definition_id"
+                ]
+                == metric_id
+            )
+        ]
+
+        assert len(observations) == 2
+
+        assert (
+            observations[0]["effective_benchmark"]
+            == observations[1]["effective_benchmark"]
+        )
+
+        assert (
+            observations[0]["baseline_profile_id"]
+            == observations[1]["baseline_profile_id"]
+            == "critical_interactive_nominal"
+        )
+
+        assert (
+            observations[0]["benchmark_profile_id"]
+            == observations[1]["benchmark_profile_id"]
+            == "critical_interactive_transaction"
+        )
 
     assert context.deployment_id == "DEP0000001"
     assert context.scenario_state.value == "completed"
