@@ -8,9 +8,15 @@ from synthetic_ops_generator.config.enterprise_loader import (
 )
 from synthetic_ops_generator.core.clock import ManualSimulationClock
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.generators.application_test import (
+    ApplicationTestGenerator,
+)
 from synthetic_ops_generator.generators.base import SourceGenerator
 from synthetic_ops_generator.generators.deployment import (
     DeploymentGenerator,
+)
+from synthetic_ops_generator.generators.infrastructure_test import (
+    InfrastructureTestGenerator,
 )
 from synthetic_ops_generator.generators.itsm import ITSMGenerator
 from synthetic_ops_generator.publishers.memory import InMemoryPublisher
@@ -92,6 +98,17 @@ def build_supported_generators(
 
         elif (
             behaviour.source
+            == SourceDomain.INFRASTRUCTURE_TEST
+        ):
+            generators.append(
+                InfrastructureTestGenerator(
+                    ids=ids,
+                    behaviour=behaviour,
+                )
+            )
+
+        elif (
+            behaviour.source
             == SourceDomain.DEPLOYMENT
         ):
             if scenario.trigger.artifact is None:
@@ -114,6 +131,17 @@ def build_supported_generators(
                     artifact_version=(
                         scenario.trigger.version
                     ),
+                )
+            )
+
+        elif (
+            behaviour.source
+            == SourceDomain.APPLICATION_TEST
+        ):
+            generators.append(
+                ApplicationTestGenerator(
+                    ids=ids,
+                    behaviour=behaviour,
                 )
             )
 
@@ -232,7 +260,8 @@ async def run(
 
     print(
         "Supported Sources Executed: "
-        "ITSM, Deployment"
+        "ITSM, Infrastructure Test, "
+        "Deployment, Application Test"
     )
 
     print()

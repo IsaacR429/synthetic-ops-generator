@@ -7,8 +7,14 @@ from synthetic_ops_generator.config.enterprise_loader import (
 )
 from synthetic_ops_generator.core.clock import ManualSimulationClock
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.generators.application_test import (
+    ApplicationTestGenerator,
+)
 from synthetic_ops_generator.generators.deployment import (
     DeploymentGenerator,
+)
+from synthetic_ops_generator.generators.infrastructure_test import (
+    InfrastructureTestGenerator,
 )
 from synthetic_ops_generator.generators.itsm import ITSMGenerator
 from synthetic_ops_generator.publishers.memory import InMemoryPublisher
@@ -52,10 +58,28 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         if behaviour.source == SourceDomain.ITSM
     )
 
+    infrastructure_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if (
+            behaviour.source
+            == SourceDomain.INFRASTRUCTURE_TEST
+        )
+    )
+
     deployment_behaviour = next(
         behaviour
         for behaviour in scenario.behaviours
         if behaviour.source == SourceDomain.DEPLOYMENT
+    )
+
+    application_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if (
+            behaviour.source
+            == SourceDomain.APPLICATION_TEST
+        )
     )
 
     assert scenario.trigger.artifact is not None
@@ -94,11 +118,19 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
             service_owner=service.owner,
             component_ids=scenario.target.component_ids,
         ),
+        InfrastructureTestGenerator(
+            ids=ids,
+            behaviour=infrastructure_behaviour,
+        ),
         DeploymentGenerator(
             ids=ids,
             behaviour=deployment_behaviour,
             artifact=scenario.trigger.artifact,
             artifact_version=scenario.trigger.version,
+        ),
+        ApplicationTestGenerator(
+            ids=ids,
+            behaviour=application_behaviour,
         ),
     ]
 
@@ -120,7 +152,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "completed",
     ]
 
-    assert len(publisher.events) == 5
+    assert len(publisher.events) == 17
 
     assert [
         event.event_type
@@ -128,9 +160,21 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
     ] == [
         "itsm.change.created",
         "itsm.approval.approved",
+        "infrastructure_test.planned",
+        "infrastructure_test.passed",
+        "infrastructure_test.planned",
+        "infrastructure_test.passed",
+        "infrastructure_test.planned",
+        "infrastructure_test.passed",
         "cicd.deployment.created",
         "cicd.deployment.started",
         "cicd.deployment.completed",
+        "application_test.planned",
+        "application_test.passed",
+        "application_test.planned",
+        "application_test.passed",
+        "application_test.planned",
+        "application_test.passed",
     ]
 
     assert {
@@ -161,7 +205,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
     assert [
         event.sequence_number
         for event in publisher.events
-    ] == [1, 2, 3, 4, 5]
+    ] == list(range(1, 18))
 
     event_times = [
         event.event_time
@@ -170,7 +214,44 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
 
     assert event_times == sorted(event_times)
 
-    assert len(set(event_times)) == 5
+    assert len(set(event_times)) == 17
+
+    source_systems = {
+        event.source_system
+        for event in publisher.events
+    }
+
+    assert source_systems == {
+        "synthetic_itsm",
+        "synthetic_infrastructure_test",
+        "synthetic_deployment",
+        "synthetic_application_test",
+    }
+
+    test_events = [
+        event
+        for event in publisher.events
+        if event.event_type.startswith(
+            (
+                "infrastructure_test.",
+                "application_test.",
+            )
+        )
+    ]
+
+    test_ids = [
+        event.data["test"]["test_id"]
+        for event in test_events
+    ]
+
+    assert set(test_ids) == {
+        "TST0000001",
+        "TST0000002",
+        "TST0000003",
+        "TST0000004",
+        "TST0000005",
+        "TST0000006",
+    }
 
     assert context.deployment_id == "DEP0000001"
     assert context.scenario_state.value == "completed"
