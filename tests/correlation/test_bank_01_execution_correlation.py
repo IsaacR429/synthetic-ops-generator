@@ -32,6 +32,7 @@ from synthetic_ops_generator.generators.infrastructure_test import (
     InfrastructureTestGenerator,
 )
 from synthetic_ops_generator.generators.itsm import ITSMGenerator
+from synthetic_ops_generator.generators.log import LogGenerator
 from synthetic_ops_generator.generators.metric import (
     MetricGenerator,
 )
@@ -121,6 +122,12 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
             behaviour.source
             == SourceDomain.APPLICATION_TEST
         )
+    )
+
+    log_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.LOG
     )
 
     assert scenario.trigger.artifact is not None
@@ -227,6 +234,10 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
             ),
             random_source=random_source,
         ),
+        LogGenerator(
+            ids=ids,
+            behaviour=log_behaviour,
+        ),
     ]
 
     visited_states = asyncio.run(
@@ -247,7 +258,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "completed",
     ]
 
-    assert len(publisher.events) == 23
+    assert len(publisher.events) == 26
 
     assert [
         event.event_type
@@ -276,6 +287,9 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "metric.observed",
         "metric.observed",
         "metric.observed",
+        "log.observed",
+        "log.observed",
+        "log.observed",
     ]
 
     assert {
@@ -306,7 +320,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
     assert [
         event.sequence_number
         for event in publisher.events
-    ] == list(range(1, 24))
+    ] == list(range(1, 27))
 
     event_times = [
         event.event_time
@@ -315,7 +329,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
 
     assert event_times == sorted(event_times)
 
-    assert len(set(event_times)) == 23
+    assert len(set(event_times)) == 26
 
     source_systems = {
         event.source_system
@@ -328,6 +342,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "synthetic_infrastructure_test",
         "synthetic_deployment",
         "synthetic_application_test",
+        "synthetic_logs",
     }
 
     test_events = [
@@ -427,6 +442,57 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
             == observations[1]["benchmark_profile_id"]
             == "critical_interactive_transaction"
         )
+
+    log_events = [
+        event
+        for event in publisher.events
+        if event.event_type == "log.observed"
+    ]
+
+    assert len(log_events) == 3
+
+    assert [
+        event.data["log"]["log_id"]
+        for event in log_events
+    ] == [
+        "LOG0000001",
+        "LOG0000002",
+        "LOG0000003",
+    ]
+
+    assert {
+        event.data["behaviour_profile_id"]
+        for event in log_events
+    } == {"normal_operational_logs"}
+
+    assert {
+        event.data["scenario_state"]
+        for event in log_events
+    } == {"observing"}
+
+    assert {
+        event.data["log"]["severity"]
+        for event in log_events
+    } == {"info"}
+
+    assert {
+        event.chg_id
+        for event in log_events
+    } == {context.chg_id}
+
+    assert {
+        event.run_id
+        for event in log_events
+    } == {context.run_id}
+
+    assert [
+        event.data["log"]["log_type"]
+        for event in log_events
+    ] == [
+        "request_accepted",
+        "request_completed",
+        "service_health",
+    ]
 
     assert context.deployment_id == "DEP0000001"
     assert context.scenario_state.value == "completed"

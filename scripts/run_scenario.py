@@ -34,6 +34,7 @@ from synthetic_ops_generator.generators.infrastructure_test import (
     InfrastructureTestGenerator,
 )
 from synthetic_ops_generator.generators.itsm import ITSMGenerator
+from synthetic_ops_generator.generators.log import LogGenerator
 from synthetic_ops_generator.generators.metric import (
     MetricGenerator,
 )
@@ -294,6 +295,14 @@ def build_supported_generators(
                 )
             )
 
+        elif behaviour.source == SourceDomain.LOG:
+            generators.append(
+                LogGenerator(
+                    ids=ids,
+                    behaviour=behaviour,
+                )
+            )
+
     return generators
 
 
@@ -415,7 +424,7 @@ async def run(
     print(
         "Supported Sources Executed: "
         "ITSM, Metric, Infrastructure Test, "
-        "Deployment, Application Test"
+        "Deployment, Application Test, Log"
     )
 
     print()

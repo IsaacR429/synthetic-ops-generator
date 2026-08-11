@@ -10,3 +10,10 @@ def test_change_ids_are_unique() -> None:
     assert first == "CHG0000001"
     assert second == "CHG0000002"
     assert first != second
+
+
+def test_log_ids_are_generated_centrally() -> None:
+    ids = IdFactory()
+
+    assert ids.log_id() == "LOG0000001"
+    assert ids.log_id() == "LOG0000002"

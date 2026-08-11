@@ -46,3 +46,6 @@ class IdFactory:
 
     def validation_id(self) -> str:
         return self.next("VAL")
+    
+    def log_id(self) -> str:
+        return self.next("LOG")
