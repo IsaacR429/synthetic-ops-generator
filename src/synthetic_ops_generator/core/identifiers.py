@@ -32,6 +32,9 @@ class IdFactory:
     def deployment_id(self) -> str:
         return self.next("DEP")
 
+    def approval_id(self) -> str:
+        return self.next("APR")
+
     def test_id(self) -> str:
         return self.next("TST")
 
