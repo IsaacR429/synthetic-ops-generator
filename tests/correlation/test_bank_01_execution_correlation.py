@@ -29,6 +29,9 @@ from synthetic_ops_generator.generators.application_test import (
 from synthetic_ops_generator.generators.deployment import (
     DeploymentGenerator,
 )
+from synthetic_ops_generator.generators.evidence import (
+    EvidenceGenerator,
+)
 from synthetic_ops_generator.generators.incident import (
     IncidentGenerator,
 )
@@ -146,6 +149,22 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         == OperationalState.OBSERVING
     )
 
+    evidence_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.EVIDENCE
+    )
+
+    assert (
+        evidence_behaviour.profile_id
+        == "complete_validation_evidence"
+    )
+
+    assert (
+        evidence_behaviour.during_state
+        == OperationalState.OBSERVING
+    )
+
     assert scenario.trigger.artifact is not None
     assert scenario.trigger.version is not None
 
@@ -258,6 +277,11 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
             ids=ids,
             behaviour=incident_behaviour,
         ),
+        EvidenceGenerator(
+            ids=ids,
+            behaviour=evidence_behaviour,
+            event_history=runner.event_history,
+        ),
     ]
 
     visited_states = asyncio.run(
@@ -278,7 +302,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "completed",
     ]
 
-    assert len(publisher.events) == 26
+    assert len(publisher.events) == 32
 
     assert [
         event.event_type
@@ -310,6 +334,12 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "log.observed",
         "log.observed",
         "log.observed",
+        "evidence.captured",
+        "evidence.captured",
+        "evidence.captured",
+        "evidence.captured",
+        "evidence.captured",
+        "evidence.captured",
     ]
 
     assert {
@@ -340,7 +370,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
     assert [
         event.sequence_number
         for event in publisher.events
-    ] == list(range(1, 27))
+    ] == list(range(1, 33))
 
     event_times = [
         event.event_time
@@ -349,7 +379,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
 
     assert event_times == sorted(event_times)
 
-    assert len(set(event_times)) == 26
+    assert len(set(event_times)) == 32
 
     source_systems = {
         event.source_system
@@ -363,6 +393,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "synthetic_deployment",
         "synthetic_application_test",
         "synthetic_logs",
+        "synthetic_evidence",
     }
 
     test_events = [
@@ -522,6 +553,64 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
 
     assert incident_events == []
     assert context.incident_id is None
+
+    evidence_events = [
+        event
+        for event in publisher.events
+        if event.event_type == "evidence.captured"
+    ]
+
+    assert len(evidence_events) == 6
+
+    assert [
+        event.data["evidence"]["evidence_type"]
+        for event in evidence_events
+    ] == [
+        "change_approval",
+        "infrastructure_validation",
+        "deployment_result",
+        "application_validation",
+        "pre_change_baseline",
+        "post_change_observation",
+    ]
+
+    event_by_id = {
+        event.event_id: event
+        for event in publisher.events
+    }
+
+    for evidence_event in evidence_events:
+        evidence = evidence_event.data["evidence"]
+
+        assert evidence["source_event_ids"]
+
+        for source_event_id in evidence[
+            "source_event_ids"
+        ]:
+            assert source_event_id in event_by_id
+
+            source_event = event_by_id[
+                source_event_id
+            ]
+
+            assert (
+                source_event.sequence_number
+                < evidence_event.sequence_number
+            )
+
+    assert list(runner.event_history) == publisher.events
+
+    assert [
+        event.data["evidence"]["evidence_id"]
+        for event in evidence_events
+    ] == [
+        "EVD0000001",
+        "EVD0000002",
+        "EVD0000003",
+        "EVD0000004",
+        "EVD0000005",
+        "EVD0000006",
+    ]
 
     assert context.deployment_id == "DEP0000001"
     assert context.scenario_state.value == "completed"

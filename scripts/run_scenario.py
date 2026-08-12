@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,12 +24,16 @@ from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.core.randomness import (
     SimulationRandom,
 )
+from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.application_test import (
     ApplicationTestGenerator,
 )
 from synthetic_ops_generator.generators.base import SourceGenerator
 from synthetic_ops_generator.generators.deployment import (
     DeploymentGenerator,
+)
+from synthetic_ops_generator.generators.evidence import (
+    EvidenceGenerator,
 )
 from synthetic_ops_generator.generators.incident import (
     IncidentGenerator,
@@ -104,6 +109,7 @@ def build_supported_generators(
     enterprise,
     ids: IdFactory,
     random_source: SimulationRandom,
+    event_history: Sequence[GeneratedEvent],
 ) -> list[SourceGenerator]:
     generators: list[SourceGenerator] = []
 
@@ -328,6 +334,15 @@ def build_supported_generators(
                 )
             )
 
+        elif behaviour.source == SourceDomain.EVIDENCE:
+            generators.append(
+                EvidenceGenerator(
+                    ids=ids,
+                    behaviour=behaviour,
+                    event_history=event_history,
+                )
+            )
+
     return generators
 
 
@@ -384,6 +399,7 @@ async def run(
         enterprise=enterprise,
         ids=ids,
         random_source=random_source,
+        event_history=runner.event_history,
     )
 
     visited_states = await runner.execute(
@@ -447,9 +463,9 @@ async def run(
     )
 
     print(
-        "Supported Sources Executed: "
+        "Event-Producing Sources: "
         "ITSM, Metric, Infrastructure Test, "
-        "Deployment, Application Test, Log"
+        "Deployment, Application Test, Log, Evidence"
     )
 
     print()

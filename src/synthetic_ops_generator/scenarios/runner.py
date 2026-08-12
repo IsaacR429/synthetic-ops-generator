@@ -4,6 +4,7 @@ from datetime import datetime
 from synthetic_ops_generator.core.clock import SimulationClock
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.domain.enterprise import Enterprise
+from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.base import SourceGenerator
 from synthetic_ops_generator.publishers.base import EventPublisher
 from synthetic_ops_generator.scenarios.context import ScenarioContext
@@ -29,6 +30,7 @@ class ScenarioRunner:
     ) -> None:
         self._ids = ids
         self._clock = clock
+        self._event_history: list[GeneratedEvent] = []
 
     def create_context(
         self,
@@ -115,6 +117,8 @@ class ScenarioRunner:
                 "Scenario's initial state."
             )
 
+        self._event_history.clear()
+
         state_machine = ScenarioStateMachine(
             initial_state=context.scenario_state,
         )
@@ -140,6 +144,8 @@ class ScenarioRunner:
                     context
                 ):
                     await publisher.publish(event)
+
+                    self._event_history.append(event)
 
                     self._clock.advance(
                         event_interval_seconds
@@ -175,3 +181,9 @@ class ScenarioRunner:
     @property
     def current_time(self) -> datetime:
         return self._clock.now()
+
+    @property
+    def event_history(
+        self,
+    ) -> Sequence[GeneratedEvent]:
+        return self._event_history
