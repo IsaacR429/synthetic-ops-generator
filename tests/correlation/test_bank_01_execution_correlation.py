@@ -168,6 +168,45 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         == OperationalState.OBSERVING
     )
 
+    assert itsm_behaviour.profile_id == "approved_change"
+    assert itsm_behaviour.during_state == OperationalState.NORMAL
+
+    assert (
+        infrastructure_behaviour.profile_id
+        == "all_required_checks_pass"
+    )
+    assert (
+        infrastructure_behaviour.during_state
+        == OperationalState.NORMAL
+    )
+
+    assert (
+        deployment_behaviour.profile_id
+        == "successful_deployment"
+    )
+    assert (
+        deployment_behaviour.during_state
+        == OperationalState.IMPLEMENTING
+    )
+
+    assert (
+        application_behaviour.profile_id
+        == "all_mandatory_tests_pass"
+    )
+    assert (
+        application_behaviour.during_state
+        == OperationalState.OBSERVING
+    )
+
+    assert (
+        log_behaviour.profile_id
+        == "normal_operational_logs"
+    )
+    assert (
+        log_behaviour.during_state
+        == OperationalState.OBSERVING
+    )
+
     assert scenario.trigger.artifact is not None
     assert scenario.trigger.version is not None
 
@@ -626,3 +665,31 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
 
     assert context.deployment_id == "DEP0000001"
     assert context.scenario_state.value == "completed"
+
+    assert (
+        scenario.expected_result.scenario_id
+        == "BANK-01"
+    )
+
+    assert (
+        scenario.expected_result.expected_decision
+        is not None
+    )
+    assert (
+        scenario.expected_result.expected_decision.value
+        == "pass"
+    )
+
+    assert (
+        scenario.expected_result.expected_action
+        is not None
+    )
+    assert (
+        scenario.expected_result.expected_action.value
+        == "proceed"
+    )
+
+    assert (
+        scenario.expected_result.expected_outcome.value
+        == "successful"
+    )
