@@ -22,11 +22,15 @@ from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.core.randomness import (
     SimulationRandom,
 )
+from synthetic_ops_generator.domain.enums import OperationalState
 from synthetic_ops_generator.generators.application_test import (
     ApplicationTestGenerator,
 )
 from synthetic_ops_generator.generators.deployment import (
     DeploymentGenerator,
+)
+from synthetic_ops_generator.generators.incident import (
+    IncidentGenerator,
 )
 from synthetic_ops_generator.generators.infrastructure_test import (
     InfrastructureTestGenerator,
@@ -128,6 +132,18 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         behaviour
         for behaviour in scenario.behaviours
         if behaviour.source == SourceDomain.LOG
+    )
+
+    incident_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.INCIDENT
+    )
+
+    assert incident_behaviour.profile_id == "no_incident"
+    assert (
+        incident_behaviour.during_state
+        == OperationalState.OBSERVING
     )
 
     assert scenario.trigger.artifact is not None
@@ -237,6 +253,10 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         LogGenerator(
             ids=ids,
             behaviour=log_behaviour,
+        ),
+        IncidentGenerator(
+            ids=ids,
+            behaviour=incident_behaviour,
         ),
     ]
 
@@ -493,6 +513,15 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         "request_completed",
         "service_health",
     ]
+
+    incident_events = [
+        event
+        for event in publisher.events
+        if event.event_type == "itsm.incident.created"
+    ]
+
+    assert incident_events == []
+    assert context.incident_id is None
 
     assert context.deployment_id == "DEP0000001"
     assert context.scenario_state.value == "completed"

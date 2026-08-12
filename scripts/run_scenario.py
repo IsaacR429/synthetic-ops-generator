@@ -30,6 +30,9 @@ from synthetic_ops_generator.generators.base import SourceGenerator
 from synthetic_ops_generator.generators.deployment import (
     DeploymentGenerator,
 )
+from synthetic_ops_generator.generators.incident import (
+    IncidentGenerator,
+)
 from synthetic_ops_generator.generators.infrastructure_test import (
     InfrastructureTestGenerator,
 )
@@ -312,6 +315,14 @@ def build_supported_generators(
         ):
             generators.append(
                 ManualValidationGenerator(
+                    ids=ids,
+                    behaviour=behaviour,
+                )
+            )
+
+        elif behaviour.source == SourceDomain.INCIDENT:
+            generators.append(
+                IncidentGenerator(
                     ids=ids,
                     behaviour=behaviour,
                 )
