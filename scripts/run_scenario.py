@@ -35,6 +35,9 @@ from synthetic_ops_generator.generators.infrastructure_test import (
 )
 from synthetic_ops_generator.generators.itsm import ITSMGenerator
 from synthetic_ops_generator.generators.log import LogGenerator
+from synthetic_ops_generator.generators.manual_validation import (
+    ManualValidationGenerator,
+)
 from synthetic_ops_generator.generators.metric import (
     MetricGenerator,
 )
@@ -298,6 +301,17 @@ def build_supported_generators(
         elif behaviour.source == SourceDomain.LOG:
             generators.append(
                 LogGenerator(
+                    ids=ids,
+                    behaviour=behaviour,
+                )
+            )
+
+        elif (
+            behaviour.source
+            == SourceDomain.MANUAL_VALIDATION
+        ):
+            generators.append(
+                ManualValidationGenerator(
                     ids=ids,
                     behaviour=behaviour,
                 )
