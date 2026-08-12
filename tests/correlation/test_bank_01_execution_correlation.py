@@ -53,6 +53,9 @@ from synthetic_ops_generator.scenarios.runner import ScenarioRunner
 from synthetic_ops_generator.scenarios.validator import (
     validate_scenario_against_enterprise,
 )
+from synthetic_ops_generator.validation.cross_source import (
+    CrossSourceValidator,
+)
 
 SCENARIO_PATH = Path(
     "config/scenarios/banking/BANK-01.yaml"
@@ -293,6 +296,15 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
             event_interval_seconds=5,
         )
     )
+
+    validation_report = CrossSourceValidator().validate(
+        events=publisher.events,
+        context=context,
+        enterprise=enterprise,
+    )
+
+    assert validation_report.is_valid is True
+    assert validation_report.findings == []
 
     assert visited_states == [
         "initialising",

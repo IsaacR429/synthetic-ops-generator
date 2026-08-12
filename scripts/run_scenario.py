@@ -62,6 +62,9 @@ from synthetic_ops_generator.scenarios.runner import ScenarioRunner
 from synthetic_ops_generator.scenarios.validator import (
     validate_scenario_against_enterprise,
 )
+from synthetic_ops_generator.validation.cross_source import (
+    CrossSourceValidator,
+)
 
 SCENARIO_ROOT = Path("config/scenarios")
 ENTERPRISE_ROOT = Path("config/enterprises")
@@ -410,6 +413,12 @@ async def run(
         event_interval_seconds=5,
     )
 
+    validation_report = CrossSourceValidator().validate(
+        events=runner.event_history,
+        context=context,
+        enterprise=enterprise,
+    )
+
     print()
     print(
         f"Scenario: {scenario.scenario_id} "
@@ -462,11 +471,37 @@ async def run(
         f"{len(publisher.events)}"
     )
 
+    print()
+    print("Cross-Source Validation:")
+
+    if validation_report.is_valid:
+        print("Status: PASS")
+        print("Findings: 0")
+    else:
+        print("Status: FAIL")
+        print(
+            f"Findings: "
+            f"{len(validation_report.findings)}"
+        )
+
+        for finding in validation_report.findings:
+            print(
+                f"- {finding.requirement_id} | "
+                f"{finding.rule} | "
+                f"{finding.message}"
+            )
+
     print(
         "Event-Producing Sources: "
         "ITSM, Metric, Infrastructure Test, "
         "Deployment, Application Test, Log, Evidence"
     )
+
+    if not validation_report.is_valid:
+        raise RuntimeError(
+            "Generated Scenario Run failed "
+            "cross-source validation."
+        )
 
     print()
     print(
