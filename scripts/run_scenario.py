@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from synthetic_ops_generator.baselines.models import (
-    BaselineProfile,
+from synthetic_ops_generator.baselines.loader import (
+    load_baseline_profile,
 )
 from synthetic_ops_generator.benchmarks.models import (
     BenchmarkCatalogue,
@@ -154,20 +154,9 @@ def build_supported_generators(
             BenchmarkCatalogue,
         )
 
-        baseline_profile = load_yaml_model(
-            "config/baselines/synthetic_defaults.yaml",
-            BaselineProfile,
+        baseline_profile = load_baseline_profile(
+            service.baseline_profile_id
         )
-
-        if (
-            baseline_profile.profile_id
-            != service.baseline_profile_id
-        ):
-            raise ValueError(
-                "Configured Baseline profile does not match "
-                f"Service {service.service_id}: "
-                f"{service.baseline_profile_id}"
-            )
 
         benchmark_profile = (
             benchmark_catalogue.profiles.get(

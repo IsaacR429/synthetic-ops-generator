@@ -1,0 +1,28 @@
+profile_id: business_workflow_nominal
+name: Business Workflow Nominal Baseline
+
+historical_window_minutes: 30
+sample_interval_seconds: 300
+
+metrics:
+
+  request_latency:
+    metric_definition_id: request_latency
+    center: 350
+    noise_stddev: 30
+    lower_bound: 200
+    upper_bound: 450
+
+  error_rate:
+    metric_definition_id: error_rate
+    center: 0.08
+    noise_stddev: 0.03
+    lower_bound: 0.0
+    upper_bound: 0.20
+
+  availability:
+    metric_definition_id: availability
+    center: 99.95
+    noise_stddev: 0.01
+    lower_bound: 99.90
+    upper_bound: 100.0

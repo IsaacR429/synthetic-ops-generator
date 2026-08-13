@@ -1,0 +1,151 @@
+scenario_id: INS-01
+
+name: Successful Claims Service Release
+
+description: >
+  Simulates a successful production Change to the Insurer Alpha
+  Claims Processing Service. Required approvals and validations
+  are present, deployment succeeds, post-change operational
+  telemetry remains healthy, and no operational Incident is created.
+
+family: change_validation
+
+industry: insurance
+
+target:
+  enterprise_id: insurer_alpha
+  business_stream_id: claims
+  service_id: claims_service
+
+  component_ids:
+    - claims_api
+    - claims_database
+
+  environment: production
+
+risk: medium
+
+initial_conditions:
+  - Change exists and is approved.
+  - Claims Processing Service is operating normally before implementation.
+  - A valid pre-change operational baseline is available.
+  - Mandatory infrastructure validations are planned.
+  - Mandatory application validations are planned.
+  - Implementation window is valid.
+
+trigger:
+  source: deployment
+
+  trigger_type: claims_service_release
+
+  description: >
+    Deploy a new Claims API version during the approved production
+    implementation window.
+
+  artifact: claims-api
+  version: 1.1.0
+
+state_sequence:
+  - initialising
+  - normal
+  - implementing
+  - observing
+  - completed
+
+behaviours:
+  - source: itsm
+    during_state: normal
+    profile_id: approved_change
+    description: >
+      Change exists with required approval and valid implementation
+      metadata.
+
+  - source: metric
+    during_state: normal
+    profile_id: healthy_baseline
+    description: >
+      Pre-change operational Metrics remain within normal Claims
+      Service behaviour.
+
+  - source: infrastructure_test
+    during_state: normal
+    profile_id: all_required_checks_pass
+    description: >
+      Required infrastructure validations complete successfully.
+
+  - source: deployment
+    during_state: implementing
+    profile_id: successful_deployment
+    description: >
+      Claims API artifact is deployed successfully.
+
+  - source: application_test
+    during_state: observing
+    profile_id: all_mandatory_tests_pass
+    description: >
+      Mandatory application validation passes after deployment.
+
+  - source: metric
+    during_state: observing
+    profile_id: healthy_post_change
+    description: >
+      Post-change latency, error rate and availability remain
+      healthy relative to the effective Claims Service policy.
+
+  - source: log
+    during_state: observing
+    profile_id: normal_operational_logs
+    description: >
+      No blocking or critical Change-attributable log condition
+      is generated.
+
+  - source: incident
+    during_state: observing
+    profile_id: no_incident
+    description: >
+      No Change-attributable operational Incident is created.
+
+  - source: evidence
+    during_state: observing
+    profile_id: complete_validation_evidence
+    description: >
+      Required Change, deployment, test and operational
+      evidence is available.
+
+expected_result:
+  scenario_id: INS-01
+
+  expected_decision: pass
+  expected_action: proceed
+  expected_outcome: successful
+
+  expected_blocking_conditions: []
+
+  expected_evidence:
+    - change_approval
+    - infrastructure_validation
+    - deployment_result
+    - application_validation
+    - pre_change_baseline
+    - post_change_observation
+
+  expected_incident_attribution: false
+
+  expected_root_cause: null
+
+  expected_insight: >
+    Claims Service release completed successfully without blocking
+    validation or operational conditions.
+
+assumptions:
+  - Claims Service benchmark and baseline configuration is valid.
+  - Required enterprise and topology references exist.
+  - Healthy post-change behaviour does not exceed configured
+    blocking conditions.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - insurance
+  - claims
+  - production_change
+  - successful_release

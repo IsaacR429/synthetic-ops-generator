@@ -27,15 +27,15 @@ class ApplicationTestDefinition:
 DEFAULT_MANDATORY_TESTS = (
     ApplicationTestDefinition(
         test_type="functional_validation",
-        name="Payment functional validation",
+        name="Service functional validation",
     ),
     ApplicationTestDefinition(
         test_type="transaction_processing",
-        name="Payment transaction processing validation",
+        name="Service transaction processing validation",
     ),
     ApplicationTestDefinition(
         test_type="post_deployment_smoke",
-        name="Payment post-deployment smoke validation",
+        name="Post-deployment smoke validation",
     ),
 )
 
