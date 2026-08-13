@@ -482,7 +482,7 @@ async def run(
             )
 
     print(
-        "Event-Producing Sources: "
+        "Configured Scenario Sources: "
         "ITSM, Metric, Infrastructure Test, "
         "Deployment, Application Test, Log, Incident, Evidence"
     )

@@ -57,6 +57,12 @@ DEFAULT_COMPLETE_VALIDATION_EVIDENCE = (
     ),
 )
 
+DEFAULT_INCOMPLETE_VALIDATION_EVIDENCE = tuple(
+    definition
+    for definition in DEFAULT_COMPLETE_VALIDATION_EVIDENCE
+    if definition.evidence_type != "change_approval"
+)
+
 DEFAULT_ROLLBACK_VALIDATION_EVIDENCE = (
     EvidenceDefinition(
         evidence_type="change_approval",
@@ -167,6 +173,12 @@ class EvidenceGenerator(SourceGenerator):
             == "complete_validation_evidence"
         ):
             return DEFAULT_COMPLETE_VALIDATION_EVIDENCE
+
+        if (
+            self._behaviour.profile_id
+            == "incomplete_validation_evidence"
+        ):
+            return DEFAULT_INCOMPLETE_VALIDATION_EVIDENCE
 
         if (
             self._behaviour.profile_id

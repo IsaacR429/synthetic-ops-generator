@@ -73,6 +73,16 @@ class ITSMGenerator(SourceGenerator):
                 yield event
             return
 
+        if (
+            self._behaviour.profile_id
+            == "missing_required_approval"
+        ):
+            async for event in self._generate_missing_required_approval(
+                context
+            ):
+                yield event
+            return
+
         raise ValueError(
             "Unsupported ITSM behaviour profile: "
             f"{self._behaviour.profile_id}"
@@ -143,5 +153,73 @@ class ITSMGenerator(SourceGenerator):
             data={
                 "approval": approval.model_dump(mode="json"),
                 "change_status": ChangeStatus.APPROVED.value,
+            },
+        )
+
+    async def _generate_missing_required_approval(
+        self,
+        context: ScenarioContext,
+    ) -> AsyncIterator[GeneratedEvent]:
+        change = Change(
+            chg_id=context.chg_id,
+            business_stream=context.business_stream,
+            service=context.service,
+            components=self._component_ids,
+            risk=context.risk,
+            owner=self._service_owner,
+            environment=context.environment,
+            status=ChangeStatus.CREATED,
+            implementation_window_start=context.simulation_time,
+            implementation_window_end=(
+                context.simulation_time
+                + timedelta(
+                    seconds=self._implementation_window_seconds
+                )
+            ),
+        )
+
+        yield GeneratedEvent(
+            event_id=self._ids.event_id(),
+            event_type="itsm.change.created",
+            event_time=context.simulation_time,
+            source_system=self.source_system,
+            scenario_id=context.scenario_id,
+            run_id=context.run_id,
+            chg_id=context.chg_id,
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=context.environment,
+            sequence_number=context.next_sequence(),
+            data={
+                "change": change.model_dump(mode="json"),
+            },
+        )
+
+        approval = Approval(
+            approval_id=self._ids.approval_id(),
+            chg_id=context.chg_id,
+            approval_type="implementation",
+            status=ApprovalStatus.MISSING,
+            source=self.source_system,
+            timestamp=context.simulation_time,
+        )
+
+        yield GeneratedEvent(
+            event_id=self._ids.event_id(),
+            event_type="itsm.approval.missing",
+            event_time=context.simulation_time,
+            source_system=self.source_system,
+            scenario_id=context.scenario_id,
+            run_id=context.run_id,
+            chg_id=context.chg_id,
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=context.environment,
+            sequence_number=context.next_sequence(),
+            data={
+                "approval": approval.model_dump(mode="json"),
+                "change_status": ChangeStatus.CREATED.value,
             },
         )

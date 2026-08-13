@@ -1,0 +1,160 @@
+scenario_id: BANK-07
+
+name: Payment Release with Missing Approval and Incomplete Evidence
+
+description: >
+  Simulates a production Change to the Bank Alpha Payment Service
+  where the release remains operationally healthy, but the required
+  implementation approval is missing and the resulting validation
+  evidence package is incomplete.
+
+family: change_validation
+
+industry: banking
+
+target:
+  enterprise_id: bank_alpha
+  business_stream_id: payments
+  service_id: payment_service
+
+  component_ids:
+    - payment_api
+    - payment_database
+    - payment_worker
+
+  environment: production
+
+risk: high
+
+initial_conditions:
+  - Change exists but the required implementation approval is missing.
+  - Payment Service is operating normally before implementation.
+  - A valid pre-change operational baseline is available.
+  - Mandatory infrastructure validations are planned.
+  - Mandatory application validations are planned.
+  - Implementation window is valid.
+
+trigger:
+  source: deployment
+
+  trigger_type: payment_release
+
+  description: >
+    Deploy a Payment API release during the production implementation
+    window despite the required implementation approval being unavailable.
+
+  artifact: payment-api
+  version: 2.7.0
+
+state_sequence:
+  - initialising
+  - normal
+  - implementing
+  - observing
+  - completed
+
+behaviours:
+  - source: itsm
+    during_state: normal
+    profile_id: missing_required_approval
+    description: >
+      Change exists, but the required implementation approval is
+      explicitly recorded as missing.
+
+  - source: metric
+    during_state: normal
+    profile_id: healthy_baseline
+    description: >
+      Pre-change Payment Service telemetry remains within normal
+      baseline behaviour.
+
+  - source: infrastructure_test
+    during_state: normal
+    profile_id: all_required_checks_pass
+    description: >
+      Required infrastructure validations complete successfully.
+
+  - source: deployment
+    during_state: implementing
+    profile_id: successful_deployment
+    description: >
+      The Payment API artifact is deployed successfully.
+
+  - source: application_test
+    during_state: observing
+    profile_id: all_mandatory_tests_pass
+    description: >
+      Mandatory post-deployment application validations pass.
+
+  - source: metric
+    during_state: observing
+    profile_id: healthy_post_change
+    description: >
+      Post-change operational Metrics remain healthy relative to
+      the effective benchmark policy.
+
+  - source: log
+    during_state: observing
+    profile_id: normal_operational_logs
+    description: >
+      No blocking or critical Change-attributable log condition
+      is generated.
+
+  - source: incident
+    during_state: observing
+    profile_id: no_incident
+    description: >
+      No Change-attributable operational Incident is created.
+
+  - source: evidence
+    during_state: observing
+    profile_id: incomplete_validation_evidence
+    description: >
+      Available validation evidence is captured, but required
+      Change approval evidence remains absent.
+
+expected_result:
+  scenario_id: BANK-07
+
+  expected_decision: incomplete
+  expected_action: review
+  expected_outcome: successful
+
+  expected_blocking_conditions:
+    - missing_required_approval
+    - missing_required_change_approval_evidence
+
+  expected_evidence:
+    - infrastructure_validation
+    - deployment_result
+    - application_validation
+    - pre_change_baseline
+    - post_change_observation
+
+  expected_incident_attribution: false
+
+  expected_root_cause: null
+
+  expected_insight: >
+    The Payment Service release completed successfully and remained
+    operationally healthy, but the required implementation approval
+    and corresponding approval evidence are missing. The validation
+    package is therefore incomplete and requires review.
+
+assumptions:
+  - Payment Service benchmark and baseline configuration is valid.
+  - Required enterprise and topology references exist.
+  - Missing required approval prevents a complete validation decision.
+  - Missing required approval evidence prevents the validation package
+    from being considered complete.
+  - Operational health does not override mandatory governance gates.
+  - Successful operational outcome does not imply a Pass decision.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - banking
+  - payments
+  - production_change
+  - missing_approval
+  - incomplete_evidence
+  - governance
