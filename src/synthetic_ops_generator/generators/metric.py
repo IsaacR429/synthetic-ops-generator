@@ -38,6 +38,8 @@ class MetricGenerator(SourceGenerator):
         {
             "healthy_baseline",
             "healthy_post_change",
+            "degraded_post_change",
+            "recovered_post_rollback",
         }
     )
 
@@ -105,8 +107,9 @@ class MetricGenerator(SourceGenerator):
             baseline = self._baseline_profile.metrics[metric_id]
             benchmark = self._benchmarks[metric_id]
 
-            observed_value = self._sample_observation(
-                baseline
+            observed_value = self._generate_observation(
+                baseline=baseline,
+                benchmark=benchmark,
             )
 
             classification = classify_metric(
@@ -114,6 +117,26 @@ class MetricGenerator(SourceGenerator):
                 benchmark,
                 observed_value,
             )
+
+            if (
+                self._behaviour.profile_id
+                == "degraded_post_change"
+                and classification.value != "blocking"
+            ):
+                raise ValueError(
+                    "Degraded Metric behaviour must produce "
+                    f"a blocking observation for {metric_id}."
+                )
+
+            if (
+                self._behaviour.profile_id
+                == "recovered_post_rollback"
+                and classification.value != "normal"
+            ):
+                raise ValueError(
+                    "Recovered Metric behaviour requires "
+                    f"a normal reference target for {metric_id}."
+                )
 
             yield GeneratedEvent(
                 event_id=self._ids.event_id(),
@@ -164,6 +187,32 @@ class MetricGenerator(SourceGenerator):
                     }
                 },
             )
+
+    def _generate_observation(
+        self,
+        *,
+        baseline: MetricBaseline,
+        benchmark: ResolvedBenchmark,
+    ) -> float:
+        if (
+            self._behaviour.profile_id
+            == "degraded_post_change"
+        ):
+            return float(
+                benchmark.blocking_threshold
+            )
+
+        if (
+            self._behaviour.profile_id
+            == "recovered_post_rollback"
+        ):
+            return float(
+                benchmark.reference_target
+            )
+
+        return self._sample_observation(
+            baseline
+        )
 
     def _sample_observation(
         self,

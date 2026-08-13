@@ -56,6 +56,18 @@ class CrossSourceValidator:
                 report=report,
             )
 
+        self._validate_deployment_relationships(
+            events=events,
+            context=context,
+            report=report,
+        )
+
+        self._validate_incident_relationships(
+            events=events,
+            context=context,
+            report=report,
+        )
+
         self._validate_evidence_references(
             events=events,
             report=report,
@@ -369,6 +381,270 @@ class CrossSourceValidator:
                     ),
                     event_ids=[event.event_id],
                 )
+
+    @staticmethod
+    def _validate_deployment_relationships(
+        *,
+        events: Sequence[GeneratedEvent],
+        context: ScenarioContext,
+        report: CrossSourceValidationReport,
+    ) -> None:
+        deployment_events = [
+            event
+            for event in events
+            if event.event_type.startswith("cicd.deployment.")
+        ]
+
+        if not deployment_events:
+            return
+
+        deployment_ids: dict[str, list[GeneratedEvent]] = {}
+
+        for event in deployment_events:
+            payload = event.data.get("deployment")
+
+            if not isinstance(payload, dict):
+                report.add_finding(
+                    requirement_id="REQ-COR-007",
+                    rule="deployment_payload",
+                    message=(
+                        f"Deployment Event {event.event_id} "
+                        "does not contain a valid Deployment payload."
+                    ),
+                    event_ids=[event.event_id],
+                )
+                continue
+
+            deployment_id = payload.get("deployment_id")
+
+            if not isinstance(deployment_id, str):
+                report.add_finding(
+                    requirement_id="REQ-COR-007",
+                    rule="deployment_id",
+                    message=(
+                        f"Deployment Event {event.event_id} "
+                        "does not contain a valid Deployment ID."
+                    ),
+                    event_ids=[event.event_id],
+                )
+                continue
+
+            deployment_ids.setdefault(
+                deployment_id,
+                [],
+            ).append(event)
+
+            if (
+                context.deployment_id is not None
+                and deployment_id != context.deployment_id
+            ):
+                report.add_finding(
+                    requirement_id="REQ-COR-007",
+                    rule="deployment_correlation",
+                    message=(
+                        f"Deployment Event {event.event_id} "
+                        f"references Deployment {deployment_id}; "
+                        f"expected {context.deployment_id}."
+                    ),
+                    event_ids=[event.event_id],
+                )
+
+        for deployment_id, related_events in deployment_ids.items():
+            rollback_events = [
+                event
+                for event in related_events
+                if event.event_type in {
+                    "cicd.deployment.rollback_started",
+                    "cicd.deployment.rollback_completed",
+                }
+            ]
+
+            if not rollback_events:
+                continue
+
+            completed_events = [
+                event
+                for event in related_events
+                if event.event_type
+                == "cicd.deployment.completed"
+            ]
+
+            if not completed_events:
+                report.add_finding(
+                    requirement_id="REQ-COR-007",
+                    rule="rollback_deployment_relationship",
+                    message=(
+                        f"Rollback for Deployment "
+                        f"{deployment_id} has no prior "
+                        "completed Deployment event."
+                    ),
+                    event_ids=[
+                        event.event_id
+                        for event in rollback_events
+                    ],
+                )
+                continue
+
+            earliest_rollback = min(
+                event.sequence_number
+                for event in rollback_events
+            )
+
+            if not any(
+                event.sequence_number < earliest_rollback
+                for event in completed_events
+            ):
+                report.add_finding(
+                    requirement_id="REQ-COR-007",
+                    rule="rollback_deployment_chronology",
+                    message=(
+                        f"Rollback for Deployment "
+                        f"{deployment_id} does not occur "
+                        "after its completed Deployment event."
+                    ),
+                    event_ids=[
+                        event.event_id
+                        for event in rollback_events
+                    ],
+                )
+
+    @staticmethod
+    def _validate_incident_relationships(
+        *,
+        events: Sequence[GeneratedEvent],
+        context: ScenarioContext,
+        report: CrossSourceValidationReport,
+    ) -> None:
+        incident_events = [
+            event
+            for event in events
+            if event.event_type.startswith("itsm.incident.")
+        ]
+
+        if not incident_events:
+            return
+
+        incident_ids: dict[str, list[GeneratedEvent]] = {}
+
+        for event in incident_events:
+            payload = event.data.get("incident")
+
+            if not isinstance(payload, dict):
+                report.add_finding(
+                    requirement_id="REQ-COR-008",
+                    rule="incident_payload",
+                    message=(
+                        f"Incident Event {event.event_id} "
+                        "does not contain a valid Incident payload."
+                    ),
+                    event_ids=[event.event_id],
+                )
+                continue
+
+            incident_id = payload.get("incident_id")
+
+            if not isinstance(incident_id, str):
+                report.add_finding(
+                    requirement_id="REQ-COR-008",
+                    rule="incident_id",
+                    message=(
+                        f"Incident Event {event.event_id} "
+                        "does not contain a valid Incident ID."
+                    ),
+                    event_ids=[event.event_id],
+                )
+                continue
+
+            incident_ids.setdefault(
+                incident_id,
+                [],
+            ).append(event)
+
+            if (
+                context.incident_id is not None
+                and incident_id != context.incident_id
+            ):
+                report.add_finding(
+                    requirement_id="REQ-COR-008",
+                    rule="incident_correlation",
+                    message=(
+                        f"Incident Event {event.event_id} "
+                        f"references Incident {incident_id}; "
+                        f"expected {context.incident_id}."
+                    ),
+                    event_ids=[event.event_id],
+                )
+
+        for incident_id, related_events in incident_ids.items():
+            created_events = [
+                event
+                for event in related_events
+                if event.event_type
+                == "itsm.incident.created"
+            ]
+
+            resolved_events = [
+                event
+                for event in related_events
+                if event.event_type
+                == "itsm.incident.resolved"
+            ]
+
+            for resolved_event in resolved_events:
+                prior_created = [
+                    event
+                    for event in created_events
+                    if (
+                        event.sequence_number
+                        < resolved_event.sequence_number
+                    )
+                ]
+
+                if not prior_created:
+                    report.add_finding(
+                        requirement_id="REQ-COR-008",
+                        rule="incident_resolution_relationship",
+                        message=(
+                            f"Resolved Incident {incident_id} "
+                            "has no prior Incident creation event."
+                        ),
+                        event_ids=[
+                            resolved_event.event_id,
+                        ],
+                    )
+                    continue
+
+                created_payload = prior_created[-1].data[
+                    "incident"
+                ]
+                resolved_payload = resolved_event.data[
+                    "incident"
+                ]
+
+                for field_name in (
+                    "chg_id",
+                    "service",
+                    "component",
+                ):
+                    if (
+                        resolved_payload.get(field_name)
+                        != created_payload.get(field_name)
+                    ):
+                        report.add_finding(
+                            requirement_id="REQ-COR-008",
+                            rule=(
+                                "incident_lifecycle_consistency"
+                            ),
+                            message=(
+                                f"Incident {incident_id} changed "
+                                f"{field_name} between creation "
+                                "and resolution."
+                            ),
+                            event_ids=[
+                                prior_created[-1].event_id,
+                                resolved_event.event_id,
+                            ],
+                        )
 
     @staticmethod
     def _validate_evidence_references(

@@ -67,6 +67,13 @@ class DeploymentGenerator(SourceGenerator):
                 yield event
             return
 
+        if self._behaviour.profile_id == "successful_rollback":
+            async for event in self._generate_successful_rollback(
+                context
+            ):
+                yield event
+            return
+
         raise ValueError(
             "Unsupported Deployment behaviour profile: "
             f"{self._behaviour.profile_id}"
@@ -137,6 +144,56 @@ class DeploymentGenerator(SourceGenerator):
             context=context,
             event_type="cicd.deployment.completed",
             deployment=completed,
+        )
+
+    async def _generate_successful_rollback(
+        self,
+        context: ScenarioContext,
+    ) -> AsyncIterator[GeneratedEvent]:
+        if context.deployment_id is None:
+            raise ValueError(
+                "Rollback requires an existing Deployment ID."
+            )
+
+        deployment_id = context.deployment_id
+        rollback_start_time = context.simulation_time
+
+        rollback_started = Deployment(
+            deployment_id=deployment_id,
+            chg_id=context.chg_id,
+            artifact=self._artifact,
+            artifact_version=self._artifact_version,
+            service=context.service,
+            component=context.component,
+            start_time=rollback_start_time,
+            status=DeploymentStatus.ROLLBACK,
+        )
+
+        yield self._event(
+            context=context,
+            event_type="cicd.deployment.rollback_started",
+            deployment=rollback_started,
+        )
+
+        rollback_completion_time = context.simulation_time
+
+        rolled_back = Deployment(
+            deployment_id=deployment_id,
+            chg_id=context.chg_id,
+            artifact=self._artifact,
+            artifact_version=self._artifact_version,
+            service=context.service,
+            component=context.component,
+            start_time=rollback_start_time,
+            completion_time=rollback_completion_time,
+            status=DeploymentStatus.ROLLED_BACK,
+            outcome=DeploymentOutcome.ROLLED_BACK,
+        )
+
+        yield self._event(
+            context=context,
+            event_type="cicd.deployment.rollback_completed",
+            deployment=rolled_back,
         )
 
     def _event(

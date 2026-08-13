@@ -496,3 +496,137 @@ def test_generator_rejects_unknown_profile() -> None:
                 build_context(),
             )
         )
+
+
+def test_degraded_profile_generates_blocking_metrics() -> None:
+    behaviour = build_behaviour(
+        profile_id="degraded_post_change",
+        state=OperationalState.DEGRADED,
+    )
+
+    context = build_context(
+        state=OperationalState.DEGRADED,
+    )
+
+    events = asyncio.run(
+        collect_events(
+            build_generator(
+                behaviour=behaviour,
+            ),
+            context,
+        )
+    )
+
+    assert len(events) == 3
+
+    assert {
+        event.data["metric"]["classification"]
+        for event in events
+    } == {"blocking"}
+
+    assert {
+        event.data["metric"]["behaviour_profile_id"]
+        for event in events
+    } == {"degraded_post_change"}
+
+    assert {
+        event.data["metric"]["scenario_state"]
+        for event in events
+    } == {"degraded"}
+
+
+def test_degraded_values_use_resolved_blocking_thresholds() -> None:
+    behaviour = build_behaviour(
+        profile_id="degraded_post_change",
+        state=OperationalState.DEGRADED,
+    )
+
+    events = asyncio.run(
+        collect_events(
+            build_generator(
+                behaviour=behaviour,
+            ),
+            build_context(
+                state=OperationalState.DEGRADED,
+            ),
+        )
+    )
+
+    values = {
+        event.data["metric"]["metric_definition_id"]:
+        event.data["metric"]["observed_value"]
+        for event in events
+    }
+
+    assert values == {
+        "request_latency": 1000.0,
+        "error_rate": 5.0,
+        "availability": 99.0,
+    }
+
+
+def test_recovered_profile_generates_normal_metrics() -> None:
+    behaviour = build_behaviour(
+        profile_id="recovered_post_rollback",
+        state=OperationalState.RECOVERY,
+    )
+
+    context = build_context(
+        state=OperationalState.RECOVERY,
+    )
+
+    events = asyncio.run(
+        collect_events(
+            build_generator(
+                behaviour=behaviour,
+            ),
+            context,
+        )
+    )
+
+    assert len(events) == 3
+
+    assert {
+        event.data["metric"]["classification"]
+        for event in events
+    } == {"normal"}
+
+    assert {
+        event.data["metric"]["behaviour_profile_id"]
+        for event in events
+    } == {"recovered_post_rollback"}
+
+    assert {
+        event.data["metric"]["scenario_state"]
+        for event in events
+    } == {"recovery"}
+
+
+def test_recovered_values_use_resolved_reference_targets() -> None:
+    behaviour = build_behaviour(
+        profile_id="recovered_post_rollback",
+        state=OperationalState.RECOVERY,
+    )
+
+    events = asyncio.run(
+        collect_events(
+            build_generator(
+                behaviour=behaviour,
+            ),
+            build_context(
+                state=OperationalState.RECOVERY,
+            ),
+        )
+    )
+
+    values = {
+        event.data["metric"]["metric_definition_id"]:
+        event.data["metric"]["observed_value"]
+        for event in events
+    }
+
+    assert values == {
+        "request_latency": 300.0,
+        "error_rate": 0.10,
+        "availability": 99.99,
+    }

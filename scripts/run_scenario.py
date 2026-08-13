@@ -334,6 +334,7 @@ def build_supported_generators(
                 IncidentGenerator(
                     ids=ids,
                     behaviour=behaviour,
+                    event_history=event_history,
                 )
             )
 
@@ -494,7 +495,7 @@ async def run(
     print(
         "Event-Producing Sources: "
         "ITSM, Metric, Infrastructure Test, "
-        "Deployment, Application Test, Log, Evidence"
+        "Deployment, Application Test, Log, Incident, Evidence"
     )
 
     if not validation_report.is_valid:

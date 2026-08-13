@@ -55,6 +55,66 @@ DEFAULT_NORMAL_LOGS = (
 )
 
 
+DEFAULT_DEGRADATION_LOGS = (
+    LogDefinition(
+        log_type="request_timeout",
+        severity=LogSeverity.ERROR,
+        message="Service request exceeded the expected response window.",
+        error_code="REQUEST_TIMEOUT",
+        attributes={
+            "operation_status": "timed_out",
+        },
+    ),
+    LogDefinition(
+        log_type="dependency_error",
+        severity=LogSeverity.ERROR,
+        message="A downstream dependency returned an operational error.",
+        error_code="DEPENDENCY_ERROR",
+        attributes={
+            "dependency_status": "degraded",
+        },
+    ),
+    LogDefinition(
+        log_type="service_health",
+        severity=LogSeverity.WARNING,
+        message="Service operating in a degraded state.",
+        component_scoped=False,
+        attributes={
+            "health_status": "degraded",
+        },
+    ),
+)
+
+
+DEFAULT_RECOVERY_LOGS = (
+    LogDefinition(
+        log_type="request_completed",
+        severity=LogSeverity.INFO,
+        message="Service request completed successfully after recovery.",
+        attributes={
+            "operation_status": "completed",
+        },
+    ),
+    LogDefinition(
+        log_type="dependency_recovered",
+        severity=LogSeverity.INFO,
+        message="Downstream dependency has recovered.",
+        attributes={
+            "dependency_status": "healthy",
+        },
+    ),
+    LogDefinition(
+        log_type="service_health",
+        severity=LogSeverity.INFO,
+        message="Service operating normally after recovery.",
+        component_scoped=False,
+        attributes={
+            "health_status": "recovered",
+        },
+    ),
+)
+
+
 class LogGenerator(SourceGenerator):
     """
     Generates structured synthetic operational logs.
@@ -74,14 +134,15 @@ class LogGenerator(SourceGenerator):
         logs: tuple[
             LogDefinition,
             ...,
-        ] = DEFAULT_NORMAL_LOGS,
+        ]
+        | None = None,
     ) -> None:
         if behaviour.source != SourceDomain.LOG:
             raise ValueError(
                 "LogGenerator requires a Log behaviour."
             )
 
-        if not logs:
+        if logs is not None and not logs:
             raise ValueError(
                 "LogGenerator requires at least one Log definition."
             )
@@ -90,6 +151,35 @@ class LogGenerator(SourceGenerator):
         self._behaviour = behaviour
         self._logs = logs
 
+    def _definitions_for_profile(
+        self,
+    ) -> tuple[LogDefinition, ...]:
+        if self._logs is not None:
+            return self._logs
+
+        if (
+            self._behaviour.profile_id
+            == "normal_operational_logs"
+        ):
+            return DEFAULT_NORMAL_LOGS
+
+        if (
+            self._behaviour.profile_id
+            == "degradation_error_logs"
+        ):
+            return DEFAULT_DEGRADATION_LOGS
+
+        if (
+            self._behaviour.profile_id
+            == "recovery_operational_logs"
+        ):
+            return DEFAULT_RECOVERY_LOGS
+
+        raise ValueError(
+            "Unsupported Log behaviour profile: "
+            f"{self._behaviour.profile_id}"
+        )
+
     async def generate(
         self,
         context: ScenarioContext,
@@ -97,16 +187,9 @@ class LogGenerator(SourceGenerator):
         if context.scenario_state != self._behaviour.during_state:
             return
 
-        if (
-            self._behaviour.profile_id
-            != "normal_operational_logs"
-        ):
-            raise ValueError(
-                "Unsupported Log behaviour profile: "
-                f"{self._behaviour.profile_id}"
-            )
+        definitions = self._definitions_for_profile()
 
-        for definition in self._logs:
+        for definition in definitions:
             component = (
                 context.component
                 if definition.component_scoped

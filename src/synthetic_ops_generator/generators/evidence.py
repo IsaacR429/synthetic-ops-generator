@@ -45,15 +45,73 @@ DEFAULT_COMPLETE_VALIDATION_EVIDENCE = (
     ),
     EvidenceDefinition(
         evidence_type="pre_change_baseline",
-        title="Pre-change operational baseline evidence",
+        title="Pre-change Metric baseline evidence",
         event_types=("metric.observed",),
         source_state=OperationalState.NORMAL,
     ),
     EvidenceDefinition(
         evidence_type="post_change_observation",
-        title="Post-change operational observation evidence",
+        title="Post-change Metric observation evidence",
         event_types=("metric.observed",),
         source_state=OperationalState.OBSERVING,
+    ),
+)
+
+DEFAULT_ROLLBACK_VALIDATION_EVIDENCE = (
+    EvidenceDefinition(
+        evidence_type="change_approval",
+        title="Approved Change evidence",
+        event_types=("itsm.approval.approved",),
+    ),
+    EvidenceDefinition(
+        evidence_type="infrastructure_validation",
+        title="Infrastructure validation evidence",
+        event_types=("infrastructure_test.passed",),
+    ),
+    EvidenceDefinition(
+        evidence_type="deployment_result",
+        title="Deployment result evidence",
+        event_types=("cicd.deployment.completed",),
+    ),
+    EvidenceDefinition(
+        evidence_type="application_regression",
+        title="Application regression evidence",
+        event_types=("application_test.failed",),
+    ),
+    EvidenceDefinition(
+        evidence_type="degraded_observation",
+        title="Post-change degradation evidence",
+        event_types=(
+            "metric.observed",
+            "log.observed",
+        ),
+        source_state=OperationalState.DEGRADED,
+    ),
+    EvidenceDefinition(
+        evidence_type="incident_record",
+        title="Operational Incident evidence",
+        event_types=("itsm.incident.created",),
+    ),
+    EvidenceDefinition(
+        evidence_type="rollback_result",
+        title="Deployment rollback evidence",
+        event_types=(
+            "cicd.deployment.rollback_completed",
+        ),
+    ),
+    EvidenceDefinition(
+        evidence_type="recovery_observation",
+        title="Post-rollback recovery evidence",
+        event_types=(
+            "metric.observed",
+            "log.observed",
+        ),
+        source_state=OperationalState.RECOVERY,
+    ),
+    EvidenceDefinition(
+        evidence_type="incident_resolution",
+        title="Incident resolution evidence",
+        event_types=("itsm.incident.resolved",),
     ),
 )
 
@@ -78,7 +136,8 @@ class EvidenceGenerator(SourceGenerator):
         definitions: tuple[
             EvidenceDefinition,
             ...,
-        ] = DEFAULT_COMPLETE_VALIDATION_EVIDENCE,
+        ]
+        | None = None,
     ) -> None:
         if behaviour.source != SourceDomain.EVIDENCE:
             raise ValueError(
@@ -86,7 +145,7 @@ class EvidenceGenerator(SourceGenerator):
                 "an Evidence behaviour."
             )
 
-        if not definitions:
+        if definitions is not None and not definitions:
             raise ValueError(
                 "EvidenceGenerator requires "
                 "at least one Evidence definition."
@@ -97,6 +156,29 @@ class EvidenceGenerator(SourceGenerator):
         self._event_history = event_history
         self._definitions = definitions
 
+    def _definitions_for_profile(
+        self,
+    ) -> tuple[EvidenceDefinition, ...]:
+        if self._definitions is not None:
+            return self._definitions
+
+        if (
+            self._behaviour.profile_id
+            == "complete_validation_evidence"
+        ):
+            return DEFAULT_COMPLETE_VALIDATION_EVIDENCE
+
+        if (
+            self._behaviour.profile_id
+            == "rollback_validation_evidence"
+        ):
+            return DEFAULT_ROLLBACK_VALIDATION_EVIDENCE
+
+        raise ValueError(
+            "Unsupported Evidence behaviour profile: "
+            f"{self._behaviour.profile_id}"
+        )
+
     async def generate(
         self,
         context: ScenarioContext,
@@ -104,14 +186,7 @@ class EvidenceGenerator(SourceGenerator):
         if context.scenario_state != self._behaviour.during_state:
             return
 
-        if (
-            self._behaviour.profile_id
-            != "complete_validation_evidence"
-        ):
-            raise ValueError(
-                "Unsupported Evidence behaviour profile: "
-                f"{self._behaviour.profile_id}"
-            )
+        definitions = self._definitions_for_profile()
 
         history = tuple(
             event
@@ -121,7 +196,7 @@ class EvidenceGenerator(SourceGenerator):
             and event.chg_id == context.chg_id
         )
 
-        for definition in self._definitions:
+        for definition in definitions:
             source_events = self._select_source_events(
                 history=history,
                 definition=definition,
@@ -147,13 +222,10 @@ class EvidenceGenerator(SourceGenerator):
                 service=context.service,
                 component=component,
                 captured_at=context.simulation_time,
-                source_event_ids=[
+                source_event_ids=tuple(
                     event.event_id
                     for event in source_events
-                ],
-                attributes={
-                    "source_event_count": len(source_events),
-                },
+                ),
             )
 
             yield GeneratedEvent(
@@ -205,7 +277,7 @@ class EvidenceGenerator(SourceGenerator):
     @staticmethod
     def _select_source_events(
         *,
-        history: tuple[GeneratedEvent, ...],
+        history: Sequence[GeneratedEvent],
         definition: EvidenceDefinition,
     ) -> tuple[GeneratedEvent, ...]:
         selected = []

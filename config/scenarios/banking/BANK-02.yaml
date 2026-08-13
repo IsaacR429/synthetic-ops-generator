@@ -1,0 +1,200 @@
+scenario_id: BANK-02
+
+name: Payment Release Regression and Rollback
+
+description: >
+  Simulates a production Change to the Bank Alpha Payment Service
+  where deployment succeeds but mandatory post-change application
+  validation detects a regression. Operational telemetry degrades,
+  an attributable Incident is created, the deployed release is
+  rolled back, Service health recovers, and the Incident is resolved.
+
+family: change_validation
+
+industry: banking
+
+target:
+  enterprise_id: bank_alpha
+  business_stream_id: payments
+  service_id: payment_service
+
+  component_ids:
+    - payment_api
+    - payment_database
+    - payment_worker
+
+  environment: production
+
+risk: high
+
+initial_conditions:
+  - Change exists and is approved.
+  - Payment Service is operating normally before implementation.
+  - A valid pre-change operational baseline is available.
+  - Mandatory infrastructure validations are planned.
+  - Mandatory application validations are planned.
+  - Implementation window is valid.
+  - Rollback capability is available for the deployed artifact.
+
+trigger:
+  source: deployment
+
+  trigger_type: payment_release
+
+  description: >
+    Deploy a new Payment API version during the approved production
+    implementation window. Post-change application validation detects
+    a regression requiring rollback.
+
+  artifact: payment-api
+  version: 2.6.0
+
+state_sequence:
+  - initialising
+  - normal
+  - implementing
+  - observing
+  - degraded
+  - rollback
+  - recovery
+  - completed
+
+behaviours:
+  - source: itsm
+    during_state: normal
+    profile_id: approved_change
+    description: >
+      Change exists with required approval and valid implementation
+      metadata.
+
+  - source: metric
+    during_state: normal
+    profile_id: healthy_baseline
+    description: >
+      Pre-change operational Metrics remain within normal Service
+      behaviour.
+
+  - source: infrastructure_test
+    during_state: normal
+    profile_id: all_required_checks_pass
+    description: >
+      Required infrastructure validations complete successfully.
+
+  - source: deployment
+    during_state: implementing
+    profile_id: successful_deployment
+    description: >
+      Payment API artifact is deployed successfully before the
+      regression becomes observable.
+
+  - source: application_test
+    during_state: observing
+    profile_id: mandatory_test_regression
+    description: >
+      Mandatory post-deployment application validation detects
+      a regression.
+
+  - source: metric
+    during_state: degraded
+    profile_id: degraded_post_change
+    description: >
+      Operational Metrics reach blocking conditions relative to
+      the effective Service benchmark policy.
+
+  - source: log
+    during_state: degraded
+    profile_id: degradation_error_logs
+    description: >
+      Operational logs expose timeout, dependency and degraded
+      Service-health evidence.
+
+  - source: incident
+    during_state: degraded
+    profile_id: incident_created
+    description: >
+      A Change-attributable operational Incident is created for
+      the degraded Payment Service.
+
+  - source: deployment
+    during_state: rollback
+    profile_id: successful_rollback
+    description: >
+      The deployed Payment API release is rolled back successfully.
+
+  - source: metric
+    during_state: recovery
+    profile_id: recovered_post_rollback
+    description: >
+      Operational Metrics return to normal Service targets after
+      rollback.
+
+  - source: log
+    during_state: recovery
+    profile_id: recovery_operational_logs
+    description: >
+      Operational logs confirm restored request processing,
+      dependency health and Service recovery.
+
+  - source: incident
+    during_state: recovery
+    profile_id: incident_resolved
+    description: >
+      The Change-attributable Incident is resolved after Service
+      recovery.
+
+  - source: evidence
+    during_state: recovery
+    profile_id: rollback_validation_evidence
+    description: >
+      Required Change, regression, degradation, Incident, rollback
+      and recovery evidence is available.
+
+expected_result:
+  scenario_id: BANK-02
+
+  expected_decision: fail
+  expected_action: rollback
+  expected_outcome: rolled_back
+
+  expected_blocking_conditions:
+    - mandatory_application_test_failed
+    - blocking_post_change_operational_metrics
+
+  expected_evidence:
+    - change_approval
+    - infrastructure_validation
+    - deployment_result
+    - application_regression
+    - degraded_observation
+    - incident_record
+    - rollback_result
+    - recovery_observation
+    - incident_resolution
+
+  expected_incident_attribution: true
+
+  expected_root_cause: null
+
+  expected_insight: >
+    The deployed release introduced a post-change application
+    regression associated with degraded operational conditions.
+    Rollback restored Service health and the attributable Incident
+    was resolved.
+
+assumptions:
+  - Payment Service benchmark and baseline configuration is valid.
+  - Required enterprise and topology references exist.
+  - Mandatory application-test failure is a blocking condition.
+  - Degraded Metric observations use the effective blocking thresholds.
+  - Recovery observations use effective reference targets.
+  - Rollback applies to the same Deployment created during implementation.
+  - Incident resolution applies to the same Incident created during degradation.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - banking
+  - payments
+  - production_change
+  - regression
+  - rollback
+  - recovery

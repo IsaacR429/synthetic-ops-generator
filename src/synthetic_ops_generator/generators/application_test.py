@@ -94,6 +94,19 @@ class ApplicationTestGenerator(SourceGenerator):
 
             return
 
+        if (
+            self._behaviour.profile_id
+            == "mandatory_test_regression"
+        ):
+            async for event in (
+                self._generate_mandatory_test_regression(
+                    context
+                )
+            ):
+                yield event
+
+            return
+
         raise ValueError(
             "Unsupported Application Test behaviour profile: "
             f"{self._behaviour.profile_id}"
@@ -143,6 +156,87 @@ class ApplicationTestGenerator(SourceGenerator):
             yield self._event(
                 context=context,
                 event_type="application_test.passed",
+                operational_test=executed,
+            )
+
+    async def _generate_mandatory_test_regression(
+        self,
+        context: ScenarioContext,
+    ) -> AsyncIterator[GeneratedEvent]:
+        mandatory_tests = [
+            definition
+            for definition in self._tests
+            if definition.mandatory
+        ]
+
+        if not mandatory_tests:
+            raise ValueError(
+                "Mandatory Test regression requires "
+                "at least one mandatory Test."
+            )
+
+        regression_test_type = (
+            mandatory_tests[-1].test_type
+        )
+
+        for definition in self._tests:
+            test_id = self._ids.test_id()
+
+            planned = OperationalTest(
+                test_id=test_id,
+                chg_id=context.chg_id,
+                category=TestCategory.APPLICATION,
+                test_type=definition.test_type,
+                name=definition.name,
+                service=context.service,
+                component=context.component,
+                mandatory=definition.mandatory,
+                status=TestExecutionStatus.PLANNED,
+                planned_at=context.simulation_time,
+            )
+
+            yield self._event(
+                context=context,
+                event_type="application_test.planned",
+                operational_test=planned,
+            )
+
+            regression_detected = (
+                definition.test_type
+                == regression_test_type
+            )
+
+            executed = OperationalTest(
+                test_id=test_id,
+                chg_id=context.chg_id,
+                category=TestCategory.APPLICATION,
+                test_type=definition.test_type,
+                name=definition.name,
+                service=context.service,
+                component=context.component,
+                mandatory=definition.mandatory,
+                status=TestExecutionStatus.EXECUTED,
+                result=(
+                    TestResult.FAILED
+                    if regression_detected
+                    else TestResult.PASSED
+                ),
+                planned_at=planned.planned_at,
+                executed_at=context.simulation_time,
+                failure_reason=(
+                    "Post-change application regression detected."
+                    if regression_detected
+                    else None
+                ),
+            )
+
+            yield self._event(
+                context=context,
+                event_type=(
+                    "application_test.failed"
+                    if regression_detected
+                    else "application_test.passed"
+                ),
                 operational_test=executed,
             )
 

@@ -101,6 +101,57 @@ def build_event(
     )
 
 
+def build_deployment_event(
+    *,
+    sequence_number: int,
+    event_type: str,
+    deployment_id: str = "DEP0000001",
+) -> GeneratedEvent:
+    return build_event(
+        sequence_number=sequence_number,
+        component="payment_api",
+    ).model_copy(
+        update={
+            "event_type": event_type,
+            "data": {
+                "deployment": {
+                    "deployment_id": deployment_id,
+                }
+            },
+        }
+    )
+
+
+def build_incident_event(
+    *,
+    sequence_number: int,
+    event_type: str,
+    incident_id: str = "INC0000001",
+    chg_id: str = "CHG0000001",
+    service: str = "payment_service",
+    component: str | None = "payment_api",
+) -> GeneratedEvent:
+    return build_event(
+        sequence_number=sequence_number,
+        component=component,
+    ).model_copy(
+        update={
+            "event_type": event_type,
+            "chg_id": chg_id,
+            "service": service,
+            "component": component,
+            "data": {
+                "incident": {
+                    "incident_id": incident_id,
+                    "chg_id": chg_id,
+                    "service": service,
+                    "component": component,
+                }
+            },
+        }
+    )
+
+
 def validate(
     events: list[GeneratedEvent],
 ):
@@ -312,5 +363,163 @@ def test_future_evidence_reference_is_reported() -> None:
     assert any(
         finding.rule
         == "evidence_reference_chronology"
+        for finding in report.findings
+    )
+
+
+def test_valid_deployment_rollback_relationship_passes() -> None:
+    context = build_context()
+    context.deployment_id = "DEP0000001"
+
+    events = [
+        build_deployment_event(
+            sequence_number=1,
+            event_type="cicd.deployment.completed",
+        ),
+        build_deployment_event(
+            sequence_number=2,
+            event_type="cicd.deployment.rollback_started",
+        ),
+        build_deployment_event(
+            sequence_number=3,
+            event_type="cicd.deployment.rollback_completed",
+        ),
+    ]
+
+    report = CrossSourceValidator().validate(
+        events=events,
+        context=context,
+        enterprise=build_enterprise(),
+    )
+
+    assert report.is_valid is True
+    assert report.findings == []
+
+
+def test_rollback_without_prior_deployment_is_reported() -> None:
+    context = build_context()
+    context.deployment_id = "DEP0000001"
+
+    events = [
+        build_deployment_event(
+            sequence_number=1,
+            event_type="cicd.deployment.rollback_started",
+        ),
+        build_deployment_event(
+            sequence_number=2,
+            event_type="cicd.deployment.rollback_completed",
+        ),
+    ]
+
+    report = CrossSourceValidator().validate(
+        events=events,
+        context=context,
+        enterprise=build_enterprise(),
+    )
+
+    assert any(
+        finding.rule
+        == "rollback_deployment_relationship"
+        for finding in report.findings
+    )
+
+
+def test_different_deployment_id_is_reported() -> None:
+    context = build_context()
+    context.deployment_id = "DEP0000001"
+
+    event = build_deployment_event(
+        sequence_number=1,
+        event_type="cicd.deployment.completed",
+        deployment_id="DEP9999999",
+    )
+
+    report = CrossSourceValidator().validate(
+        events=[event],
+        context=context,
+        enterprise=build_enterprise(),
+    )
+
+    assert any(
+        finding.rule == "deployment_correlation"
+        for finding in report.findings
+    )
+
+
+def test_valid_incident_lifecycle_passes() -> None:
+    context = build_context()
+    context.incident_id = "INC0000001"
+
+    events = [
+        build_incident_event(
+            sequence_number=1,
+            event_type="itsm.incident.created",
+        ),
+        build_incident_event(
+            sequence_number=2,
+            event_type="itsm.incident.resolved",
+        ),
+    ]
+
+    report = CrossSourceValidator().validate(
+        events=events,
+        context=context,
+        enterprise=build_enterprise(),
+    )
+
+    assert report.is_valid is True
+    assert report.findings == []
+
+
+def test_incident_resolution_without_creation_is_reported() -> None:
+    context = build_context()
+    context.incident_id = "INC0000001"
+
+    event = build_incident_event(
+        sequence_number=1,
+        event_type="itsm.incident.resolved",
+    )
+
+    report = CrossSourceValidator().validate(
+        events=[event],
+        context=context,
+        enterprise=build_enterprise(),
+    )
+
+    assert any(
+        finding.rule
+        == "incident_resolution_relationship"
+        for finding in report.findings
+    )
+
+
+def test_incident_lifecycle_field_mismatch_is_reported() -> None:
+    context = build_context()
+    context.incident_id = "INC0000001"
+
+    created = build_incident_event(
+        sequence_number=1,
+        event_type="itsm.incident.created",
+    )
+
+    resolved = build_incident_event(
+        sequence_number=2,
+        event_type="itsm.incident.resolved",
+        service="payment_service",
+        component=None,
+    )
+
+    report = CrossSourceValidator().validate(
+        events=[
+            created,
+            resolved,
+        ],
+        context=context,
+        enterprise=build_enterprise(),
+    )
+
+    assert any(
+        finding.rule
+        == "incident_lifecycle_consistency"
         for finding in report.findings
     )
