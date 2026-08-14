@@ -79,7 +79,7 @@ async def test_historical_executor_runs_complete_bank_02() -> None:
     )
 
     publisher = InMemoryPublisher()
-    executor = HistoricalRunExecutor()
+    executor = HistoricalRunExecutor(config_root=CONFIG_ROOT)
 
     progress_reports: list[tuple[OperationalState, int]] = []
 
@@ -98,7 +98,6 @@ async def test_historical_executor_runs_complete_bank_02() -> None:
             plateau_samples=2,
             recovery_samples=4,
         ),
-        config_root=CONFIG_ROOT,
         progress_observer=on_progress,
     )
 
@@ -139,7 +138,7 @@ async def test_historical_executor_cancellation_propagates() -> None:
     )
 
     publisher = CancellingPublisher(cancel_at_count=10)
-    executor = HistoricalRunExecutor()
+    executor = HistoricalRunExecutor(config_root=CONFIG_ROOT)
 
     with pytest.raises(asyncio.CancelledError):
         await executor.execute(
@@ -154,7 +153,6 @@ async def test_historical_executor_cancellation_propagates() -> None:
                 plateau_samples=2,
                 recovery_samples=4,
             ),
-            config_root=CONFIG_ROOT,
         )
 
     assert len(publisher.published) == 10
@@ -177,7 +175,7 @@ async def test_historical_executor_partial_publication_on_failure() -> None:
     )
 
     publisher = FailingPublisher(fail_at_count=7)
-    executor = HistoricalRunExecutor()
+    executor = HistoricalRunExecutor(config_root=CONFIG_ROOT)
 
     with pytest.raises(RuntimeError, match="Publisher failed intentionally"):
         await executor.execute(
@@ -192,7 +190,6 @@ async def test_historical_executor_partial_publication_on_failure() -> None:
                 plateau_samples=2,
                 recovery_samples=4,
             ),
-            config_root=CONFIG_ROOT,
         )
 
     assert len(publisher.published) == 6
