@@ -370,3 +370,230 @@ def test_graceful_shutdown_stops_active_run_and_preserves_status_after_restart(
         assert payload["execution_mode"] == "standard"
 
         assert payload["event_count"] == 0
+
+
+def test_graceful_shutdown_stops_historical_run_and_preserves_status_after_restart(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "runs"
+
+    blocking_publisher = (
+        BlockingPublisher()
+    )
+
+    first_app = create_app(
+        data_root=data_root,
+        execution_publisher_factory=(
+            lambda: blocking_publisher
+        ),
+    )
+
+    with TestClient(first_app) as client:
+        started = client.post(
+            "/runs",
+            json={
+                "scenario_id": "BANK-02",
+                "random_seed": 42,
+                "execution_mode": (
+                    "historical"
+                ),
+            },
+        )
+
+        assert started.status_code == 202
+
+        started_payload = started.json()
+
+        assert (
+            started_payload["status"]
+            == "running"
+        )
+
+        assert (
+            started_payload[
+                "execution_mode"
+            ]
+            == "historical"
+        )
+
+        run_id = started_payload["run_id"]
+
+        assert blocking_publisher.blocked.wait(
+            timeout=5.0
+        )
+
+        live = client.get(
+            f"/runs/{run_id}"
+        )
+
+        assert live.status_code == 200
+
+        live_payload = live.json()
+
+        assert (
+            live_payload["status"]
+            == "running"
+        )
+
+        assert (
+            live_payload[
+                "execution_mode"
+            ]
+            == "historical"
+        )
+
+    # Leaving TestClient invokes the FastAPI
+    # lifespan:
+    #
+    # ActiveRunManager.shutdown()
+    #     -> task.cancel()
+    #     -> ControlService catches CancelledError
+    #     -> latest historical progress is read
+    #     -> RunStore persists STOPPED
+    #     -> RunStore then closes.
+
+    second_app = create_app(
+        data_root=data_root
+    )
+
+    with TestClient(second_app) as client:
+        persisted = client.get(
+            f"/runs/{run_id}"
+        )
+
+        assert persisted.status_code == 200
+
+        payload = persisted.json()
+
+        assert (
+            payload["status"]
+            == "stopped"
+        )
+
+        assert (
+            payload["execution_mode"]
+            == "historical"
+        )
+
+        assert payload["event_count"] == 0
+
+        assert (
+            payload["validation_passed"]
+            is None
+        )
+
+        assert (
+            payload["completed_at"]
+            is not None
+        )
+
+        assert payload["error_message"] is None
+
+
+def test_historical_run_survives_application_restart(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "runs"
+
+    first_app = create_app(
+        data_root=data_root
+    )
+
+    with TestClient(first_app) as client:
+        started = client.post(
+            "/runs",
+            json={
+                "scenario_id": "BANK-02",
+                "random_seed": 42,
+                "execution_mode": (
+                    "historical"
+                ),
+            },
+        )
+
+        assert started.status_code == 202
+
+        payload = started.json()
+
+        assert (
+            payload["execution_mode"]
+            == "historical"
+        )
+
+        run_id = payload["run_id"]
+
+        completed = wait_for_terminal_run(
+            client,
+            run_id,
+        )
+
+        assert (
+            completed["status"]
+            == "completed"
+        )
+
+        assert (
+            completed["execution_mode"]
+            == "historical"
+        )
+
+        assert (
+            completed["event_count"]
+            == 48
+        )
+
+        assert (
+            completed["validation_passed"]
+            is None
+        )
+
+    second_app = create_app(
+        data_root=data_root
+    )
+
+    with TestClient(second_app) as client:
+        restored = client.get(
+            f"/runs/{run_id}"
+        )
+
+        assert restored.status_code == 200
+
+        restored_payload = (
+            restored.json()
+        )
+
+        assert (
+            restored_payload["status"]
+            == "completed"
+        )
+
+        assert (
+            restored_payload[
+                "execution_mode"
+            ]
+            == "historical"
+        )
+
+        assert (
+            restored_payload["event_count"]
+            == 48
+        )
+
+        assert (
+            restored_payload[
+                "validation_passed"
+            ]
+            is None
+        )
+
+        replayed = client.post(
+            f"/runs/{run_id}/replay"
+        )
+
+        assert replayed.status_code == 200
+
+        assert replayed.json() == {
+            "run_id": run_id,
+            "scenario_id": "BANK-02",
+            "replayed_event_count": 48,
+        }

@@ -94,6 +94,75 @@ class BlockingAfterFirstPublisher(
         self._published_count += 1
 
 
+class BlockingAfterHistoricalSamplePublisher(
+    EventPublisher
+):
+    """
+    Publishes one complete historical sample
+    of three Metric events, then blocks before
+    the next Event.
+
+    This provides a deterministic cancellation
+    point after persisted historical progress.
+    """
+
+    def __init__(
+        self,
+        delegate: EventPublisher,
+    ) -> None:
+        self._delegate = delegate
+        self._published_count = 0
+
+        self.blocked = asyncio.Event()
+        self._release = asyncio.Event()
+
+    async def publish(
+        self,
+        event: GeneratedEvent,
+    ) -> None:
+        if self._published_count >= 3:
+            self.blocked.set()
+
+            await self._release.wait()
+
+        await self._delegate.publish(
+            event
+        )
+
+        self._published_count += 1
+
+
+class FailingAfterHistoricalSamplePublisher(
+    EventPublisher
+):
+    """
+    Publishes one complete historical sample,
+    then fails before the next Event.
+    """
+
+    def __init__(
+        self,
+        delegate: EventPublisher,
+    ) -> None:
+        self._delegate = delegate
+        self._published_count = 0
+
+    async def publish(
+        self,
+        event: GeneratedEvent,
+    ) -> None:
+        if self._published_count >= 3:
+            raise RuntimeError(
+                "historical publisher failed"
+            )
+
+        await self._delegate.publish(
+            event
+        )
+
+        self._published_count += 1
+
+
 async def wait_for_terminal_run(
     service: ControlService,
     run_id: str,
@@ -1329,6 +1398,639 @@ async def test_control_service_executes_historical_managed_run(
             "historical"
             in event.data["metric"]
             for event in retained_events
+        )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_control_service_executes_insurance_historical_managed_run(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "runs"
+
+    store = SQLiteEventStore(
+        database_path=(
+            data_root
+            / "events.sqlite3"
+        )
+    )
+
+    run_store = SQLiteRunStore(
+        database_path=(
+            data_root
+            / "runs.sqlite3"
+        )
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = (
+        ActiveRunManager()
+    )
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT
+                / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            historical_run_executor=(
+                HistoricalRunExecutor(
+                    config_root=CONFIG_ROOT
+                )
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path
+                    / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        started = await service.start_run(
+            scenario_id="INS-02",
+            random_seed=42,
+            execution_mode=(
+                RunExecutionMode.HISTORICAL
+            ),
+        )
+
+        assert (
+            started.execution_mode
+            == RunExecutionMode.HISTORICAL
+        )
+
+        record = await wait_for_terminal_run(
+            service,
+            started.run_id,
+        )
+
+        retained_events = (
+            await store.get_run_events(
+                started.run_id
+            )
+        )
+
+        assert (
+            record.status
+            == RunStatus.COMPLETED
+        )
+
+        assert (
+            record.execution_mode
+            == RunExecutionMode.HISTORICAL
+        )
+
+        assert (
+            record.current_state
+            == OperationalState.COMPLETED
+        )
+
+        assert record.event_count == 48
+
+        assert (
+            record.validation_passed
+            is None
+        )
+
+        assert len(retained_events) == 48
+
+        assert all(
+            event.scenario_id == "INS-02"
+            for event in retained_events
+        )
+
+        assert all(
+            event.event_type
+            == "metric.observed"
+            for event in retained_events
+        )
+
+        assert all(
+            "historical"
+            in event.data["metric"]
+            for event in retained_events
+        )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_control_service_stops_historical_managed_run_after_sample(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "runs"
+
+    store = SQLiteEventStore(
+        database_path=(
+            data_root
+            / "events.sqlite3"
+        )
+    )
+
+    run_store = SQLiteRunStore(
+        database_path=(
+            data_root
+            / "runs.sqlite3"
+        )
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = (
+        ActiveRunManager()
+    )
+
+    blocking_publisher = (
+        BlockingAfterHistoricalSamplePublisher(
+            delegate=(
+                RetentionPublisher(
+                    store=store
+                )
+            )
+        )
+    )
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT
+                / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            historical_run_executor=(
+                HistoricalRunExecutor(
+                    config_root=CONFIG_ROOT
+                )
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path
+                    / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+            execution_publisher_factory=(
+                lambda: blocking_publisher
+            ),
+        )
+
+        started = await service.start_run(
+            scenario_id="BANK-02",
+            random_seed=42,
+            execution_mode=(
+                RunExecutionMode.HISTORICAL
+            ),
+        )
+
+        await asyncio.wait_for(
+            blocking_publisher.blocked.wait(),
+            timeout=5.0,
+        )
+
+        live_record = await service.get_run(
+            started.run_id
+        )
+
+        assert (
+            live_record.status
+            == RunStatus.RUNNING
+        )
+
+        assert live_record.event_count == 3
+
+        assert (
+            live_record.current_state
+            == OperationalState.NORMAL
+        )
+
+        stop_result = await service.stop_run(
+            started.run_id
+        )
+
+        stopped_record = await service.get_run(
+            started.run_id
+        )
+
+        retained_events = (
+            await store.get_run_events(
+                started.run_id
+            )
+        )
+
+        assert (
+            stop_result.status
+            == RunStatus.STOPPED
+        )
+
+        assert stop_result.event_count == 3
+
+        assert (
+            stopped_record.status
+            == RunStatus.STOPPED
+        )
+
+        assert (
+            stopped_record.execution_mode
+            == RunExecutionMode.HISTORICAL
+        )
+
+        assert (
+            stopped_record.current_state
+            == OperationalState.NORMAL
+        )
+
+        assert stopped_record.event_count == 3
+
+        assert (
+            stopped_record.validation_passed
+            is None
+        )
+
+        assert (
+            stopped_record.completed_at
+            is not None
+        )
+
+        assert len(retained_events) == 3
+
+        assert not (
+            active_run_manager.is_active(
+                started.run_id
+            )
+        )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_control_service_handles_historical_managed_run_failure(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "runs"
+
+    store = SQLiteEventStore(
+        database_path=(
+            data_root
+            / "events.sqlite3"
+        )
+    )
+
+    run_store = SQLiteRunStore(
+        database_path=(
+            data_root
+            / "runs.sqlite3"
+        )
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = (
+        ActiveRunManager()
+    )
+
+    failing_publisher = (
+        FailingAfterHistoricalSamplePublisher(
+            delegate=(
+                RetentionPublisher(
+                    store=store
+                )
+            )
+        )
+    )
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            historical_run_executor=(
+                HistoricalRunExecutor(
+                    config_root=CONFIG_ROOT
+                )
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path
+                    / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+            execution_publisher_factory=(
+                lambda: failing_publisher
+            ),
+        )
+
+        started = await service.start_run(
+            scenario_id="BANK-02",
+            random_seed=42,
+            execution_mode=(
+                RunExecutionMode.HISTORICAL
+            ),
+        )
+
+        failed_record = await wait_for_terminal_run(
+            service,
+            started.run_id,
+        )
+
+        retained_events = (
+            await store.get_run_events(
+                started.run_id
+            )
+        )
+
+        assert (
+            failed_record.status
+            == RunStatus.FAILED
+        )
+
+        assert (
+            failed_record.execution_mode
+            == RunExecutionMode.HISTORICAL
+        )
+
+        assert (
+            failed_record.current_state
+            == OperationalState.NORMAL
+        )
+
+        assert failed_record.event_count == 3
+
+        assert (
+            failed_record.validation_passed
+            is None
+        )
+
+        assert (
+            failed_record.completed_at
+            is not None
+        )
+
+        assert failed_record.error_message == (
+            "historical publisher failed"
+        )
+
+        assert len(retained_events) == 3
+
+        assert not (
+            active_run_manager.is_active(
+                started.run_id
+            )
+        )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_control_service_replays_completed_historical_run(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+    replay_publisher = InMemoryPublisher()
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            historical_run_executor=(
+                HistoricalRunExecutor(
+                    config_root=CONFIG_ROOT
+                )
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path
+                    / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=replay_publisher,
+            active_run_manager=active_run_manager,
+        )
+
+        started = await service.start_run(
+            scenario_id="BANK-02",
+            random_seed=42,
+            execution_mode=(
+                RunExecutionMode.HISTORICAL
+            ),
+        )
+
+        completed = await wait_for_terminal_run(
+            service,
+            started.run_id,
+        )
+
+        assert (
+            completed.status
+            == RunStatus.COMPLETED
+        )
+
+        retained_events = (
+            await store.get_run_events(
+                started.run_id
+            )
+        )
+
+        replayed = await service.replay_run(
+            started.run_id
+        )
+
+        assert replayed.run_id == (
+            started.run_id
+        )
+
+        assert (
+            replayed.scenario_id
+            == "BANK-02"
+        )
+
+        assert (
+            replayed.replayed_event_count
+            == 48
+        )
+
+        assert len(retained_events) == 48
+
+        assert (
+            replay_publisher.events
+            == list(retained_events)
+        )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_historical_orphaned_run_is_reconciled_as_failed(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            historical_run_executor=(
+                HistoricalRunExecutor(
+                    config_root=CONFIG_ROOT
+                )
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path
+                    / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        running_record = RunRecord(
+            run_id="RUN0000001",
+            scenario_id="BANK-02",
+            change_id="CHG0000001",
+            status=RunStatus.RUNNING,
+            started_at=datetime.now(UTC),
+            completed_at=None,
+            current_state=(
+                OperationalState.OBSERVING
+            ),
+            event_count=0,
+            validation_passed=None,
+            random_seed=42,
+            event_interval_seconds=5.0,
+            execution_mode=(
+                RunExecutionMode.HISTORICAL
+            ),
+        )
+
+        await run_store.create(
+            running_record
+        )
+
+        reconciled = (
+            await service.reconcile_orphaned_runs()
+        )
+
+        assert reconciled == 1
+
+        record = await service.get_run(
+            "RUN0000001"
+        )
+
+        assert (
+            record.status
+            == RunStatus.FAILED
+        )
+
+        assert (
+            record.execution_mode
+            == RunExecutionMode.HISTORICAL
+        )
+
+        assert (
+            record.current_state
+            == OperationalState.OBSERVING
+        )
+
+        assert record.event_count == 0
+
+        assert (
+            record.validation_passed
+            is None
+        )
+
+        assert record.completed_at is not None
+
+        assert record.error_message == (
+            "Run interrupted by "
+            "application restart."
         )
 
     finally:
