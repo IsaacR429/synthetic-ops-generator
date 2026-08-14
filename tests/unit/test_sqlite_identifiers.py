@@ -54,3 +54,30 @@ def test_sqlite_id_factory_keeps_prefix_counters_independent(
     assert ids.run_id() == "RUN0000002"
     assert ids.change_id() == "CHG0000002"
     assert ids.event_id() == "EVT0000002"
+
+
+def test_history_ids_survive_factory_restart(
+    tmp_path: Path,
+) -> None:
+    database_path = (
+        tmp_path
+        / "identifiers.sqlite3"
+    )
+
+    first_ids = SQLiteIdFactory(
+        database_path=database_path
+    )
+
+    assert (
+        first_ids.history_id()
+        == "HST0000001"
+    )
+
+    second_ids = SQLiteIdFactory(
+        database_path=database_path
+    )
+
+    assert (
+        second_ids.history_id()
+        == "HST0000002"
+    )

@@ -23,6 +23,9 @@ class IdFactory:
     def change_id(self) -> str:
         return self.next("CHG")
 
+    def history_id(self) -> str:
+        return self.next("HST")
+
     def run_id(self) -> str:
         return self.next("RUN")
 

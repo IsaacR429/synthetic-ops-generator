@@ -16,4 +16,12 @@ def test_log_ids_are_generated_centrally() -> None:
     ids = IdFactory()
 
     assert ids.log_id() == "LOG0000001"
-    assert ids.log_id() == "LOG0000002"
+    assert ids.log_id() == "LOG0000002"
+
+
+def test_history_ids_are_sequential() -> None:
+    ids = IdFactory()
+
+    assert ids.history_id() == "HST0000001"
+    assert ids.history_id() == "HST0000002"
+
