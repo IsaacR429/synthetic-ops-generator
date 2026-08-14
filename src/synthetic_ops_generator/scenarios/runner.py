@@ -1,15 +1,25 @@
-from collections.abc import Sequence
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Sequence,
+)
 from datetime import datetime
 
 from synthetic_ops_generator.core.clock import SimulationClock
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.domain.enterprise import Enterprise
+from synthetic_ops_generator.domain.enums import OperationalState
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.base import SourceGenerator
 from synthetic_ops_generator.publishers.base import EventPublisher
 from synthetic_ops_generator.scenarios.context import ScenarioContext
 from synthetic_ops_generator.scenarios.models import ScenarioDefinition
 from synthetic_ops_generator.scenarios.state_machine import ScenarioStateMachine
+
+ScenarioProgressObserver = Callable[
+    [OperationalState, int],
+    Awaitable[None],
+]
 
 
 class ScenarioRunner:
@@ -93,6 +103,9 @@ class ScenarioRunner:
         context: ScenarioContext,
         generators: Sequence[SourceGenerator],
         publisher: EventPublisher,
+        progress_observer: (
+            ScenarioProgressObserver | None
+        ) = None,
         event_interval_seconds: float = 5.0,
     ) -> list[str]:
         """
@@ -139,6 +152,12 @@ class ScenarioRunner:
                 new_state.value
             )
 
+            if progress_observer is not None:
+                await progress_observer(
+                    context.scenario_state,
+                    len(self._event_history),
+                )
+
             for generator in generators:
                 async for event in generator.generate(
                     context
@@ -154,6 +173,12 @@ class ScenarioRunner:
                     context.simulation_time = (
                         self._clock.now()
                     )
+
+            if progress_observer is not None:
+                await progress_observer(
+                    context.scenario_state,
+                    len(self._event_history),
+                )
 
         return visited_states
 

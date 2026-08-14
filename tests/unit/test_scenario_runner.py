@@ -21,6 +21,9 @@ from synthetic_ops_generator.domain.enums import (
     RiskLevel,
 )
 from synthetic_ops_generator.oracle.models import ExpectedScenarioResult
+from synthetic_ops_generator.publishers.memory import (
+    InMemoryPublisher,
+)
 from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     ScenarioDefinition,
@@ -262,3 +265,101 @@ def test_runner_rejects_wrong_enterprise() -> None:
             enterprise=wrong_enterprise,
             random_seed=42,
         )
+
+
+@pytest.mark.asyncio
+async def test_runner_notifies_progress_observer_at_state_boundaries(
+) -> None:
+    start = datetime(
+        2026,
+        8,
+        11,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    runner = ScenarioRunner(
+        ids=IdFactory(),
+        clock=ManualSimulationClock(start),
+    )
+
+    scenario = build_scenario()
+
+    context = runner.create_context(
+        scenario=scenario,
+        enterprise=build_enterprise(),
+        random_seed=42,
+    )
+
+    progress_updates: list[
+        tuple[OperationalState, int]
+    ] = []
+
+    async def observe_progress(
+        state: OperationalState,
+        event_count: int,
+    ) -> None:
+        progress_updates.append(
+            (
+                state,
+                event_count,
+            )
+        )
+
+    visited_states = await runner.execute(
+        scenario=scenario,
+        context=context,
+        generators=[],
+        publisher=InMemoryPublisher(),
+        event_interval_seconds=5.0,
+        progress_observer=observe_progress,
+    )
+
+    assert visited_states == [
+        "initialising",
+        "normal",
+        "implementing",
+        "observing",
+        "completed",
+    ]
+
+    assert progress_updates == [
+        (
+            OperationalState.NORMAL,
+            0,
+        ),
+        (
+            OperationalState.NORMAL,
+            0,
+        ),
+        (
+            OperationalState.IMPLEMENTING,
+            0,
+        ),
+        (
+            OperationalState.IMPLEMENTING,
+            0,
+        ),
+        (
+            OperationalState.OBSERVING,
+            0,
+        ),
+        (
+            OperationalState.OBSERVING,
+            0,
+        ),
+        (
+            OperationalState.COMPLETED,
+            0,
+        ),
+        (
+            OperationalState.COMPLETED,
+            0,
+        ),
+    ]
+
+    assert (
+        context.scenario_state
+        == OperationalState.COMPLETED
+    )
