@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.history.incident_dataset import (
@@ -22,6 +24,23 @@ def build_historical_metric_events(
     context: ScenarioContext,
     ids: IdFactory,
 ) -> tuple[GeneratedEvent, ...]:
+    return tuple(
+        iter_historical_metric_events(
+            dataset=dataset,
+            runtime=runtime,
+            context=context,
+            ids=ids,
+        )
+    )
+
+
+def iter_historical_metric_events(
+    *,
+    dataset: HistoricalIncidentDataset,
+    runtime: HistoricalScenarioRuntime,
+    context: ScenarioContext,
+    ids: IdFactory,
+) -> Iterator[GeneratedEvent]:
     _validate_event_adapter_inputs(
         dataset=dataset,
         runtime=runtime,
@@ -37,8 +56,6 @@ def build_historical_metric_events(
         iter(dataset.metric_series.values())
     )
     point_count = len(first_metric.points)
-
-    events: list[GeneratedEvent] = []
 
     for point_index in range(point_count):
         for metric_id in sorted(
@@ -74,25 +91,21 @@ def build_historical_metric_events(
                 historical_context=historical_context,
             )
 
-            events.append(
-                GeneratedEvent(
-                    event_id=ids.event_id(),
-                    event_type=METRIC_EVENT_TYPE,
-                    event_time=point.timestamp,
-                    source_system=METRIC_SOURCE_SYSTEM,
-                    scenario_id=context.scenario_id,
-                    run_id=context.run_id,
-                    chg_id=context.chg_id,
-                    business_stream=context.business_stream,
-                    service=context.service,
-                    component=None,
-                    environment=context.environment,
-                    sequence_number=context.next_sequence(),
-                    data=event_data,
-                )
+            yield GeneratedEvent(
+                event_id=ids.event_id(),
+                event_type=METRIC_EVENT_TYPE,
+                event_time=point.timestamp,
+                source_system=METRIC_SOURCE_SYSTEM,
+                scenario_id=context.scenario_id,
+                run_id=context.run_id,
+                chg_id=context.chg_id,
+                business_stream=context.business_stream,
+                service=context.service,
+                component=None,
+                environment=context.environment,
+                sequence_number=context.next_sequence(),
+                data=event_data,
             )
-
-    return tuple(events)
 
 
 def _validate_event_adapter_inputs(

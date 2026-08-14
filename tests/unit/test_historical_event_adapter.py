@@ -16,6 +16,7 @@ from synthetic_ops_generator.core.randomness import (
 )
 from synthetic_ops_generator.history.event_adapter import (
     build_historical_metric_events,
+    iter_historical_metric_events,
 )
 from synthetic_ops_generator.history.incident_dataset import (
     build_historical_incident_dataset,
@@ -300,3 +301,48 @@ def test_event_adapter_advances_canonical_sequence(
 
     assert len(events) == 48
     assert context.sequence_number == 48
+
+
+def test_iter_historical_metric_events_is_lazy() -> None:
+    scenario = load_scenario("config/scenarios/banking/BANK-02.yaml")
+    enterprise = load_enterprise_configuration("config/enterprises/bank_alpha")
+    runtime = build_historical_scenario_runtime(
+        scenario=scenario,
+        enterprise=enterprise,
+        config_root=CONFIG_ROOT,
+    )
+    anchor_time = datetime(2026, 8, 14, 10, 0, tzinfo=UTC)
+    dataset = build_historical_incident_dataset(
+        runtime=runtime,
+        anchor_time=anchor_time,
+        curve_spec=PerturbationCurveSpec(
+            degradation_samples=4,
+            plateau_samples=2,
+            recovery_samples=4,
+        ),
+        random_source=SimulationRandom(seed=42),
+    )
+    ids = IdFactory()
+    runner = ScenarioRunner(ids=ids, clock=ManualSimulationClock(anchor_time))
+    context = runner.create_context(
+        scenario=scenario, enterprise=enterprise, random_seed=42
+    )
+
+    assert context.sequence_number == 0
+
+    iterator = iter_historical_metric_events(
+        dataset=dataset,
+        runtime=runtime,
+        context=context,
+        ids=ids,
+    )
+
+    assert context.sequence_number == 0
+
+    first_event = next(iterator)
+    assert first_event.sequence_number == 1
+    assert context.sequence_number == 1
+
+    second_event = next(iterator)
+    assert second_event.sequence_number == 2
+    assert context.sequence_number == 2
