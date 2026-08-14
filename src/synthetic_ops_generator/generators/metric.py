@@ -15,6 +15,11 @@ from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.core.randomness import SimulationRandom
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.base import SourceGenerator
+from synthetic_ops_generator.metrics.event_payload import (
+    METRIC_EVENT_TYPE,
+    METRIC_SOURCE_SYSTEM,
+    build_metric_event_data,
+)
 from synthetic_ops_generator.metrics.models import MetricDefinition
 from synthetic_ops_generator.scenarios.context import ScenarioContext
 from synthetic_ops_generator.scenarios.models import (
@@ -32,7 +37,7 @@ class MetricGenerator(SourceGenerator):
     or modify operational policy.
     """
 
-    source_system = "synthetic_observability"
+    source_system = METRIC_SOURCE_SYSTEM
 
     _SUPPORTED_PROFILES: ClassVar[frozenset[str]] = frozenset(
         {
@@ -140,7 +145,7 @@ class MetricGenerator(SourceGenerator):
 
             yield GeneratedEvent(
                 event_id=self._ids.event_id(),
-                event_type="metric.observed",
+                event_type=METRIC_EVENT_TYPE,
                 event_time=context.simulation_time,
                 source_system=self.source_system,
                 scenario_id=context.scenario_id,
@@ -151,41 +156,25 @@ class MetricGenerator(SourceGenerator):
                 component=None,
                 environment=context.environment,
                 sequence_number=context.next_sequence(),
-                data={
-                    "metric": {
-                        "metric_definition_id": (
-                            definition.metric_definition_id
-                        ),
-                        "name": definition.name,
-                        "observed_value": observed_value,
-                        "unit": definition.unit,
-                        "evaluation_statistic": (
-                            definition.evaluation_statistic
-                        ),
-                        "direction": definition.direction.value,
-                        "classification": classification.value,
-                        "baseline_profile_id": (
-                            self._baseline_profile.profile_id
-                        ),
-                        "baseline": baseline.model_dump(
-                            mode="json"
-                        ),
-                        "benchmark_profile_id": (
-                            self._benchmark_profile_id
-                        ),
-                        "effective_benchmark": (
-                            benchmark.model_dump(
-                                mode="json"
-                            )
-                        ),
-                        "behaviour_profile_id": (
-                            self._behaviour.profile_id
-                        ),
-                        "scenario_state": (
-                            context.scenario_state.value
-                        ),
-                    }
-                },
+                data=build_metric_event_data(
+                    definition=definition,
+                    baseline=baseline,
+                    benchmark=benchmark,
+                    baseline_profile_id=(
+                        self._baseline_profile.profile_id
+                    ),
+                    benchmark_profile_id=(
+                        self._benchmark_profile_id
+                    ),
+                    behaviour_profile_id=(
+                        self._behaviour.profile_id
+                    ),
+                    scenario_state=(
+                        context.scenario_state
+                    ),
+                    observed_value=observed_value,
+                    classification=classification,
+                ),
             )
 
     def _generate_observation(
