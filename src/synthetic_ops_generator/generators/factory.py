@@ -1,16 +1,6 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from synthetic_ops_generator.baselines.loader import (
-    load_baseline_profile,
-)
-from synthetic_ops_generator.benchmarks.models import (
-    BenchmarkCatalogue,
-)
-from synthetic_ops_generator.benchmarks.resolver import (
-    resolve_benchmark,
-)
-from synthetic_ops_generator.config.loader import load_yaml_model
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.core.randomness import SimulationRandom
 from synthetic_ops_generator.domain.enterprise import (
@@ -40,7 +30,10 @@ from synthetic_ops_generator.generators.manual_validation import (
     ManualValidationGenerator,
 )
 from synthetic_ops_generator.generators.metric import MetricGenerator
-from synthetic_ops_generator.metrics.models import MetricCatalogue
+from synthetic_ops_generator.metrics.runtime import (
+    MetricRuntimeConfiguration,
+    resolve_metric_runtime_configuration,
+)
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
     SourceDomain,
@@ -79,10 +72,9 @@ class GeneratorFactory:
             enterprise=enterprise,
         )
 
-        metric_definitions = None
-        metric_baseline_profile = None
-        resolved_metric_benchmarks = None
-        metric_benchmark_profile_id = None
+        metric_runtime: (
+            MetricRuntimeConfiguration | None
+        ) = None
 
         has_metric_behaviour = any(
             behaviour.source == SourceDomain.METRIC
@@ -90,81 +82,11 @@ class GeneratorFactory:
         )
 
         if has_metric_behaviour:
-            if service.benchmark_profile_id is None:
-                raise ValueError(
-                    f"Service {service.service_id} does not define "
-                    "a Benchmark profile."
+            metric_runtime = (
+                resolve_metric_runtime_configuration(
+                    service=service,
+                    config_root=self._config_root,
                 )
-
-            if service.baseline_profile_id is None:
-                raise ValueError(
-                    f"Service {service.service_id} does not define "
-                    "a Baseline profile."
-                )
-
-            metric_catalogue = load_yaml_model(
-                self._config_root
-                / "metrics"
-                / "definitions.yaml",
-                MetricCatalogue,
-            )
-
-            benchmark_catalogue = load_yaml_model(
-                self._config_root
-                / "benchmarks"
-                / "synthetic_defaults.yaml",
-                BenchmarkCatalogue,
-            )
-
-            baseline_profile = load_baseline_profile(
-                service.baseline_profile_id,
-                directory=self._config_root / "baselines",
-            )
-
-            benchmark_profile = benchmark_catalogue.profiles.get(
-                service.benchmark_profile_id
-            )
-
-            if benchmark_profile is None:
-                raise ValueError(
-                    "Configured Benchmark profile was not found: "
-                    f"{service.benchmark_profile_id}"
-                )
-
-            resolved_benchmarks = {}
-
-            for metric_id in baseline_profile.metrics:
-                definition = metric_catalogue.definitions.get(
-                    metric_id
-                )
-
-                if definition is None:
-                    raise ValueError(
-                        "Baseline references unknown "
-                        "Metric Definition: "
-                        f"{metric_id}"
-                    )
-
-                base_policy = benchmark_profile.metrics.get(
-                    metric_id
-                )
-
-                if base_policy is None:
-                    raise ValueError(
-                        "Benchmark profile does not define Metric: "
-                        f"{metric_id}"
-                    )
-
-                resolved_benchmarks[metric_id] = resolve_benchmark(
-                    definition,
-                    base_policy,
-                )
-
-            metric_definitions = metric_catalogue.definitions
-            metric_baseline_profile = baseline_profile
-            resolved_metric_benchmarks = resolved_benchmarks
-            metric_benchmark_profile_id = (
-                benchmark_profile.profile_id
             )
 
         for behaviour in scenario.behaviours:
@@ -179,12 +101,7 @@ class GeneratorFactory:
                 )
 
             elif behaviour.source == SourceDomain.METRIC:
-                if (
-                    metric_definitions is None
-                    or metric_baseline_profile is None
-                    or resolved_metric_benchmarks is None
-                    or metric_benchmark_profile_id is None
-                ):
+                if metric_runtime is None:
                     raise RuntimeError(
                         "Metric runtime configuration "
                         "was not resolved."
@@ -194,11 +111,17 @@ class GeneratorFactory:
                     MetricGenerator(
                         ids=ids,
                         behaviour=behaviour,
-                        definitions=metric_definitions,
-                        baseline_profile=metric_baseline_profile,
-                        benchmarks=resolved_metric_benchmarks,
+                        definitions=(
+                            metric_runtime.definitions
+                        ),
+                        baseline_profile=(
+                            metric_runtime.baseline_profile
+                        ),
+                        benchmarks=(
+                            metric_runtime.resolved_benchmarks
+                        ),
                         benchmark_profile_id=(
-                            metric_benchmark_profile_id
+                            metric_runtime.benchmark_profile_id
                         ),
                         random_source=random_source,
                     )
