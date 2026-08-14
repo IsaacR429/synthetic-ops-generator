@@ -48,6 +48,9 @@ from synthetic_ops_generator.replay.service import (
     ReplayService,
 )
 from synthetic_ops_generator.retention.base import EventStore
+from synthetic_ops_generator.scenarios.capabilities import (
+    resolve_scenario_execution_capabilities,
+)
 from synthetic_ops_generator.scenarios.catalogue import (
     ScenarioCatalogue,
 )
@@ -75,6 +78,12 @@ class RunNotReplayableError(Exception):
 
 
 class RunNotStoppableError(RuntimeError):
+    pass
+
+
+class RunExecutionModeNotSupportedError(
+    RuntimeError
+):
     pass
 
 
@@ -160,6 +169,23 @@ class ControlService:
         if scenario is None:
             raise ScenarioNotFoundError(
                 f"Scenario '{scenario_id}' was not found."
+            )
+
+        capabilities = (
+            resolve_scenario_execution_capabilities(
+                scenario
+            )
+        )
+
+        if (
+            execution_mode
+            == RunExecutionMode.HISTORICAL
+            and not capabilities.historical_supported
+        ):
+            raise RunExecutionModeNotSupportedError(
+                "Scenario "
+                f"'{scenario.scenario_id}' does not "
+                "support managed historical execution."
             )
 
         enterprise_path = (

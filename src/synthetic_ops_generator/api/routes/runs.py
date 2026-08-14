@@ -17,6 +17,7 @@ from synthetic_ops_generator.api.models import (
 )
 from synthetic_ops_generator.control.service import (
     ControlService,
+    RunExecutionModeNotSupportedError,
     RunNotFoundError,
     RunNotReplayableError,
     RunNotStoppableError,
@@ -61,6 +62,11 @@ async def start_run(
     except ScenarioNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except RunExecutionModeNotSupportedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
 

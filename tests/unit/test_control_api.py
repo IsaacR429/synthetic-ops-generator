@@ -675,3 +675,100 @@ def test_get_unknown_enterprise_returns_404(
             "was not found."
         )
     }
+
+
+def test_get_historical_scenario_capabilities(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/scenarios/BANK-02/capabilities"
+    )
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "scenario_id": "BANK-02",
+        "execution_modes": [
+            "standard",
+            "historical",
+        ],
+        "historical": {
+            "supported": True,
+            "unavailable_reason": None,
+        },
+    }
+
+
+def test_get_non_historical_scenario_capabilities(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/scenarios/BANK-01/capabilities"
+    )
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "scenario_id": "BANK-01",
+        "execution_modes": [
+            "standard",
+        ],
+        "historical": {
+            "supported": False,
+            "unavailable_reason": (
+                "Managed historical execution "
+                "currently requires an incident "
+                "and rollback scenario."
+            ),
+        },
+    }
+
+
+def test_insurance_rollback_supports_historical_execution(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/scenarios/INS-02/capabilities"
+    )
+
+    assert response.status_code == 200
+
+    assert (
+        response.json()["execution_modes"]
+        == [
+            "standard",
+            "historical",
+        ]
+    )
+
+
+def test_unknown_scenario_capabilities_returns_404(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/scenarios/UNKNOWN/capabilities"
+    )
+
+    assert response.status_code == 404
+
+
+def test_start_historical_run_rejects_unsupported_scenario(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+            "execution_mode": "historical",
+        },
+    )
+
+    assert response.status_code == 409
+
+    assert response.json() == {
+        "detail": (
+            "Scenario 'BANK-01' does not "
+            "support managed historical execution."
+        )
+    }

@@ -239,6 +239,26 @@ class ScenarioDetailResponse(BaseModel):
         )
 
 
+class HistoricalExecutionCapabilityResponse(
+    BaseModel
+):
+    supported: bool
+
+    unavailable_reason: str | None = None
+
+
+class ScenarioCapabilitiesResponse(BaseModel):
+    scenario_id: str
+
+    execution_modes: list[
+        RunExecutionMode
+    ]
+
+    historical: (
+        HistoricalExecutionCapabilityResponse
+    )
+
+
 class StartRunRequest(BaseModel):
     scenario_id: str = Field(min_length=1)
     random_seed: int = 42
