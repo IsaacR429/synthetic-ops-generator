@@ -1,0 +1,36 @@
+profile_id: critical_interactive_nominal
+name: Critical Interactive Historical Behaviour
+
+temporal:
+  business_start_hour: 8
+  business_end_hour: 18
+  business_days:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+
+  business_hours_factor: 1.0
+  off_hours_factor: 0.65
+  weekend_factor: 0.45
+
+persistence:
+  persistence: 0.80
+  innovation_stddev: 0.03
+  lower_bound: 0.20
+  upper_bound: 1.50
+
+metric_responses:
+
+  request_latency:
+    metric_definition_id: request_latency
+    slope_per_activity_unit: 150.0
+
+  error_rate:
+    metric_definition_id: error_rate
+    slope_per_activity_unit: 0.10
+
+  availability:
+    metric_definition_id: availability
+    slope_per_activity_unit: -0.02

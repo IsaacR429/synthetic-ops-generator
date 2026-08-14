@@ -1,0 +1,36 @@
+profile_id: business_workflow_nominal
+name: Business Workflow Historical Behaviour
+
+temporal:
+  business_start_hour: 8
+  business_end_hour: 17
+  business_days:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+
+  business_hours_factor: 1.0
+  off_hours_factor: 0.55
+  weekend_factor: 0.35
+
+persistence:
+  persistence: 0.85
+  innovation_stddev: 0.025
+  lower_bound: 0.15
+  upper_bound: 1.40
+
+metric_responses:
+
+  request_latency:
+    metric_definition_id: request_latency
+    slope_per_activity_unit: 220.0
+
+  error_rate:
+    metric_definition_id: error_rate
+    slope_per_activity_unit: 0.12
+
+  availability:
+    metric_definition_id: availability
+    slope_per_activity_unit: -0.03
