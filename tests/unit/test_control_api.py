@@ -545,3 +545,133 @@ def test_start_historical_run_executes_scenario(
     )
 
     assert completed["error_message"] is None
+
+
+def test_list_enterprises_returns_catalogue(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/enterprises"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert [
+        enterprise["enterprise_id"]
+        for enterprise in payload
+    ] == [
+        "bank_alpha",
+        "insurer_alpha",
+    ]
+
+    assert [
+        enterprise["industry"]
+        for enterprise in payload
+    ] == [
+        "banking",
+        "insurance",
+    ]
+
+    assert all(
+        enterprise[
+            "business_stream_count"
+        ] > 0
+        for enterprise in payload
+    )
+
+    assert all(
+        enterprise["service_count"] > 0
+        for enterprise in payload
+    )
+
+    assert all(
+        enterprise["component_count"] > 0
+        for enterprise in payload
+    )
+
+
+def test_get_enterprise_returns_operational_structure(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/enterprises/bank_alpha"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert (
+        payload["enterprise_id"]
+        == "bank_alpha"
+    )
+
+    assert payload["industry"] == "banking"
+
+    assert payload["business_streams"]
+    assert payload["services"]
+    assert payload["components"]
+
+    assert any(
+        service["service_id"]
+        == "payment_service"
+        for service in payload["services"]
+    )
+
+    assert any(
+        component["component_id"]
+        == "payment_api"
+        for component
+        in payload["components"]
+    )
+
+
+def test_get_insurance_enterprise_uses_same_contract(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/enterprises/insurer_alpha"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert (
+        payload["enterprise_id"]
+        == "insurer_alpha"
+    )
+
+    assert payload["industry"] == "insurance"
+
+    assert any(
+        service["service_id"]
+        == "claims_service"
+        for service in payload["services"]
+    )
+
+    assert any(
+        component["component_id"]
+        == "claims_api"
+        for component
+        in payload["components"]
+    )
+
+
+def test_get_unknown_enterprise_returns_404(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/enterprises/UNKNOWN"
+    )
+
+    assert response.status_code == 404
+
+    assert response.json() == {
+        "detail": (
+            "Enterprise 'UNKNOWN' "
+            "was not found."
+        )
+    }

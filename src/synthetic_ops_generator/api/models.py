@@ -11,14 +11,19 @@ from synthetic_ops_generator.control.models import (
     RunStatus,
     StopRunResult,
 )
+from synthetic_ops_generator.domain.enterprise import (
+    Enterprise,
+)
 from synthetic_ops_generator.domain.enums import (
     Action,
+    Criticality,
     Decision,
     Environment,
     Industry,
     OperationalState,
     Outcome,
     RiskLevel,
+    WorkloadClass,
 )
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
@@ -30,6 +35,94 @@ from synthetic_ops_generator.scenarios.models import (
 class HealthResponse(BaseModel):
     status: Literal["ok"]
     service: str
+
+
+class EnterpriseSummaryResponse(BaseModel):
+    enterprise_id: str
+    name: str
+    industry: Industry
+
+    business_stream_count: int = Field(ge=0)
+    service_count: int = Field(ge=0)
+    component_count: int = Field(ge=0)
+
+    @classmethod
+    def from_enterprise(
+        cls,
+        enterprise: Enterprise,
+    ) -> "EnterpriseSummaryResponse":
+        return cls(
+            enterprise_id=(
+                enterprise.enterprise_id
+            ),
+            name=enterprise.name,
+            industry=enterprise.industry,
+            business_stream_count=len(
+                enterprise.business_streams
+            ),
+            service_count=len(
+                enterprise.services
+            ),
+            component_count=len(
+                enterprise.components
+            ),
+        )
+
+
+class BusinessStreamResponse(BaseModel):
+    stream_id: str
+    name: str
+
+
+class EnterpriseServiceResponse(BaseModel):
+    service_id: str
+    name: str
+
+    business_stream_id: str
+
+    owner: str
+    criticality: Criticality
+
+    workload_class: WorkloadClass | None = None
+
+    benchmark_profile_id: str | None = None
+    baseline_profile_id: str | None = None
+
+
+class EnterpriseComponentResponse(BaseModel):
+    component_id: str
+    name: str
+    component_type: str
+
+    service_id: str
+    environment: Environment
+
+
+class EnterpriseDetailResponse(BaseModel):
+    enterprise_id: str
+    name: str
+    industry: Industry
+
+    business_streams: list[
+        BusinessStreamResponse
+    ] = Field(default_factory=list)
+
+    services: list[
+        EnterpriseServiceResponse
+    ] = Field(default_factory=list)
+
+    components: list[
+        EnterpriseComponentResponse
+    ] = Field(default_factory=list)
+
+    @classmethod
+    def from_enterprise(
+        cls,
+        enterprise: Enterprise,
+    ) -> "EnterpriseDetailResponse":
+        return cls.model_validate(
+            enterprise.model_dump()
+        )
 
 
 class ScenarioSummaryResponse(BaseModel):

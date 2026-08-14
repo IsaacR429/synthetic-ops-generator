@@ -4,6 +4,9 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from synthetic_ops_generator.api.routes.enterprises import (
+    router as enterprises_router,
+)
 from synthetic_ops_generator.api.routes.health import (
     router as health_router,
 )
@@ -12,6 +15,9 @@ from synthetic_ops_generator.api.routes.runs import (
 )
 from synthetic_ops_generator.api.routes.scenarios import (
     router as scenarios_router,
+)
+from synthetic_ops_generator.config.enterprise_catalogue import (
+    EnterpriseCatalogue,
 )
 from synthetic_ops_generator.control.active_run_manager import (
     ActiveRunManager,
@@ -67,6 +73,13 @@ def create_app(
 
     catalogue = ScenarioCatalogue(
         config_root_path / "scenarios"
+    )
+
+    enterprise_catalogue = (
+        EnterpriseCatalogue(
+            config_root_path
+            / "enterprises"
+        )
     )
 
     generator_factory = GeneratorFactory(
@@ -167,8 +180,12 @@ def create_app(
     )
 
     app.state.scenario_catalogue = catalogue
+    app.state.enterprise_catalogue = (
+        enterprise_catalogue
+    )
 
     app.include_router(health_router)
+    app.include_router(enterprises_router)
     app.include_router(scenarios_router)
     app.include_router(runs_router)
 
