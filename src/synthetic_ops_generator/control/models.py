@@ -14,6 +14,11 @@ class RunStatus(StrEnum):
     STOPPED = "stopped"
 
 
+class RunExecutionMode(StrEnum):
+    STANDARD = "standard"
+    HISTORICAL = "historical"
+
+
 @dataclass(frozen=True)
 class RunRecord:
     run_id: str
@@ -34,6 +39,10 @@ class RunRecord:
     event_interval_seconds: float
 
     error_message: str | None = None
+
+    execution_mode: RunExecutionMode = (
+        RunExecutionMode.STANDARD
+    )
 
 
 @dataclass(frozen=True)

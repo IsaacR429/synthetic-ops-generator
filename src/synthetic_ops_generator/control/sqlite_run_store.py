@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from synthetic_ops_generator.control.models import (
+    RunExecutionMode,
     RunRecord,
     RunStatus,
 )
@@ -129,9 +130,15 @@ class SQLiteRunStore(RunStore):
                     random_seed INTEGER NOT NULL,
                     event_interval_seconds REAL NOT NULL
                         CHECK(event_interval_seconds > 0),
-                    error_message TEXT
+                    error_message TEXT,
+                    execution_mode TEXT NOT NULL
+                        DEFAULT 'standard'
                 )
                 """
+            )
+
+            self._ensure_execution_mode_column(
+                connection
             )
 
             connection.execute(
@@ -149,6 +156,28 @@ class SQLiteRunStore(RunStore):
                 ON runs (status)
                 """
             )
+
+    @staticmethod
+    def _ensure_execution_mode_column(
+        connection: sqlite3.Connection,
+    ) -> None:
+        columns = {
+            str(row[1])
+            for row in connection.execute(
+                "PRAGMA table_info(runs)"
+            ).fetchall()
+        }
+
+        if "execution_mode" in columns:
+            return
+
+        connection.execute(
+            """
+            ALTER TABLE runs
+            ADD COLUMN execution_mode TEXT NOT NULL
+            DEFAULT 'standard'
+            """
+        )
 
     def _create_sync(
         self,
@@ -171,9 +200,10 @@ class SQLiteRunStore(RunStore):
                     validation_passed,
                     random_seed,
                     event_interval_seconds,
-                    error_message
+                    error_message,
+                    execution_mode
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 self._record_values(record),
             )
@@ -199,7 +229,8 @@ class SQLiteRunStore(RunStore):
                     validation_passed,
                     random_seed,
                     event_interval_seconds,
-                    error_message
+                    error_message,
+                    execution_mode
                 FROM runs
                 WHERE run_id = ?
                 """,
@@ -232,7 +263,8 @@ class SQLiteRunStore(RunStore):
                     validation_passed,
                     random_seed,
                     event_interval_seconds,
-                    error_message
+                    error_message,
+                    execution_mode
                 FROM runs
                 WHERE status = ?
                 ORDER BY started_at, run_id
@@ -266,7 +298,8 @@ class SQLiteRunStore(RunStore):
                     validation_passed = ?,
                     random_seed = ?,
                     event_interval_seconds = ?,
-                    error_message = ?
+                    error_message = ?,
+                    execution_mode = ?
                 WHERE run_id = ?
                 """,
                 (
@@ -295,6 +328,7 @@ class SQLiteRunStore(RunStore):
                     record.random_seed,
                     record.event_interval_seconds,
                     record.error_message,
+                    record.execution_mode.value,
                     record.run_id,
                 ),
             )
@@ -331,6 +365,7 @@ class SQLiteRunStore(RunStore):
             record.random_seed,
             record.event_interval_seconds,
             record.error_message,
+            record.execution_mode.value,
         )
 
     @staticmethod
@@ -371,6 +406,9 @@ class SQLiteRunStore(RunStore):
                 str(row[11])
                 if row[11] is not None
                 else None
+            ),
+            execution_mode=RunExecutionMode(
+                str(row[12])
             ),
         )
 
