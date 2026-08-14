@@ -189,7 +189,7 @@ def build_historical_incident_dataset(
                     perturbation_phase=None,
                     perturbation_strength=0.0,
                     counterfactual_value=(
-                        obs_point.observed_value
+                        obs_point.expected_value
                     ),
                     observed_value=(
                         obs_point.observed_value
