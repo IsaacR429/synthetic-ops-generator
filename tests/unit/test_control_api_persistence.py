@@ -104,6 +104,7 @@ def test_run_ids_survive_application_restart(
             "run_id": "RUN0000001",
             "change_id": "CHG0000001",
             "status": "running",
+            "execution_mode": "standard",
         }
 
         first_completed = (
@@ -365,5 +366,7 @@ def test_graceful_shutdown_stops_active_run_and_preserves_status_after_restart(
         )
 
         assert payload["error_message"] is None
+
+        assert payload["execution_mode"] == "standard"
 
         assert payload["event_count"] == 0

@@ -8,6 +8,7 @@ from synthetic_ops_generator.control.active_run_manager import (
     ActiveRunManager,
 )
 from synthetic_ops_generator.control.models import (
+    RunExecutionMode,
     RunRecord,
     RunStatus,
 )
@@ -32,6 +33,9 @@ from synthetic_ops_generator.events.envelope import (
 )
 from synthetic_ops_generator.generators.factory import (
     GeneratorFactory,
+)
+from synthetic_ops_generator.history.executor import (
+    HistoricalRunExecutor,
 )
 from synthetic_ops_generator.publishers.base import (
     EventPublisher,
@@ -1202,6 +1206,129 @@ async def test_control_service_persists_live_progress_during_execution(
         assert (
             final_record.completed_at
             is not None
+        )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_control_service_executes_historical_managed_run(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "runs"
+
+    store = SQLiteEventStore(
+        database_path=(
+            data_root
+            / "events.sqlite3"
+        )
+    )
+
+    run_store = SQLiteRunStore(
+        database_path=(
+            data_root
+            / "runs.sqlite3"
+        )
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = (
+        ActiveRunManager()
+    )
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT
+                / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            historical_run_executor=(
+                HistoricalRunExecutor(
+                    config_root=CONFIG_ROOT
+                )
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path
+                    / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=(
+                active_run_manager
+            ),
+        )
+
+        result = await service.start_run(
+            scenario_id="BANK-02",
+            random_seed=42,
+            execution_mode=(
+                RunExecutionMode.HISTORICAL
+            ),
+        )
+
+        assert (
+            result.execution_mode
+            == RunExecutionMode.HISTORICAL
+        )
+
+        record = await wait_for_terminal_run(
+            service,
+            result.run_id,
+        )
+
+        retained_events = (
+            await store.get_run_events(
+                result.run_id
+            )
+        )
+
+        assert record.status == (
+            RunStatus.COMPLETED
+        )
+
+        assert (
+            record.execution_mode
+            == RunExecutionMode.HISTORICAL
+        )
+
+        assert (
+            record.current_state
+            == OperationalState.COMPLETED
+        )
+
+        assert record.event_count == 48
+
+        assert (
+            record.validation_passed
+            is None
+        )
+
+        assert len(retained_events) == 48
+
+        assert all(
+            event.event_type
+            == "metric.observed"
+            for event in retained_events
+        )
+
+        assert all(
+            "historical"
+            in event.data["metric"]
+            for event in retained_events
         )
 
     finally:

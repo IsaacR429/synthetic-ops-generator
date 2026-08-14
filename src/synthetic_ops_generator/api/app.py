@@ -29,6 +29,9 @@ from synthetic_ops_generator.core.sqlite_identifiers import (
 from synthetic_ops_generator.generators.factory import (
     GeneratorFactory,
 )
+from synthetic_ops_generator.history.executor import (
+    HistoricalRunExecutor,
+)
 from synthetic_ops_generator.publishers.memory import (
     InMemoryPublisher,
 )
@@ -68,6 +71,12 @@ def create_app(
 
     generator_factory = GeneratorFactory(
         config_root=config_root_path
+    )
+
+    historical_run_executor = (
+        HistoricalRunExecutor(
+            config_root=config_root_path
+        )
     )
 
     @asynccontextmanager
@@ -126,6 +135,9 @@ def create_app(
             active_run_manager=active_run_manager,
             execution_publisher_factory=(
                 execution_publisher_factory
+            ),
+            historical_run_executor=(
+                historical_run_executor
             ),
             event_interval_seconds=(
                 event_interval_seconds

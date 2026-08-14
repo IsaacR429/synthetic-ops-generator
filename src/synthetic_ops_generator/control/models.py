@@ -52,6 +52,10 @@ class RunStartResult:
     change_id: str
     status: RunStatus
 
+    execution_mode: RunExecutionMode = (
+        RunExecutionMode.STANDARD
+    )
+
 
 @dataclass(frozen=True)
 class StopRunResult:

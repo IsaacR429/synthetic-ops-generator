@@ -54,6 +54,9 @@ async def start_run(
         result = await service.start_run(
             scenario_id=request.scenario_id,
             random_seed=request.random_seed,
+            execution_mode=(
+                request.execution_mode
+            ),
         )
     except ScenarioNotFoundError as exc:
         raise HTTPException(

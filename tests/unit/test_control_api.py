@@ -212,6 +212,7 @@ def test_start_run_executes_scenario(
         "run_id": "RUN0000001",
         "change_id": "CHG0000001",
         "status": "running",
+        "execution_mode": "standard",
     }
 
 
@@ -490,3 +491,57 @@ def test_stop_non_stoppable_run_returns_409(
             "is 'completed'."
         )
     }
+
+
+def test_start_historical_run_executes_scenario(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-02",
+            "random_seed": 42,
+            "execution_mode": "historical",
+        },
+    )
+
+    assert response.status_code == 202
+
+    payload = response.json()
+
+    assert payload == {
+        "scenario_id": "BANK-02",
+        "run_id": "RUN0000001",
+        "change_id": "CHG0000001",
+        "status": "running",
+        "execution_mode": "historical",
+    }
+
+    completed = wait_for_terminal_run(
+        client,
+        payload["run_id"],
+    )
+
+    assert (
+        completed["status"]
+        == "completed"
+    )
+
+    assert (
+        completed["current_state"]
+        == "completed"
+    )
+
+    assert (
+        completed["execution_mode"]
+        == "historical"
+    )
+
+    assert completed["event_count"] == 48
+
+    assert (
+        completed["validation_passed"]
+        is None
+    )
+
+    assert completed["error_message"] is None

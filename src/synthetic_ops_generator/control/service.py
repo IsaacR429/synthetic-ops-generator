@@ -12,6 +12,7 @@ from synthetic_ops_generator.control.active_run_manager import (
 )
 from synthetic_ops_generator.control.models import (
     ReplayExecutionResult,
+    RunExecutionMode,
     RunRecord,
     RunStartResult,
     RunStatus,
@@ -30,6 +31,12 @@ from synthetic_ops_generator.domain.enums import (
 )
 from synthetic_ops_generator.generators.factory import (
     GeneratorFactory,
+)
+from synthetic_ops_generator.history.executor import (
+    HistoricalRunExecutor,
+)
+from synthetic_ops_generator.history.perturbation import (
+    PerturbationCurveSpec,
 )
 from synthetic_ops_generator.publishers.base import (
     EventPublisher,
@@ -98,6 +105,9 @@ class ControlService:
         execution_publisher_factory: (
             ExecutionPublisherFactory | None
         ) = None,
+        historical_run_executor: (
+            HistoricalRunExecutor | None
+        ) = None,
         event_interval_seconds: float = 5.0,
     ) -> None:
         if event_interval_seconds <= 0:
@@ -120,6 +130,9 @@ class ControlService:
             if execution_publisher_factory is not None
             else self._create_default_execution_publisher
         )
+        self._historical_run_executor = (
+            historical_run_executor
+        )
         self._event_interval_seconds = (
             event_interval_seconds
         )
@@ -136,6 +149,9 @@ class ControlService:
         *,
         scenario_id: str,
         random_seed: int,
+        execution_mode: RunExecutionMode = (
+            RunExecutionMode.STANDARD
+        ),
     ) -> RunStartResult:
         scenario = self._catalogue.get_scenario(
             scenario_id
@@ -189,6 +205,7 @@ class ControlService:
             event_interval_seconds=(
                 self._event_interval_seconds
             ),
+            execution_mode=execution_mode,
         )
 
         await self._run_store.create(
@@ -197,18 +214,6 @@ class ControlService:
 
         async def _execute() -> None:
             try:
-                random_source = SimulationRandom(
-                    context.random_seed
-                )
-
-                generators = self._generator_factory.build(
-                    scenario=scenario,
-                    enterprise=enterprise,
-                    ids=self._ids,
-                    random_source=random_source,
-                    event_history=runner.event_history,
-                )
-
                 publisher = (
                     self._execution_publisher_factory()
                 )
@@ -222,6 +227,72 @@ class ControlService:
                         state,
                         event_count,
                     )
+
+                if (
+                    execution_mode
+                    == RunExecutionMode.HISTORICAL
+                ):
+                    if self._historical_run_executor is None:
+                        raise RuntimeError(
+                            "Historical execution is not configured."
+                        )
+
+                    await self._historical_run_executor.execute(
+                        scenario=scenario,
+                        enterprise=enterprise,
+                        context=context,
+                        ids=self._ids,
+                        publisher=publisher,
+                        anchor_time=context.simulation_time,
+                        curve_spec=(
+                            PerturbationCurveSpec(
+                                degradation_samples=4,
+                                plateau_samples=2,
+                                recovery_samples=4,
+                            )
+                        ),
+                        progress_observer=persist_progress,
+                    )
+
+                    latest_record = (
+                        await self._run_store.get(
+                            context.run_id
+                        )
+                    )
+
+                    if latest_record is None:
+                        raise RuntimeError(
+                            f"Run '{context.run_id}' disappeared "
+                            "during historical execution."
+                        )
+
+                    completed_record = replace(
+                        latest_record,
+                        status=RunStatus.COMPLETED,
+                        completed_at=datetime.now(UTC),
+                        current_state=(
+                            OperationalState.COMPLETED
+                        ),
+                        validation_passed=None,
+                    )
+
+                    await self._run_store.update(
+                        completed_record
+                    )
+
+                    return
+
+                random_source = SimulationRandom(
+                    context.random_seed
+                )
+
+                generators = self._generator_factory.build(
+                    scenario=scenario,
+                    enterprise=enterprise,
+                    ids=self._ids,
+                    random_source=random_source,
+                    event_history=runner.event_history,
+                )
 
                 await runner.execute(
                     scenario=scenario,
@@ -243,16 +314,33 @@ class ControlService:
                 )
 
             except asyncio.CancelledError:
-                stopped_record = replace(
-                    run_record,
-                    status=RunStatus.STOPPED,
-                    completed_at=datetime.now(UTC),
-                    current_state=context.scenario_state,
-                    event_count=len(
-                        runner.event_history
-                    ),
-                    validation_passed=None,
-                )
+                if (
+                    execution_mode
+                    == RunExecutionMode.HISTORICAL
+                ):
+                    latest_record = (
+                        await self._latest_persisted_progress(
+                            context.run_id
+                        )
+                    )
+
+                    stopped_record = replace(
+                        latest_record,
+                        status=RunStatus.STOPPED,
+                        completed_at=datetime.now(UTC),
+                        validation_passed=None,
+                    )
+                else:
+                    stopped_record = replace(
+                        run_record,
+                        status=RunStatus.STOPPED,
+                        completed_at=datetime.now(UTC),
+                        current_state=context.scenario_state,
+                        event_count=len(
+                            runner.event_history
+                        ),
+                        validation_passed=None,
+                    )
 
                 await self._run_store.update(
                     stopped_record
@@ -261,17 +349,35 @@ class ControlService:
                 raise
 
             except Exception as exc:
-                failed_record = replace(
-                    run_record,
-                    status=RunStatus.FAILED,
-                    completed_at=datetime.now(UTC),
-                    current_state=context.scenario_state,
-                    event_count=len(
-                        runner.event_history
-                    ),
-                    validation_passed=None,
-                    error_message=str(exc),
-                )
+                if (
+                    execution_mode
+                    == RunExecutionMode.HISTORICAL
+                ):
+                    latest_record = (
+                        await self._latest_persisted_progress(
+                            context.run_id
+                        )
+                    )
+
+                    failed_record = replace(
+                        latest_record,
+                        status=RunStatus.FAILED,
+                        completed_at=datetime.now(UTC),
+                        validation_passed=None,
+                        error_message=str(exc),
+                    )
+                else:
+                    failed_record = replace(
+                        run_record,
+                        status=RunStatus.FAILED,
+                        completed_at=datetime.now(UTC),
+                        current_state=context.scenario_state,
+                        event_count=len(
+                            runner.event_history
+                        ),
+                        validation_passed=None,
+                        error_message=str(exc),
+                    )
 
                 await self._run_store.update(
                     failed_record
@@ -309,7 +415,24 @@ class ControlService:
             run_id=context.run_id,
             change_id=context.chg_id,
             status=RunStatus.RUNNING,
+            execution_mode=execution_mode,
         )
+
+    async def _latest_persisted_progress(
+        self,
+        run_id: str,
+    ) -> RunRecord:
+        record = await self._run_store.get(
+            run_id
+        )
+
+        if record is None:
+            raise RuntimeError(
+                f"Run '{run_id}' disappeared "
+                "during execution."
+            )
+
+        return record
 
     async def get_run(
         self,

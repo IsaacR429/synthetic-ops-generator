@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from synthetic_ops_generator.control.models import (
     ReplayExecutionResult,
+    RunExecutionMode,
     RunRecord,
     RunStartResult,
     RunStatus,
@@ -148,6 +149,9 @@ class ScenarioDetailResponse(BaseModel):
 class StartRunRequest(BaseModel):
     scenario_id: str = Field(min_length=1)
     random_seed: int = 42
+    execution_mode: RunExecutionMode = (
+        RunExecutionMode.STANDARD
+    )
 
 
 class StartRunResponse(BaseModel):
@@ -155,6 +159,7 @@ class StartRunResponse(BaseModel):
     run_id: str
     change_id: str
     status: RunStatus
+    execution_mode: RunExecutionMode
 
     @classmethod
     def from_result(
@@ -166,6 +171,7 @@ class StartRunResponse(BaseModel):
             run_id=result.run_id,
             change_id=result.change_id,
             status=result.status,
+            execution_mode=result.execution_mode,
         )
 
 
@@ -175,6 +181,7 @@ class RunResponse(BaseModel):
     change_id: str
 
     status: RunStatus
+    execution_mode: RunExecutionMode
 
     started_at: datetime
     completed_at: datetime | None
@@ -199,6 +206,7 @@ class RunResponse(BaseModel):
             scenario_id=record.scenario_id,
             change_id=record.change_id,
             status=record.status,
+            execution_mode=record.execution_mode,
             started_at=record.started_at,
             completed_at=record.completed_at,
             current_state=record.current_state,

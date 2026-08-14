@@ -1,4 +1,5 @@
-from collections.abc import Callable
+import inspect
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,10 @@ from synthetic_ops_generator.publishers.base import EventPublisher
 from synthetic_ops_generator.scenarios.context import ScenarioContext
 from synthetic_ops_generator.scenarios.models import ScenarioDefinition
 
-ProgressObserver = Callable[[OperationalState, int], None]
+ProgressObserver = Callable[
+    [OperationalState, int],
+    Awaitable[None] | None,
+]
 
 
 @dataclass(frozen=True)
@@ -35,6 +39,15 @@ class HistoricalRunExecutionResult:
 
 
 class HistoricalRunExecutor:
+    def __init__(
+        self,
+        *,
+        config_root: str | Path,
+    ) -> None:
+        self._config_root = Path(
+            config_root
+        )
+
     async def execute(
         self,
         *,
@@ -45,13 +58,12 @@ class HistoricalRunExecutor:
         publisher: EventPublisher,
         anchor_time: datetime,
         curve_spec: PerturbationCurveSpec,
-        config_root: str | Path,
         progress_observer: ProgressObserver | None = None,
     ) -> HistoricalRunExecutionResult:
         runtime = build_historical_scenario_runtime(
             scenario=scenario,
             enterprise=enterprise,
-            config_root=config_root,
+            config_root=self._config_root,
         )
 
         dataset = build_historical_incident_dataset(
@@ -83,19 +95,23 @@ class HistoricalRunExecutor:
                 event_count % metrics_per_sample == 0
                 and progress_observer is not None
             ):
-                progress_observer(
+                res = progress_observer(
                     current_sample_state,
                     event_count,
                 )
+                if inspect.isawaitable(res):
+                    await res
 
         if (
             progress_observer is not None
             and event_count > 0
         ):
-            progress_observer(
+            res = progress_observer(
                 OperationalState.COMPLETED,
                 event_count,
             )
+            if inspect.isawaitable(res):
+                await res
 
         return HistoricalRunExecutionResult(
             event_count=event_count,
