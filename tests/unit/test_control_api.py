@@ -213,6 +213,7 @@ def test_start_run_executes_scenario(
         "change_id": "CHG0000001",
         "status": "running",
         "execution_mode": "standard",
+        "historical_configuration": None,
     }
 
 
@@ -515,6 +516,11 @@ def test_start_historical_run_executes_scenario(
         "change_id": "CHG0000001",
         "status": "running",
         "execution_mode": "historical",
+        "historical_configuration": {
+            "degradation_samples": 4,
+            "plateau_samples": 2,
+            "recovery_samples": 4,
+        },
     }
 
     completed = wait_for_terminal_run(
@@ -786,3 +792,88 @@ def test_start_historical_run_rejects_unsupported_scenario(
             "support managed historical execution."
         )
     }
+
+
+def test_start_historical_run_accepts_custom_configuration(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-02",
+            "random_seed": 42,
+            "execution_mode": "historical",
+            "historical": {
+                "degradation_samples": 6,
+                "plateau_samples": 3,
+                "recovery_samples": 5,
+            },
+        },
+    )
+
+    assert response.status_code == 202
+
+    payload = response.json()
+
+    assert payload[
+        "historical_configuration"
+    ] == {
+        "degradation_samples": 6,
+        "plateau_samples": 3,
+        "recovery_samples": 5,
+    }
+
+    completed = wait_for_terminal_run(
+        client,
+        payload["run_id"],
+    )
+
+    assert completed["status"] == "completed"
+
+    assert completed[
+        "historical_configuration"
+    ] == {
+        "degradation_samples": 6,
+        "plateau_samples": 3,
+        "recovery_samples": 5,
+    }
+
+    assert completed["event_count"] == 60
+
+
+def test_standard_run_rejects_historical_configuration(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "execution_mode": "standard",
+            "historical": {
+                "degradation_samples": 4,
+                "plateau_samples": 2,
+                "recovery_samples": 4,
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_historical_run_rejects_invalid_configuration(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-02",
+            "execution_mode": "historical",
+            "historical": {
+                "degradation_samples": 0,
+                "plateau_samples": 2,
+                "recovery_samples": 4,
+            },
+        },
+    )
+
+    assert response.status_code == 422

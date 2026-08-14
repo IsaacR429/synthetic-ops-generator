@@ -2,6 +2,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from synthetic_ops_generator.control.configuration import (
+    HistoricalExecutionConfiguration,
+)
 from synthetic_ops_generator.domain.enums import (
     OperationalState,
 )
@@ -44,6 +47,10 @@ class RunRecord:
         RunExecutionMode.STANDARD
     )
 
+    historical_configuration: (
+        HistoricalExecutionConfiguration | None
+    ) = None
+
 
 @dataclass(frozen=True)
 class RunStartResult:
@@ -55,6 +62,10 @@ class RunStartResult:
     execution_mode: RunExecutionMode = (
         RunExecutionMode.STANDARD
     )
+
+    historical_configuration: (
+        HistoricalExecutionConfiguration | None
+    ) = None
 
 
 @dataclass(frozen=True)

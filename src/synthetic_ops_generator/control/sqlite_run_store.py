@@ -3,6 +3,9 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from synthetic_ops_generator.control.configuration import (
+    HistoricalExecutionConfiguration,
+)
 from synthetic_ops_generator.control.models import (
     RunExecutionMode,
     RunRecord,
@@ -132,12 +135,31 @@ class SQLiteRunStore(RunStore):
                         CHECK(event_interval_seconds > 0),
                     error_message TEXT,
                     execution_mode TEXT NOT NULL
-                        DEFAULT 'standard'
+                        DEFAULT 'standard',
+                    historical_degradation_samples INTEGER
+                        CHECK(
+                            historical_degradation_samples IS NULL
+                            OR historical_degradation_samples > 0
+                        ),
+                    historical_plateau_samples INTEGER
+                        CHECK(
+                            historical_plateau_samples IS NULL
+                            OR historical_plateau_samples >= 0
+                        ),
+                    historical_recovery_samples INTEGER
+                        CHECK(
+                            historical_recovery_samples IS NULL
+                            OR historical_recovery_samples >= 0
+                        )
                 )
                 """
             )
 
             self._ensure_execution_mode_column(
+                connection
+            )
+
+            self._ensure_historical_configuration_columns(
                 connection
             )
 
@@ -179,6 +201,95 @@ class SQLiteRunStore(RunStore):
             """
         )
 
+    @staticmethod
+    def _ensure_historical_configuration_columns(
+        connection: sqlite3.Connection,
+    ) -> None:
+        columns = {
+            str(row[1])
+            for row in connection.execute(
+                "PRAGMA table_info(runs)"
+            ).fetchall()
+        }
+
+        if (
+            "historical_degradation_samples"
+            not in columns
+        ):
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN
+                historical_degradation_samples
+                INTEGER
+                CHECK(
+                    historical_degradation_samples
+                    IS NULL
+                    OR
+                    historical_degradation_samples > 0
+                )
+                """
+            )
+
+        if (
+            "historical_plateau_samples"
+            not in columns
+        ):
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN
+                historical_plateau_samples
+                INTEGER
+                CHECK(
+                    historical_plateau_samples
+                    IS NULL
+                    OR historical_plateau_samples >= 0
+                )
+                """
+            )
+
+        if (
+            "historical_recovery_samples"
+            not in columns
+        ):
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN
+                historical_recovery_samples
+                INTEGER
+                CHECK(
+                    historical_recovery_samples
+                    IS NULL
+                    OR historical_recovery_samples >= 0
+                )
+                """
+            )
+
+        connection.execute(
+            """
+            UPDATE runs
+            SET
+                historical_degradation_samples =
+                    COALESCE(
+                        historical_degradation_samples,
+                        4
+                    ),
+                historical_plateau_samples =
+                    COALESCE(
+                        historical_plateau_samples,
+                        2
+                    ),
+                historical_recovery_samples =
+                    COALESCE(
+                        historical_recovery_samples,
+                        4
+                    )
+            WHERE execution_mode = 'historical'
+            """
+        )
+
     def _create_sync(
         self,
         record: RunRecord,
@@ -201,9 +312,12 @@ class SQLiteRunStore(RunStore):
                     random_seed,
                     event_interval_seconds,
                     error_message,
-                    execution_mode
+                    execution_mode,
+                    historical_degradation_samples,
+                    historical_plateau_samples,
+                    historical_recovery_samples
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 self._record_values(record),
             )
@@ -230,7 +344,10 @@ class SQLiteRunStore(RunStore):
                     random_seed,
                     event_interval_seconds,
                     error_message,
-                    execution_mode
+                    execution_mode,
+                    historical_degradation_samples,
+                    historical_plateau_samples,
+                    historical_recovery_samples
                 FROM runs
                 WHERE run_id = ?
                 """,
@@ -264,7 +381,10 @@ class SQLiteRunStore(RunStore):
                     random_seed,
                     event_interval_seconds,
                     error_message,
-                    execution_mode
+                    execution_mode,
+                    historical_degradation_samples,
+                    historical_plateau_samples,
+                    historical_recovery_samples
                 FROM runs
                 WHERE status = ?
                 ORDER BY started_at, run_id
@@ -299,7 +419,10 @@ class SQLiteRunStore(RunStore):
                     random_seed = ?,
                     event_interval_seconds = ?,
                     error_message = ?,
-                    execution_mode = ?
+                    execution_mode = ?,
+                    historical_degradation_samples = ?,
+                    historical_plateau_samples = ?,
+                    historical_recovery_samples = ?
                 WHERE run_id = ?
                 """,
                 (
@@ -329,6 +452,27 @@ class SQLiteRunStore(RunStore):
                     record.event_interval_seconds,
                     record.error_message,
                     record.execution_mode.value,
+                    (
+                        record.historical_configuration
+                        .degradation_samples
+                        if record.historical_configuration
+                        is not None
+                        else None
+                    ),
+                    (
+                        record.historical_configuration
+                        .plateau_samples
+                        if record.historical_configuration
+                        is not None
+                        else None
+                    ),
+                    (
+                        record.historical_configuration
+                        .recovery_samples
+                        if record.historical_configuration
+                        is not None
+                        else None
+                    ),
                     record.run_id,
                 ),
             )
@@ -366,6 +510,27 @@ class SQLiteRunStore(RunStore):
             record.event_interval_seconds,
             record.error_message,
             record.execution_mode.value,
+            (
+                record.historical_configuration
+                .degradation_samples
+                if record.historical_configuration
+                is not None
+                else None
+            ),
+            (
+                record.historical_configuration
+                .plateau_samples
+                if record.historical_configuration
+                is not None
+                else None
+            ),
+            (
+                record.historical_configuration
+                .recovery_samples
+                if record.historical_configuration
+                is not None
+                else None
+            ),
         )
 
     @staticmethod
@@ -373,6 +538,20 @@ class SQLiteRunStore(RunStore):
         row: tuple[object, ...],
     ) -> RunRecord:
         validation_value = row[8]
+        execution_mode = RunExecutionMode(
+            str(row[12])
+        )
+
+        historical_configuration = None
+
+        if execution_mode == RunExecutionMode.HISTORICAL:
+            historical_configuration = (
+                HistoricalExecutionConfiguration(
+                    degradation_samples=int(row[13]),
+                    plateau_samples=int(row[14]),
+                    recovery_samples=int(row[15]),
+                )
+            )
 
         return RunRecord(
             run_id=str(row[0]),
@@ -407,8 +586,9 @@ class SQLiteRunStore(RunStore):
                 if row[11] is not None
                 else None
             ),
-            execution_mode=RunExecutionMode(
-                str(row[12])
+            execution_mode=execution_mode,
+            historical_configuration=(
+                historical_configuration
             ),
         )
 
@@ -457,6 +637,26 @@ class SQLiteRunStore(RunStore):
                 "Event interval must be greater than zero."
             )
 
+        if (
+            record.execution_mode
+            == RunExecutionMode.HISTORICAL
+            and record.historical_configuration is None
+        ):
+            raise ValueError(
+                "Historical Runs require a "
+                "historical execution configuration."
+            )
+
+        if (
+            record.execution_mode
+            != RunExecutionMode.HISTORICAL
+            and record.historical_configuration is not None
+        ):
+            raise ValueError(
+                "Historical execution configuration "
+                "cannot be stored for a Standard Run."
+            )
+
         SQLiteRunStore._datetime_to_text(
             record.started_at
         )
@@ -471,3 +671,4 @@ class SQLiteRunStore(RunStore):
             raise RuntimeError(
                 "SQLiteRunStore is not started."
             )
+

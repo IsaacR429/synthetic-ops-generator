@@ -12,6 +12,7 @@ from synthetic_ops_generator.control.active_run_manager import (
 )
 from synthetic_ops_generator.control.configuration import (
     DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION,
+    HistoricalExecutionConfiguration,
 )
 from synthetic_ops_generator.control.models import (
     ReplayExecutionResult,
@@ -161,6 +162,9 @@ class ControlService:
         execution_mode: RunExecutionMode = (
             RunExecutionMode.STANDARD
         ),
+        historical_configuration: (
+            HistoricalExecutionConfiguration | None
+        ) = None,
     ) -> RunStartResult:
         scenario = self._catalogue.get_scenario(
             scenario_id
@@ -187,6 +191,29 @@ class ControlService:
                 f"'{scenario.scenario_id}' does not "
                 "support managed historical execution."
             )
+
+        if (
+            execution_mode
+            != RunExecutionMode.HISTORICAL
+            and historical_configuration is not None
+        ):
+            raise ValueError(
+                "Historical configuration can only "
+                "be supplied for historical execution."
+            )
+
+        resolved_historical_configuration = (
+            historical_configuration
+            if historical_configuration is not None
+            else (
+                DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION
+                if (
+                    execution_mode
+                    == RunExecutionMode.HISTORICAL
+                )
+                else None
+            )
+        )
 
         enterprise_path = (
             self._enterprise_root
@@ -232,6 +259,9 @@ class ControlService:
                 self._event_interval_seconds
             ),
             execution_mode=execution_mode,
+            historical_configuration=(
+                resolved_historical_configuration
+            ),
         )
 
         await self._run_store.create(
@@ -263,6 +293,8 @@ class ControlService:
                             "Historical execution is not configured."
                         )
 
+                    assert resolved_historical_configuration is not None
+
                     await self._historical_run_executor.execute(
                         scenario=scenario,
                         enterprise=enterprise,
@@ -271,7 +303,7 @@ class ControlService:
                         publisher=publisher,
                         anchor_time=context.simulation_time,
                         curve_spec=(
-                            DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION
+                            resolved_historical_configuration
                             .to_curve_spec()
                         ),
                         progress_observer=persist_progress,
@@ -439,6 +471,9 @@ class ControlService:
             change_id=context.chg_id,
             status=RunStatus.RUNNING,
             execution_mode=execution_mode,
+            historical_configuration=(
+                resolved_historical_configuration
+            ),
         )
 
     async def _latest_persisted_progress(

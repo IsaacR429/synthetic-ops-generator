@@ -5,6 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from synthetic_ops_generator.control.configuration import (
+    DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION,
+)
 from synthetic_ops_generator.control.models import (
     RunExecutionMode,
     RunRecord,
@@ -325,6 +328,9 @@ async def test_sqlite_run_store_persists_execution_mode(
             make_run_record(),
             execution_mode=(
                 RunExecutionMode.HISTORICAL
+            ),
+            historical_configuration=(
+                DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION
             ),
         )
 

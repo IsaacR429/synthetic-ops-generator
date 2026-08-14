@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 import threading
 import time
 from datetime import UTC, datetime
@@ -7,7 +8,11 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from synthetic_ops_generator.api.app import create_app
+from synthetic_ops_generator.control.configuration import (
+    HistoricalExecutionConfiguration,
+)
 from synthetic_ops_generator.control.models import (
+    RunExecutionMode,
     RunRecord,
     RunStatus,
 )
@@ -105,6 +110,7 @@ def test_run_ids_survive_application_restart(
             "change_id": "CHG0000001",
             "status": "running",
             "execution_mode": "standard",
+            "historical_configuration": None,
         }
 
         first_completed = (
@@ -597,3 +603,116 @@ def test_historical_run_survives_application_restart(
             "scenario_id": "BANK-02",
             "replayed_event_count": 48,
         }
+
+
+def test_custom_historical_configuration_survives_application_restart(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "runs"
+
+    first_app = create_app(
+        data_root=data_root
+    )
+
+    with TestClient(first_app) as client:
+        started = client.post(
+            "/runs",
+            json={
+                "scenario_id": "BANK-02",
+                "random_seed": 42,
+                "execution_mode": "historical",
+                "historical": {
+                    "degradation_samples": 6,
+                    "plateau_samples": 3,
+                    "recovery_samples": 5,
+                },
+            },
+        )
+
+        assert started.status_code == 202
+
+        run_id = started.json()["run_id"]
+
+        completed = wait_for_terminal_run(
+            client,
+            run_id,
+        )
+
+        assert completed["event_count"] == 60
+
+    second_app = create_app(
+        data_root=data_root
+    )
+
+    with TestClient(second_app) as client:
+        restored = client.get(
+            f"/runs/{run_id}"
+        )
+
+        assert restored.status_code == 200
+
+        payload = restored.json()
+
+        assert (
+            payload["historical_configuration"]
+            == {
+                "degradation_samples": 6,
+                "plateau_samples": 3,
+                "recovery_samples": 5,
+            }
+        )
+
+        assert payload["event_count"] == 60
+
+
+def test_legacy_historical_run_migration_backfills_default_configuration(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "runs" / "runs.sqlite3"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE runs (
+                run_id TEXT PRIMARY KEY,
+                scenario_id TEXT NOT NULL,
+                change_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                current_state TEXT NOT NULL,
+                event_count INTEGER NOT NULL CHECK(event_count >= 0),
+                validation_passed INTEGER,
+                random_seed INTEGER NOT NULL,
+                event_interval_seconds REAL NOT NULL CHECK(event_interval_seconds > 0),
+                error_message TEXT,
+                execution_mode TEXT NOT NULL DEFAULT 'standard'
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO runs (
+                run_id, scenario_id, change_id, status, started_at,
+                completed_at, current_state, event_count, validation_passed,
+                random_seed, event_interval_seconds, error_message, execution_mode
+            ) VALUES (
+                'RUN0000001', 'BANK-02', 'CHG0000001', 'completed',
+                '2026-08-01T10:00:00+00:00', '2026-08-01T10:01:00+00:00',
+                'completed', 48, NULL, 42, 5.0, NULL, 'historical'
+            )
+            """
+        )
+
+    store = SQLiteRunStore(database_path=db_path)
+    asyncio.run(store.start())
+
+    record = asyncio.run(store.get("RUN0000001"))
+    assert record is not None
+    assert record.execution_mode == RunExecutionMode.HISTORICAL
+    assert record.historical_configuration == HistoricalExecutionConfiguration(
+        degradation_samples=4,
+        plateau_samples=2,
+        recovery_samples=4,
+    )

@@ -58,6 +58,9 @@ async def start_run(
             execution_mode=(
                 request.execution_mode
             ),
+            historical_configuration=(
+                request.historical_configuration()
+            ),
         )
     except ScenarioNotFoundError as exc:
         raise HTTPException(

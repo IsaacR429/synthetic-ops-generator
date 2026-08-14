@@ -1,7 +1,11 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import (
+    BaseModel,
+    Field,
+    model_validator,
+)
 
 from synthetic_ops_generator.control.configuration import (
     HistoricalExecutionConfiguration,
@@ -296,12 +300,75 @@ class ScenarioCapabilitiesResponse(BaseModel):
     )
 
 
+class HistoricalExecutionConfigurationRequest(
+    BaseModel
+):
+    degradation_samples: int = Field(
+        default=4,
+        gt=0,
+    )
+    plateau_samples: int = Field(
+        default=2,
+        ge=0,
+    )
+    recovery_samples: int = Field(
+        default=4,
+        ge=0,
+    )
+
+    def to_configuration(
+        self,
+    ) -> HistoricalExecutionConfiguration:
+        return HistoricalExecutionConfiguration(
+            degradation_samples=(
+                self.degradation_samples
+            ),
+            plateau_samples=(
+                self.plateau_samples
+            ),
+            recovery_samples=(
+                self.recovery_samples
+            ),
+        )
+
+
 class StartRunRequest(BaseModel):
     scenario_id: str = Field(min_length=1)
     random_seed: int = 42
+
     execution_mode: RunExecutionMode = (
         RunExecutionMode.STANDARD
     )
+
+    historical: (
+        HistoricalExecutionConfigurationRequest
+        | None
+    ) = None
+
+    @model_validator(mode="after")
+    def validate_execution_configuration(
+        self,
+    ) -> "StartRunRequest":
+        if (
+            self.execution_mode
+            != RunExecutionMode.HISTORICAL
+            and self.historical is not None
+        ):
+            raise ValueError(
+                "Historical configuration can "
+                "only be supplied for historical "
+                "execution."
+            )
+
+        return self
+
+    def historical_configuration(
+        self,
+    ) -> HistoricalExecutionConfiguration | None:
+        if self.historical is None:
+            return None
+
+        return self.historical.to_configuration()
 
 
 class StartRunResponse(BaseModel):
@@ -310,6 +377,11 @@ class StartRunResponse(BaseModel):
     change_id: str
     status: RunStatus
     execution_mode: RunExecutionMode
+
+    historical_configuration: (
+        HistoricalExecutionConfigurationResponse
+        | None
+    ) = None
 
     @classmethod
     def from_result(
@@ -322,6 +394,17 @@ class StartRunResponse(BaseModel):
             change_id=result.change_id,
             status=result.status,
             execution_mode=result.execution_mode,
+            historical_configuration=(
+                HistoricalExecutionConfigurationResponse
+                .from_configuration(
+                    result.historical_configuration
+                )
+                if (
+                    result.historical_configuration
+                    is not None
+                )
+                else None
+            ),
         )
 
 
@@ -346,6 +429,11 @@ class RunResponse(BaseModel):
 
     error_message: str | None = None
 
+    historical_configuration: (
+        HistoricalExecutionConfigurationResponse
+        | None
+    ) = None
+
     @classmethod
     def from_record(
         cls,
@@ -369,6 +457,14 @@ class RunResponse(BaseModel):
                 record.event_interval_seconds
             ),
             error_message=record.error_message,
+            historical_configuration=(
+                HistoricalExecutionConfigurationResponse
+                .from_configuration(
+                    record.historical_configuration
+                )
+                if record.historical_configuration is not None
+                else None
+            ),
         )
 
 

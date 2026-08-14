@@ -7,6 +7,9 @@ import pytest
 from synthetic_ops_generator.control.active_run_manager import (
     ActiveRunManager,
 )
+from synthetic_ops_generator.control.configuration import (
+    DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION,
+)
 from synthetic_ops_generator.control.models import (
     RunExecutionMode,
     RunRecord,
@@ -1987,6 +1990,9 @@ async def test_historical_orphaned_run_is_reconciled_as_failed(
             event_interval_seconds=5.0,
             execution_mode=(
                 RunExecutionMode.HISTORICAL
+            ),
+            historical_configuration=(
+                DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION
             ),
         )
 
