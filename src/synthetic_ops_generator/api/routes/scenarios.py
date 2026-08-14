@@ -4,9 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from synthetic_ops_generator.api.models import (
     HistoricalExecutionCapabilityResponse,
+    HistoricalExecutionConfigurationResponse,
     ScenarioCapabilitiesResponse,
     ScenarioDetailResponse,
     ScenarioSummaryResponse,
+)
+from synthetic_ops_generator.control.configuration import (
+    DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION,
 )
 from synthetic_ops_generator.control.models import (
     RunExecutionMode,
@@ -122,6 +126,13 @@ async def get_scenario_capabilities(
                         "currently requires an incident "
                         "and rollback scenario."
                     )
+                ),
+                configuration=(
+                    HistoricalExecutionConfigurationResponse.from_configuration(
+                        DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION
+                    )
+                    if capabilities.historical_supported
+                    else None
                 ),
             )
         ),

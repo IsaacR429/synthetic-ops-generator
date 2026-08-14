@@ -695,6 +695,11 @@ def test_get_historical_scenario_capabilities(
         "historical": {
             "supported": True,
             "unavailable_reason": None,
+            "configuration": {
+                "degradation_samples": 4,
+                "plateau_samples": 2,
+                "recovery_samples": 4,
+            },
         },
     }
 
@@ -720,6 +725,7 @@ def test_get_non_historical_scenario_capabilities(
                 "currently requires an incident "
                 "and rollback scenario."
             ),
+            "configuration": None,
         },
     }
 
@@ -740,6 +746,14 @@ def test_insurance_rollback_supports_historical_execution(
             "historical",
         ]
     )
+
+    historical = response.json()["historical"]
+
+    assert historical["configuration"] == {
+        "degradation_samples": 4,
+        "plateau_samples": 2,
+        "recovery_samples": 4,
+    }
 
 
 def test_unknown_scenario_capabilities_returns_404(

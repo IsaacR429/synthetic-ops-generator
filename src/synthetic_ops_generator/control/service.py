@@ -10,6 +10,9 @@ from synthetic_ops_generator.config.enterprise_loader import (
 from synthetic_ops_generator.control.active_run_manager import (
     ActiveRunManager,
 )
+from synthetic_ops_generator.control.configuration import (
+    DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION,
+)
 from synthetic_ops_generator.control.models import (
     ReplayExecutionResult,
     RunExecutionMode,
@@ -34,9 +37,6 @@ from synthetic_ops_generator.generators.factory import (
 )
 from synthetic_ops_generator.history.executor import (
     HistoricalRunExecutor,
-)
-from synthetic_ops_generator.history.perturbation import (
-    PerturbationCurveSpec,
 )
 from synthetic_ops_generator.publishers.base import (
     EventPublisher,
@@ -271,11 +271,8 @@ class ControlService:
                         publisher=publisher,
                         anchor_time=context.simulation_time,
                         curve_spec=(
-                            PerturbationCurveSpec(
-                                degradation_samples=4,
-                                plateau_samples=2,
-                                recovery_samples=4,
-                            )
+                            DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION
+                            .to_curve_spec()
                         ),
                         progress_observer=persist_progress,
                     )

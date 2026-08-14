@@ -3,6 +3,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from synthetic_ops_generator.control.configuration import (
+    HistoricalExecutionConfiguration,
+)
 from synthetic_ops_generator.control.models import (
     ReplayExecutionResult,
     RunExecutionMode,
@@ -239,12 +242,46 @@ class ScenarioDetailResponse(BaseModel):
         )
 
 
+class HistoricalExecutionConfigurationResponse(
+    BaseModel
+):
+    degradation_samples: int = Field(gt=0)
+    plateau_samples: int = Field(ge=0)
+    recovery_samples: int = Field(ge=0)
+
+    @classmethod
+    def from_configuration(
+        cls,
+        configuration: (
+            HistoricalExecutionConfiguration
+        ),
+    ) -> (
+        "HistoricalExecutionConfigurationResponse"
+    ):
+        return cls(
+            degradation_samples=(
+                configuration.degradation_samples
+            ),
+            plateau_samples=(
+                configuration.plateau_samples
+            ),
+            recovery_samples=(
+                configuration.recovery_samples
+            ),
+        )
+
+
 class HistoricalExecutionCapabilityResponse(
     BaseModel
 ):
     supported: bool
 
     unavailable_reason: str | None = None
+
+    configuration: (
+        HistoricalExecutionConfigurationResponse
+        | None
+    ) = None
 
 
 class ScenarioCapabilitiesResponse(BaseModel):
