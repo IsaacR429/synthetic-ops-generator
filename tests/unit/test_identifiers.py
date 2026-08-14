@@ -24,4 +24,4 @@ def test_history_ids_are_sequential() -> None:
 
     assert ids.history_id() == "HST0000001"
     assert ids.history_id() == "HST0000002"
-
+
