@@ -5,10 +5,19 @@ generator:
 
 runtime:
   mode: accelerated
+  speed_multiplier: 12.0
 
 frequency:
-  metrics_interval_seconds: 5
-  normal_logs_per_second: 2
+  metrics:
+    interval_seconds: 5
+
+  logs:
+    normal_per_second: 2
+    warning_per_second: 8
+    failure_per_second: 25
+
+  infrastructure_tests:
+    interval_seconds: 60
 
 defaults:
   environment: production

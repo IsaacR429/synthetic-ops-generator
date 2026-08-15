@@ -65,6 +65,42 @@ class ScenarioBehaviour(BaseModel):
     description: str | None = None
 
 
+class ScenarioIntervalFrequencyOverride(BaseModel):
+    interval_seconds: float | None = Field(
+        default=None,
+        gt=0,
+    )
+
+
+class ScenarioLogFrequencyOverride(BaseModel):
+    normal_per_second: float | None = Field(
+        default=None,
+        gt=0,
+    )
+    warning_per_second: float | None = Field(
+        default=None,
+        gt=0,
+    )
+    failure_per_second: float | None = Field(
+        default=None,
+        gt=0,
+    )
+
+
+class ScenarioFrequencyOverride(BaseModel):
+    metrics: (
+        ScenarioIntervalFrequencyOverride | None
+    ) = None
+
+    logs: (
+        ScenarioLogFrequencyOverride | None
+    ) = None
+
+    infrastructure_tests: (
+        ScenarioIntervalFrequencyOverride | None
+    ) = None
+
+
 class ScenarioDefinition(BaseModel):
     scenario_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
@@ -90,6 +126,8 @@ class ScenarioDefinition(BaseModel):
     behaviours: list[ScenarioBehaviour] = Field(
         min_length=1
     )
+
+    frequency: ScenarioFrequencyOverride | None = None
 
     expected_result: ExpectedScenarioResult
 
