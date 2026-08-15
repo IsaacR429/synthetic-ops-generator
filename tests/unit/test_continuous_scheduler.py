@@ -67,7 +67,7 @@ class SleepRecorder:
     def __init__(self) -> None:
         self.calls: list[float] = []
 
-    def __call__(self, seconds: float) -> None:
+    async def __call__(self, seconds: float) -> None:
         self.calls.append(seconds)
 
 
@@ -166,6 +166,32 @@ class LogEventGenerator:
             chg_id=context.chg_id,
             data={"log": log_err.model_dump(mode="json")},
         )
+
+
+class TimelineSingleEventGenerator:
+    def __init__(self, event_type: str) -> None:
+        self.event_type = event_type
+
+    async def generate(
+        self, context: ScenarioContext
+    ) -> AsyncGenerator[GeneratedEvent, None]:
+        while True:
+            sequence_number = context.next_sequence()
+            yield GeneratedEvent(
+                event_id=f"EVT-{sequence_number}",
+                sequence_number=sequence_number,
+                event_type=self.event_type,
+                event_time=context.simulation_time,
+                source_system="synthetic_observability",
+                business_stream=context.business_stream,
+                service=context.service,
+                component=context.component,
+                environment=Environment.PRODUCTION,
+                scenario_id=context.scenario_id,
+                run_id=context.run_id,
+                chg_id=context.chg_id,
+                data={},
+            )
 
 
 class SingleEventGenerator:
@@ -285,6 +311,95 @@ async def test_continuous_source_scheduler_schedules_log_events_by_severity() ->
     ).total_seconds() == pytest.approx(0.125)
 
     assert sleep.calls == pytest.approx([0.125 / 12.0])
+
+
+@pytest.mark.asyncio
+async def test_continuous_source_scheduler_interleaves_multiple_sources_on_shared_timeline() -> None:
+    start = datetime(2026, 8, 15, 10, 0, tzinfo=UTC)
+    clock = ManualSimulationClock(start)
+    sleep = SleepRecorder()
+
+    metric_behaviour = ScenarioBehaviour(
+        source=SourceDomain.METRIC,
+        during_state=OperationalState.OBSERVING,
+        profile_id="metric",
+        continuous=True,
+    )
+
+    infrastructure_behaviour = ScenarioBehaviour(
+        source=SourceDomain.INFRASTRUCTURE_TEST,
+        during_state=OperationalState.OBSERVING,
+        profile_id="infra",
+        continuous=True,
+    )
+
+    frequency = SourceFrequencyConfiguration(
+        metrics=IntervalFrequencyConfiguration(interval_seconds=6.0),
+        logs=LogFrequencyConfiguration(
+            normal_per_second=2.0,
+            warning_per_second=8.0,
+            failure_per_second=25.0,
+        ),
+        infrastructure_tests=IntervalFrequencyConfiguration(
+            interval_seconds=4.0
+        ),
+    )
+
+    scheduler = ContinuousSourceScheduler(
+        clock=clock,
+        runtime=RuntimeTimingConfiguration(
+            mode=RuntimeMode.ACCELERATED,
+            speed_multiplier=12.0,
+        ),
+        frequency=frequency,
+        sleep_fn=sleep,
+    )
+
+    publisher = RecordingPublisher(stop_after=5)
+
+    await scheduler.run(
+        context=make_context(clock=clock),
+        bindings=[
+            ContinuousSourceBinding(
+                behaviour=metric_behaviour,
+                generator=TimelineSingleEventGenerator("metric.sample"),
+            ),
+            ContinuousSourceBinding(
+                behaviour=infrastructure_behaviour,
+                generator=TimelineSingleEventGenerator(
+                    "infrastructure_test.passed"
+                ),
+            ),
+        ],
+        publisher=publisher,
+    )
+
+    assert [event.event_type for event in publisher.events] == [
+        "metric.sample",
+        "infrastructure_test.passed",
+        "infrastructure_test.passed",
+        "metric.sample",
+        "infrastructure_test.passed",
+    ]
+
+    offsets = [
+        (event.event_time - start).total_seconds()
+        for event in publisher.events
+    ]
+
+    assert offsets == pytest.approx([
+        0.0,
+        0.0,
+        4.0,
+        6.0,
+        8.0,
+    ])
+
+    assert sleep.calls == pytest.approx([
+        4.0 / 12.0,
+        2.0 / 12.0,
+        2.0 / 12.0,
+    ])
 
 
 @pytest.mark.asyncio

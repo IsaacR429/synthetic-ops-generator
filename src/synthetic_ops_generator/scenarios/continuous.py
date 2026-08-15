@@ -1,6 +1,8 @@
+import heapq
 import inspect
 from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from synthetic_ops_generator.config.runtime import (
     RuntimeTimingConfiguration,
@@ -124,35 +126,56 @@ class ContinuousSourceScheduler:
         if not active_bindings:
             raise ValueError("No continuous source behaviours")
 
-        iterators = []
-        for binding in active_bindings:
+        heap: list[tuple[float, int, ContinuousSourceBinding, Any]] = []
+
+        for idx, binding in enumerate(active_bindings):
             if hasattr(binding.generator, "generate"):
                 gen = binding.generator.generate(context)
             else:
                 gen = binding.generator
-            iterators.append((binding, gen))
 
-        for binding, gen in iterators:
+            it = gen.__aiter__() if hasattr(gen, "__aiter__") else gen
+            heapq.heappush(heap, (0.0, idx, binding, it))
+
+        current_sim_offset = 0.0
+
+        while heap:
+            sched_time, priority_idx, binding, it = heapq.heappop(heap)
+
+            if sched_time > current_sim_offset:
+                delta_sim = sched_time - current_sim_offset
+                wall_seconds = self._runtime.wall_clock_seconds(delta_sim)
+
+                if self._sleep_fn is not None:
+                    res = self._sleep_fn(wall_seconds)
+                    if inspect.isawaitable(res):
+                        await res
+
+                self._clock.advance(delta_sim)
+                current_sim_offset = sched_time
+                context.simulation_time = self._clock.now()
+
             try:
-                async for event in gen:
-                    try:
-                        await publisher.publish(event)
-                    except StopAsyncIteration:
-                        return
+                event = await it.__anext__()
+            except StopAsyncIteration:
+                continue
 
-                    simulated_interval = self._simulated_interval(
-                        binding.behaviour.source, event
-                    )
-                    wall_seconds = self._runtime.wall_clock_seconds(
-                        simulated_interval
-                    )
-
-                    if self._sleep_fn is not None:
-                        res = self._sleep_fn(wall_seconds)
-                        if inspect.isawaitable(res):
-                            await res
-
-                    self._clock.advance(simulated_interval)
-                    context.simulation_time = self._clock.now()
+            try:
+                await publisher.publish(event)
             except StopAsyncIteration:
                 return
+
+            simulated_interval = self._simulated_interval(
+                binding.behaviour.source, event
+            )
+            next_sched_time = current_sim_offset + simulated_interval
+
+            heapq.heappush(
+                heap,
+                (
+                    next_sched_time,
+                    priority_idx,
+                    binding,
+                    it,
+                ),
+            )
