@@ -3,6 +3,8 @@ from datetime import datetime
 from enum import StrEnum
 
 from synthetic_ops_generator.control.configuration import (
+    ContinuousExecutionConfiguration,
+    GenerationLifecycle,
     HistoricalExecutionConfiguration,
 )
 from synthetic_ops_generator.domain.enums import (
@@ -49,6 +51,14 @@ class RunRecord:
 
     historical_configuration: (
         HistoricalExecutionConfiguration | None
+    ) = None
+
+    generation_lifecycle: GenerationLifecycle = (
+        GenerationLifecycle.BOUNDED
+    )
+
+    continuous_configuration: (
+        ContinuousExecutionConfiguration | None
     ) = None
 
 

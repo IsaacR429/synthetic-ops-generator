@@ -4,6 +4,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from synthetic_ops_generator.control.configuration import (
+    ContinuousExecutionConfiguration,
+    ContinuousStopMode,
+    GenerationLifecycle,
     HistoricalExecutionConfiguration,
 )
 from synthetic_ops_generator.control.models import (
@@ -150,6 +153,14 @@ class SQLiteRunStore(RunStore):
                         CHECK(
                             historical_recovery_samples IS NULL
                             OR historical_recovery_samples >= 0
+                        ),
+                    generation_lifecycle TEXT NOT NULL
+                        DEFAULT 'bounded',
+                    continuous_stop_mode TEXT,
+                    continuous_duration_seconds INTEGER
+                        CHECK(
+                            continuous_duration_seconds IS NULL
+                            OR continuous_duration_seconds > 0
                         )
                 )
                 """
@@ -160,6 +171,10 @@ class SQLiteRunStore(RunStore):
             )
 
             self._ensure_historical_configuration_columns(
+                connection
+            )
+
+            self._ensure_generation_lifecycle_columns(
                 connection
             )
 
@@ -290,6 +305,46 @@ class SQLiteRunStore(RunStore):
             """
         )
 
+    @staticmethod
+    def _ensure_generation_lifecycle_columns(
+        connection: sqlite3.Connection,
+    ) -> None:
+        columns = {
+            str(row[1])
+            for row in connection.execute(
+                "PRAGMA table_info(runs)"
+            ).fetchall()
+        }
+
+        if "generation_lifecycle" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN generation_lifecycle TEXT NOT NULL
+                DEFAULT 'bounded'
+                """
+            )
+
+        if "continuous_stop_mode" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN continuous_stop_mode TEXT
+                """
+            )
+
+        if "continuous_duration_seconds" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN continuous_duration_seconds INTEGER
+                CHECK(
+                    continuous_duration_seconds IS NULL
+                    OR continuous_duration_seconds > 0
+                )
+                """
+            )
+
     def _create_sync(
         self,
         record: RunRecord,
@@ -315,9 +370,12 @@ class SQLiteRunStore(RunStore):
                     execution_mode,
                     historical_degradation_samples,
                     historical_plateau_samples,
-                    historical_recovery_samples
+                    historical_recovery_samples,
+                    generation_lifecycle,
+                    continuous_stop_mode,
+                    continuous_duration_seconds
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 self._record_values(record),
             )
@@ -347,7 +405,10 @@ class SQLiteRunStore(RunStore):
                     execution_mode,
                     historical_degradation_samples,
                     historical_plateau_samples,
-                    historical_recovery_samples
+                    historical_recovery_samples,
+                    generation_lifecycle,
+                    continuous_stop_mode,
+                    continuous_duration_seconds
                 FROM runs
                 WHERE run_id = ?
                 """,
@@ -384,7 +445,10 @@ class SQLiteRunStore(RunStore):
                     execution_mode,
                     historical_degradation_samples,
                     historical_plateau_samples,
-                    historical_recovery_samples
+                    historical_recovery_samples,
+                    generation_lifecycle,
+                    continuous_stop_mode,
+                    continuous_duration_seconds
                 FROM runs
                 WHERE status = ?
                 ORDER BY started_at, run_id
@@ -422,7 +486,10 @@ class SQLiteRunStore(RunStore):
                     execution_mode = ?,
                     historical_degradation_samples = ?,
                     historical_plateau_samples = ?,
-                    historical_recovery_samples = ?
+                    historical_recovery_samples = ?,
+                    generation_lifecycle = ?,
+                    continuous_stop_mode = ?,
+                    continuous_duration_seconds = ?
                 WHERE run_id = ?
                 """,
                 (
@@ -470,6 +537,21 @@ class SQLiteRunStore(RunStore):
                         record.historical_configuration
                         .recovery_samples
                         if record.historical_configuration
+                        is not None
+                        else None
+                    ),
+                    record.generation_lifecycle.value,
+                    (
+                        record.continuous_configuration
+                        .stop_mode.value
+                        if record.continuous_configuration
+                        is not None
+                        else None
+                    ),
+                    (
+                        record.continuous_configuration
+                        .duration_seconds
+                        if record.continuous_configuration
                         is not None
                         else None
                     ),
@@ -531,6 +613,21 @@ class SQLiteRunStore(RunStore):
                 is not None
                 else None
             ),
+            record.generation_lifecycle.value,
+            (
+                record.continuous_configuration
+                .stop_mode.value
+                if record.continuous_configuration
+                is not None
+                else None
+            ),
+            (
+                record.continuous_configuration
+                .duration_seconds
+                if record.continuous_configuration
+                is not None
+                else None
+            ),
         )
 
     @staticmethod
@@ -551,6 +648,39 @@ class SQLiteRunStore(RunStore):
                     plateau_samples=int(row[14]),
                     recovery_samples=int(row[15]),
                 )
+            )
+
+        generation_lifecycle = (
+            GenerationLifecycle(str(row[16]))
+            if len(row) > 16 and row[16] is not None
+            else GenerationLifecycle.BOUNDED
+        )
+
+        continuous_configuration = None
+
+        if (
+            generation_lifecycle
+            == GenerationLifecycle.CONTINUOUS
+        ):
+            continuous_configuration = (
+                ContinuousExecutionConfiguration(
+                    stop_mode=ContinuousStopMode(
+                        str(row[17])
+                    ),
+                    duration_seconds=(
+                        int(row[18])
+                        if len(row) > 18 and row[18] is not None
+                        else None
+                    ),
+                )
+            )
+        elif (
+            len(row) > 17
+            and (row[17] is not None or (len(row) > 18 and row[18] is not None))
+        ):
+            raise ValueError(
+                "Bounded Run cannot contain "
+                "continuous execution configuration."
             )
 
         return RunRecord(
@@ -589,6 +719,12 @@ class SQLiteRunStore(RunStore):
             execution_mode=execution_mode,
             historical_configuration=(
                 historical_configuration
+            ),
+            generation_lifecycle=(
+                generation_lifecycle
+            ),
+            continuous_configuration=(
+                continuous_configuration
             ),
         )
 
@@ -657,6 +793,26 @@ class SQLiteRunStore(RunStore):
                 "cannot be stored for a Standard Run."
             )
 
+        if (
+            record.generation_lifecycle
+            == GenerationLifecycle.BOUNDED
+            and record.continuous_configuration is not None
+        ):
+            raise ValueError(
+                "Bounded Runs cannot contain "
+                "continuous execution configuration."
+            )
+
+        if (
+            record.generation_lifecycle
+            == GenerationLifecycle.CONTINUOUS
+            and record.continuous_configuration is None
+        ):
+            raise ValueError(
+                "Continuous Runs require "
+                "continuous execution configuration."
+            )
+
         SQLiteRunStore._datetime_to_text(
             record.started_at
         )
@@ -671,4 +827,3 @@ class SQLiteRunStore(RunStore):
             raise RuntimeError(
                 "SQLiteRunStore is not started."
             )
-

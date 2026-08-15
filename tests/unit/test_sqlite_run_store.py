@@ -7,6 +7,9 @@ import pytest
 
 from synthetic_ops_generator.control.configuration import (
     DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION,
+    ContinuousExecutionConfiguration,
+    ContinuousStopMode,
+    GenerationLifecycle,
 )
 from synthetic_ops_generator.control.models import (
     RunExecutionMode,
@@ -426,3 +429,97 @@ async def test_sqlite_run_store_migrates_old_schema_without_execution_mode(
     finally:
         await store.stop()
 
+
+@pytest.mark.asyncio
+async def test_sqlite_run_store_rejects_continuous_configuration_for_bounded_run(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+
+    try:
+        record = replace(
+            make_run_record(),
+            continuous_configuration=(
+                ContinuousExecutionConfiguration()
+            ),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Bounded Runs cannot contain "
+                "continuous execution configuration"
+            ),
+        ):
+            await store.create(record)
+
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_sqlite_run_store_requires_configuration_for_continuous_run(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+
+    try:
+        record = replace(
+            make_run_record(),
+            generation_lifecycle=(
+                GenerationLifecycle.CONTINUOUS
+            ),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Continuous Runs require "
+                "continuous execution configuration"
+            ),
+        ):
+            await store.create(record)
+
+    finally:
+        await store.stop()
+
+
+def test_continuous_configuration_rejects_duration_for_manual_mode(
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Manual continuous execution cannot "
+            "define a duration"
+        ),
+    ):
+        ContinuousExecutionConfiguration(
+            stop_mode=ContinuousStopMode.MANUAL,
+            duration_seconds=60,
+        )
+
+
+@pytest.mark.parametrize(
+    "duration_seconds",
+    [
+        None,
+        0,
+        -1,
+    ],
+)
+def test_continuous_duration_configuration_requires_positive_duration(
+    duration_seconds: int | None,
+) -> None:
+    with pytest.raises(ValueError):
+        ContinuousExecutionConfiguration(
+            stop_mode=ContinuousStopMode.DURATION,
+            duration_seconds=duration_seconds,
+        )
