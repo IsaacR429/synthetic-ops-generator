@@ -33,6 +33,9 @@ from synthetic_ops_generator.core.randomness import (
 from synthetic_ops_generator.domain.enums import (
     OperationalState,
 )
+from synthetic_ops_generator.events.envelope import (
+    GeneratedEvent,
+)
 from synthetic_ops_generator.generators.factory import (
     GeneratorFactory,
 )
@@ -506,6 +509,20 @@ class ControlService:
             )
 
         return record
+
+    async def get_run_events(
+        self,
+        run_id: str,
+    ) -> tuple[GeneratedEvent, ...]:
+        record = await self.get_run(
+            run_id
+        )
+
+        events = await self._store.get_run_events(
+            record.run_id
+        )
+
+        return tuple(events)
 
     async def _persist_run_progress(
         self,

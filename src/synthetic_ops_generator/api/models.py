@@ -32,6 +32,9 @@ from synthetic_ops_generator.domain.enums import (
     RiskLevel,
     WorkloadClass,
 )
+from synthetic_ops_generator.events.envelope import (
+    GeneratedEvent,
+)
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
     ScenarioFamily,
@@ -503,4 +506,25 @@ class StopRunResponse(BaseModel):
             scenario_id=result.scenario_id,
             status=result.status,
             event_count=result.event_count,
+        )
+
+
+class RunEventsResponse(BaseModel):
+    run_id: str
+    retained_event_count: int = Field(
+        ge=0
+    )
+    events: list[GeneratedEvent]
+
+    @classmethod
+    def from_events(
+        cls,
+        *,
+        run_id: str,
+        events: tuple[GeneratedEvent, ...],
+    ) -> "RunEventsResponse":
+        return cls(
+            run_id=run_id,
+            retained_event_count=len(events),
+            events=list(events),
         )

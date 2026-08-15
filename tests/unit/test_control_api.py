@@ -877,3 +877,123 @@ def test_historical_run_rejects_invalid_configuration(
     )
 
     assert response.status_code == 422
+
+
+def test_get_run_events_returns_retained_events_in_sequence_order(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    completed = wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    response = client.get(
+        f"/runs/{run_id}/events"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["run_id"] == run_id
+
+    assert (
+        payload["retained_event_count"]
+        == completed["event_count"]
+    )
+
+    events = payload["events"]
+
+    assert len(events) == (
+        payload["retained_event_count"]
+    )
+
+    assert {
+        event["run_id"]
+        for event in events
+    } == {run_id}
+
+    assert [
+        event["sequence_number"]
+        for event in events
+    ] == list(
+        range(
+            1,
+            len(events) + 1,
+        )
+    )
+
+
+def test_get_custom_historical_run_events(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-02",
+            "random_seed": 42,
+            "execution_mode": "historical",
+            "historical": {
+                "degradation_samples": 6,
+                "plateau_samples": 3,
+                "recovery_samples": 5,
+            },
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    completed = wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    assert completed["event_count"] == 60
+
+    response = client.get(
+        f"/runs/{run_id}/events"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["run_id"] == run_id
+    assert payload["retained_event_count"] == 60
+
+    assert [
+        event["sequence_number"]
+        for event in payload["events"]
+    ] == list(
+        range(1, 61)
+    )
+
+
+def test_get_run_events_returns_404_for_unknown_run(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/runs/RUN9999999/events"
+    )
+
+    assert response.status_code == 404
+
+    assert response.json() == {
+        "detail": (
+            "Run 'RUN9999999' was not found."
+        )
+    }

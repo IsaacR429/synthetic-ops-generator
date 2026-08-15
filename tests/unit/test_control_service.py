@@ -2043,3 +2043,50 @@ async def test_historical_orphaned_run_is_reconciled_as_failed(
         await active_run_manager.shutdown()
         await run_store.stop()
         await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_get_run_events_requires_existing_run(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+        )
+
+        with pytest.raises(
+            RunNotFoundError
+        ):
+            await service.get_run_events(
+                "RUN9999999"
+            )
+
+    finally:
+        await run_store.stop()
+        await store.stop()

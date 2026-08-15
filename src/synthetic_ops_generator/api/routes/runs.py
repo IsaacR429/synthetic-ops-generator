@@ -10,6 +10,7 @@ from fastapi import (
 
 from synthetic_ops_generator.api.models import (
     ReplayRunResponse,
+    RunEventsResponse,
     RunResponse,
     StartRunRequest,
     StartRunResponse,
@@ -98,6 +99,30 @@ async def get_run(
 
     return RunResponse.from_record(
         record
+    )
+
+
+@router.get(
+    "/{run_id}/events",
+    response_model=RunEventsResponse,
+)
+async def get_run_events(
+    run_id: str,
+    service: ControlServiceDependency,
+) -> RunEventsResponse:
+    try:
+        events = await service.get_run_events(
+            run_id
+        )
+    except RunNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    return RunEventsResponse.from_events(
+        run_id=run_id,
+        events=events,
     )
 
 
