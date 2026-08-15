@@ -107,6 +107,7 @@ class ScenarioRunner:
             ScenarioProgressObserver | None
         ) = None,
         event_interval_seconds: float = 5.0,
+        stop_at_state: OperationalState | None = None,
     ) -> list[str]:
         """
         Execute a Scenario state sequence and publish events
@@ -130,6 +131,31 @@ class ScenarioRunner:
                 "Scenario's initial state."
             )
 
+        target_states = scenario.state_sequence[1:]
+
+        if stop_at_state is not None:
+            try:
+                stop_index = scenario.state_sequence.index(
+                    stop_at_state
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    "Requested stop state is not part "
+                    "of the Scenario state sequence."
+                ) from exc
+
+            if stop_index == 0:
+                raise ValueError(
+                    "Scenario execution cannot stop "
+                    "at the initial state."
+                )
+
+            target_states = (
+                scenario.state_sequence[
+                    1 : stop_index + 1
+                ]
+            )
+
         self._event_history.clear()
 
         state_machine = ScenarioStateMachine(
@@ -140,7 +166,7 @@ class ScenarioRunner:
             state_machine.state.value
         ]
 
-        for target_state in scenario.state_sequence[1:]:
+        for target_state in target_states:
             new_state = state_machine.transition(
                 target_state
             )

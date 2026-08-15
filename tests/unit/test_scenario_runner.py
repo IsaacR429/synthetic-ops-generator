@@ -363,3 +363,58 @@ async def test_runner_notifies_progress_observer_at_state_boundaries(
         context.scenario_state
         == OperationalState.COMPLETED
     )
+
+
+@pytest.mark.asyncio
+async def test_runner_can_stop_at_active_state_before_completed() -> None:
+    scenario = build_scenario()
+    enterprise = build_enterprise()
+
+    start = datetime(
+        2026,
+        8,
+        15,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    runner = ScenarioRunner(
+        ids=IdFactory(),
+        clock=ManualSimulationClock(start),
+    )
+
+    context = runner.create_context(
+        scenario=scenario,
+        enterprise=enterprise,
+        random_seed=42,
+    )
+
+    class NullPublisher:
+        async def publish(
+            self,
+            event: object,
+        ) -> None:
+            del event
+
+    visited_states = await runner.execute(
+        scenario=scenario,
+        context=context,
+        generators=[],
+        publisher=NullPublisher(),
+        stop_at_state=OperationalState.OBSERVING,
+    )
+
+    assert visited_states == [
+        OperationalState.INITIALISING.value,
+        OperationalState.NORMAL.value,
+        OperationalState.IMPLEMENTING.value,
+        OperationalState.OBSERVING.value,
+    ]
+
+    assert context.scenario_state == OperationalState.OBSERVING
+
+    assert (
+        OperationalState.COMPLETED.value
+        not in visited_states
+    )

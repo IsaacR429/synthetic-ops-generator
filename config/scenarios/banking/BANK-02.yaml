@@ -124,6 +124,7 @@ behaviours:
   - source: metric
     during_state: recovery
     profile_id: recovered_post_rollback
+    continuous: true
     description: >
       Operational Metrics return to normal Service targets after
       rollback.
@@ -131,6 +132,7 @@ behaviours:
   - source: log
     during_state: recovery
     profile_id: recovery_operational_logs
+    continuous: true
     description: >
       Operational logs confirm restored request processing,
       dependency health and Service recovery.
