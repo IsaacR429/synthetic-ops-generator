@@ -64,6 +64,8 @@ class ScenarioBehaviour(BaseModel):
 
     description: str | None = None
 
+    continuous: bool = False
+
 
 class ScenarioIntervalFrequencyOverride(BaseModel):
     interval_seconds: float | None = Field(
