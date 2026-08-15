@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from 'react-router'
 
+import { ApiStatus } from '../components/ApiStatus'
+
 const navigation = [
     {
         label: 'Overview',
@@ -79,13 +81,7 @@ export function AppShell() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.025] px-3 py-1.5">
-                            <div className="size-2 rounded-full bg-slate-500" />
-
-                            <span className="text-xs text-slate-400">
-                                API status pending
-                            </span>
-                        </div>
+                        <ApiStatus />
                     </header>
 
                     <main className="min-w-0 flex-1 px-7 py-7">
