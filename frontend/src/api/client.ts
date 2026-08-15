@@ -101,13 +101,6 @@ export function startRun(
   })
 }
 
-export function listRuns(
-  status?: string,
-): Promise<RunResponse[]> {
-  const query = status ? `?status=${encodeURIComponent(status)}` : ''
-  return request<RunResponse[]>(`/runs${query}`)
-}
-
 export function getRun(
   runId: string,
 ): Promise<RunResponse> {

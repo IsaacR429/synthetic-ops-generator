@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router'
 
 import {
+  ApiError,
+  getRun,
   getScenarioCapabilities,
   listEnterprises,
   listScenarios,
+  startRun,
+  stopRun,
 } from '../api/client'
 import type {
   EnterpriseSummary,
   RunExecutionMode,
+  RunResponse,
+  RunStatus,
   ScenarioCapabilities,
   ScenarioSummary,
   StartRunRequest,
@@ -32,7 +39,28 @@ function parseIntegerInput(value: string): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null
 }
 
+function runStatusClasses(status: RunStatus): string {
+  const classes: Record<RunStatus, string> = {
+    running: 'border-violet-400/20 bg-violet-500/10 text-violet-300',
+    completed: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300',
+    failed: 'border-red-400/20 bg-red-500/10 text-red-300',
+    stopped: 'border-amber-400/20 bg-amber-500/10 text-amber-300',
+  }
+
+  return classes[status]
+}
+
+function formatRunTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(value))
+}
+
 export function RunConfigurationPage() {
+  const navigate = useNavigate()
+
   const [enterprises, setEnterprises] = useState<EnterpriseSummary[]>([])
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([])
   const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>('')
@@ -51,6 +79,11 @@ export function RunConfigurationPage() {
   const [degradationSamplesInput, setDegradationSamplesInput] = useState('')
   const [plateauSamplesInput, setPlateauSamplesInput] = useState('')
   const [recoverySamplesInput, setRecoverySamplesInput] = useState('')
+
+  const [activeRun, setActiveRun] = useState<RunResponse | null>(null)
+  const [startingRun, setStartingRun] = useState(false)
+  const [stoppingRun, setStoppingRun] = useState(false)
+  const [executionError, setExecutionError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -168,6 +201,60 @@ export function RunConfigurationPage() {
     }
   }, [capabilities])
 
+  const activeRunId = activeRun?.run_id
+  const activeRunStatus = activeRun?.status
+
+  useEffect(() => {
+    if (!activeRunId || activeRunStatus !== 'running') {
+      return
+    }
+
+    const currentRunId = activeRunId
+    let cancelled = false
+    let timeoutId: number | undefined
+
+    async function pollRun() {
+      try {
+        const latest = await getRun(currentRunId)
+
+        if (cancelled) {
+          return
+        }
+
+        setActiveRun(latest)
+        setExecutionError(null)
+
+        if (latest.status === 'running') {
+          timeoutId = window.setTimeout(() => {
+            void pollRun()
+          }, 1500)
+        }
+      } catch {
+        if (cancelled) {
+          return
+        }
+
+        setExecutionError('StreamOps could not refresh the live Run state.')
+
+        timeoutId = window.setTimeout(() => {
+          void pollRun()
+        }, 3000)
+      }
+    }
+
+    timeoutId = window.setTimeout(() => {
+      void pollRun()
+    }, 1500)
+
+    return () => {
+      cancelled = true
+
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [activeRunId, activeRunStatus])
+
   const selectedEnterprise = useMemo(
     () => enterprises.find((e) => e.enterprise_id === selectedEnterpriseId),
     [enterprises, selectedEnterpriseId],
@@ -246,12 +333,76 @@ export function RunConfigurationPage() {
     setSelectedEnterpriseId(enterpriseId)
     setSelectedScenarioId('')
     setCapabilities(null)
+
+    setActiveRun(null)
+    setExecutionError(null)
   }
 
   const handleScenarioChange = (scenarioId: string) => {
     setSelectedScenarioId(scenarioId)
     setCapabilities(null)
     setCapabilityError(null)
+
+    setActiveRun(null)
+    setExecutionError(null)
+  }
+
+  async function handleStartRun() {
+    if (!startRunRequest || startingRun || activeRun?.status === 'running') {
+      return
+    }
+
+    try {
+      setStartingRun(true)
+      setExecutionError(null)
+
+      const started = await startRun(startRunRequest)
+      const current = await getRun(started.run_id)
+
+      setActiveRun(current)
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : 'StreamOps could not start the Run.'
+
+      setExecutionError(message)
+    } finally {
+      setStartingRun(false)
+    }
+  }
+
+  async function handleStopRun() {
+    if (!activeRun || activeRun.status !== 'running' || stoppingRun) {
+      return
+    }
+
+    const runId = activeRun.run_id
+
+    try {
+      setStoppingRun(true)
+      setExecutionError(null)
+
+      try {
+        await stopRun(runId)
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 409)) {
+          throw error
+        }
+      }
+
+      const latest = await getRun(runId)
+      setActiveRun(latest)
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : 'StreamOps could not stop the Run.'
+
+      setExecutionError(message)
+    } finally {
+      setStoppingRun(false)
+    }
   }
 
   return (
@@ -666,6 +817,187 @@ export function RunConfigurationPage() {
                             {JSON.stringify(startRunRequest, null, 2)}
                           </pre>
                         </details>
+                      )}
+
+                      <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/8 pt-5">
+                        <div>
+                          <div className="text-xs font-semibold text-white">
+                            Execute Run
+                          </div>
+
+                          <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                            Submit this configuration to the StreamOps control
+                            plane.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={
+                            !startRunRequest ||
+                            startingRun ||
+                            activeRun?.status === 'running'
+                          }
+                          onClick={() => {
+                            void handleStartRun()
+                          }}
+                          className={[
+                            'rounded-lg px-5 py-2.5',
+                            'text-xs font-semibold',
+                            'transition-all duration-200',
+                            !startRunRequest ||
+                            startingRun ||
+                            activeRun?.status === 'running'
+                              ? [
+                                  'cursor-not-allowed',
+                                  'border border-white/6',
+                                  'bg-white/[0.025]',
+                                  'text-slate-600',
+                                ].join(' ')
+                              : [
+                                  'border border-violet-400/25',
+                                  'bg-gradient-to-r',
+                                  'from-violet-600/80',
+                                  'to-purple-500/70',
+                                  'text-white',
+                                  'shadow-[0_10px_30px_rgba(124,58,237,0.20)]',
+                                  'hover:from-violet-500/90',
+                                  'hover:to-purple-500/80',
+                                ].join(' '),
+                          ].join(' ')}
+                        >
+                          {startingRun
+                            ? 'Starting...'
+                            : activeRun?.status === 'running'
+                              ? 'Run Active'
+                              : 'Start Run'}
+                        </button>
+                      </div>
+
+                      {executionError && (
+                        <div className="mt-4 rounded-lg border border-red-400/15 bg-red-500/[0.05] px-4 py-3 text-[11px] leading-5 text-red-300">
+                          {executionError}
+                        </div>
+                      )}
+
+                      {activeRun && (
+                        <div className="mt-6 overflow-hidden rounded-lg border border-violet-400/15 bg-[#0b0914] shadow-[0_12px_40px_rgba(49,16,101,0.12)]">
+                          <div className="flex items-center justify-between gap-4 border-b border-white/8 bg-white/[0.02] px-5 py-4">
+                            <div>
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-400/80">
+                                Live Execution
+                              </div>
+
+                              <div className="mt-1 flex items-center gap-2">
+                                <span className="font-mono text-sm font-semibold text-white">
+                                  {activeRun.run_id}
+                                </span>
+
+                                <span className="text-slate-600">·</span>
+
+                                <span className="font-mono text-xs text-slate-400">
+                                  {activeRun.scenario_id}
+                                </span>
+
+                                <span className="text-slate-600">·</span>
+
+                                <span className="text-xs text-slate-400">
+                                  {formatLabel(activeRun.execution_mode)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div
+                              className={[
+                                'rounded-full border px-3 py-1',
+                                'text-[10px] font-semibold',
+                                'uppercase tracking-[0.10em]',
+                                runStatusClasses(activeRun.status),
+                              ].join(' ')}
+                            >
+                              {activeRun.status}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-px bg-white/6 sm:grid-cols-4">
+                            <div className="bg-[#0b0914]/90 p-4">
+                              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
+                                Current State
+                              </div>
+
+                              <div className="mt-2 text-sm font-semibold text-white">
+                                {formatLabel(activeRun.current_state)}
+                              </div>
+                            </div>
+
+                            <div className="bg-[#0b0914]/90 p-4">
+                              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
+                                Events
+                              </div>
+
+                              <div className="mt-2 text-sm font-semibold text-white">
+                                {activeRun.event_count}
+                              </div>
+                            </div>
+
+                            <div className="bg-[#0b0914]/90 p-4">
+                              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
+                                Started
+                              </div>
+
+                              <div className="mt-2 text-sm font-semibold text-white">
+                                {formatRunTime(activeRun.started_at)}
+                              </div>
+                            </div>
+
+                            <div className="bg-[#0b0914]/90 p-4">
+                              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
+                                Validation
+                              </div>
+
+                              <div className="mt-2 text-sm font-semibold text-white">
+                                {activeRun.validation_passed === null
+                                  ? activeRun.status === 'running'
+                                    ? 'Pending'
+                                    : 'Not reported'
+                                  : activeRun.validation_passed
+                                    ? 'Passed'
+                                    : 'Failed'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {activeRun.error_message && (
+                            <div className="border-t border-red-400/10 bg-red-500/[0.04] px-5 py-3 text-[11px] leading-5 text-red-300">
+                              {activeRun.error_message}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-end gap-3 border-t border-white/8 px-5 py-4">
+                            {activeRun.status === 'running' && (
+                              <button
+                                type="button"
+                                disabled={stoppingRun}
+                                onClick={() => {
+                                  void handleStopRun()
+                                }}
+                                className="rounded-lg border border-red-400/15 bg-red-500/[0.04] px-4 py-2 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {stoppingRun ? 'Stopping...' : 'Stop Run'}
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigate(`/runs/${activeRun.run_id}`)
+                              }
+                              className="rounded-lg border border-violet-400/20 bg-violet-500/[0.07] px-4 py-2 text-[11px] font-medium text-violet-200 transition-colors hover:bg-violet-500/[0.12]"
+                            >
+                              Inspect Run →
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}
