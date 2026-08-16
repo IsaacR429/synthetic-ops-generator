@@ -77,6 +77,14 @@ class RunStartResult:
         HistoricalExecutionConfiguration | None
     ) = None
 
+    generation_lifecycle: GenerationLifecycle = (
+        GenerationLifecycle.BOUNDED
+    )
+
+    continuous_configuration: (
+        ContinuousExecutionConfiguration | None
+    ) = None
+
 
 @dataclass(frozen=True)
 class StopRunResult:

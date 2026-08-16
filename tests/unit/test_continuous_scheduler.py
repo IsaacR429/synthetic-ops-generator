@@ -86,23 +86,22 @@ class MetricEventGenerator:
     async def generate(
         self, context: ScenarioContext
     ) -> AsyncGenerator[GeneratedEvent, None]:
-        while True:
-            sequence_number = context.next_sequence()
-            yield GeneratedEvent(
-                event_id=f"EVT-{sequence_number}",
-                sequence_number=sequence_number,
-                event_type="metric.sample",
-                event_time=context.simulation_time,
-                source_system="synthetic_observability",
-                business_stream=context.business_stream,
-                service=context.service,
-                component=context.component,
-                environment=Environment.PRODUCTION,
-                scenario_id=context.scenario_id,
-                run_id=context.run_id,
-                chg_id=context.chg_id,
-                data={"metric": {"name": "cpu_utilization", "value": 45.0}},
-            )
+        sequence_number = context.next_sequence()
+        yield GeneratedEvent(
+            event_id=f"EVT-{sequence_number}",
+            sequence_number=sequence_number,
+            event_type="metric.sample",
+            event_time=context.simulation_time,
+            source_system="synthetic_observability",
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=Environment.PRODUCTION,
+            scenario_id=context.scenario_id,
+            run_id=context.run_id,
+            chg_id=context.chg_id,
+            data={"metric": {"name": "cpu_utilization", "value": 45.0}},
+        )
 
 
 class LogEventGenerator:
@@ -175,23 +174,22 @@ class TimelineSingleEventGenerator:
     async def generate(
         self, context: ScenarioContext
     ) -> AsyncGenerator[GeneratedEvent, None]:
-        while True:
-            sequence_number = context.next_sequence()
-            yield GeneratedEvent(
-                event_id=f"EVT-{sequence_number}",
-                sequence_number=sequence_number,
-                event_type=self.event_type,
-                event_time=context.simulation_time,
-                source_system="synthetic_observability",
-                business_stream=context.business_stream,
-                service=context.service,
-                component=context.component,
-                environment=Environment.PRODUCTION,
-                scenario_id=context.scenario_id,
-                run_id=context.run_id,
-                chg_id=context.chg_id,
-                data={},
-            )
+        sequence_number = context.next_sequence()
+        yield GeneratedEvent(
+            event_id=f"EVT-{sequence_number}",
+            sequence_number=sequence_number,
+            event_type=self.event_type,
+            event_time=context.simulation_time,
+            source_system="synthetic_observability",
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=Environment.PRODUCTION,
+            scenario_id=context.scenario_id,
+            run_id=context.run_id,
+            chg_id=context.chg_id,
+            data={},
+        )
 
 
 class SingleEventGenerator:

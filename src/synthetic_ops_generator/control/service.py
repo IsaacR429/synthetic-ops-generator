@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -7,11 +7,19 @@ from pathlib import Path
 from synthetic_ops_generator.config.enterprise_loader import (
     load_enterprise_configuration,
 )
+from synthetic_ops_generator.config.runtime import (
+    load_generator_runtime_configuration,
+    resolve_source_frequency_configuration,
+)
 from synthetic_ops_generator.control.active_run_manager import (
     ActiveRunManager,
 )
 from synthetic_ops_generator.control.configuration import (
+    DEFAULT_CONTINUOUS_EXECUTION_CONFIGURATION,
     DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION,
+    ContinuousExecutionConfiguration,
+    ContinuousStopMode,
+    GenerationLifecycle,
     HistoricalExecutionConfiguration,
 )
 from synthetic_ops_generator.control.models import (
@@ -58,6 +66,13 @@ from synthetic_ops_generator.scenarios.capabilities import (
 from synthetic_ops_generator.scenarios.catalogue import (
     ScenarioCatalogue,
 )
+from synthetic_ops_generator.scenarios.continuous import (
+    ContinuousSourceBinding,
+    ContinuousSourceScheduler,
+)
+from synthetic_ops_generator.scenarios.models import (
+    SourceDomain,
+)
 from synthetic_ops_generator.scenarios.runner import (
     ScenarioRunner,
 )
@@ -95,6 +110,68 @@ ExecutionPublisherFactory = Callable[
     [],
     EventPublisher,
 ]
+
+RunProgressObserver = Callable[
+    [OperationalState, int],
+    Awaitable[None],
+]
+
+
+class _ContinuousProgressPublisher(
+    EventPublisher
+):
+    def __init__(
+        self,
+        *,
+        delegate: EventPublisher,
+        state: OperationalState,
+        initial_event_count: int,
+        progress_observer: RunProgressObserver,
+    ) -> None:
+        self._delegate = delegate
+        self._state = state
+        self._event_count = initial_event_count
+        self._progress_observer = (
+            progress_observer
+        )
+
+    async def publish(
+        self,
+        event: GeneratedEvent,
+    ) -> None:
+        operation = asyncio.create_task(
+            self._publish_and_persist(
+                event
+            )
+        )
+
+        try:
+            await asyncio.shield(
+                operation
+            )
+
+        except asyncio.CancelledError:
+            # Publishing the Event and persisting
+            # its Run count form one accounting
+            # boundary. Finish an in-flight Event
+            # before propagating Stop cancellation.
+            await operation
+            raise
+
+    async def _publish_and_persist(
+        self,
+        event: GeneratedEvent,
+    ) -> None:
+        await self._delegate.publish(
+            event
+        )
+
+        self._event_count += 1
+
+        await self._progress_observer(
+            self._state,
+            self._event_count,
+        )
 
 
 class ControlService:
@@ -168,6 +245,12 @@ class ControlService:
         historical_configuration: (
             HistoricalExecutionConfiguration | None
         ) = None,
+        generation_lifecycle: GenerationLifecycle = (
+            GenerationLifecycle.BOUNDED
+        ),
+        continuous_configuration: (
+            ContinuousExecutionConfiguration | None
+        ) = None,
     ) -> RunStartResult:
         scenario = self._catalogue.get_scenario(
             scenario_id
@@ -177,6 +260,80 @@ class ControlService:
             raise ScenarioNotFoundError(
                 f"Scenario '{scenario_id}' was not found."
             )
+
+        if (
+            generation_lifecycle
+            == GenerationLifecycle.CONTINUOUS
+            and execution_mode
+            == RunExecutionMode.HISTORICAL
+        ):
+            raise RunExecutionModeNotSupportedError(
+                "Continuous lifecycle is not supported "
+                "for historical execution."
+            )
+
+        if (
+            generation_lifecycle
+            != GenerationLifecycle.CONTINUOUS
+            and continuous_configuration is not None
+        ):
+            raise ValueError(
+                "Continuous configuration can only "
+                "be supplied for continuous generation."
+            )
+
+        resolved_continuous_configuration = (
+            continuous_configuration
+            if continuous_configuration is not None
+            else (
+                DEFAULT_CONTINUOUS_EXECUTION_CONFIGURATION
+                if (
+                    generation_lifecycle
+                    == GenerationLifecycle.CONTINUOUS
+                )
+                else None
+            )
+        )
+
+        if (
+            generation_lifecycle
+            == GenerationLifecycle.CONTINUOUS
+        ):
+            assert (
+                resolved_continuous_configuration
+                is not None
+            )
+
+            if (
+                resolved_continuous_configuration.stop_mode
+                != ContinuousStopMode.MANUAL
+            ):
+                raise RunExecutionModeNotSupportedError(
+                    "Duration-based continuous "
+                    "execution is not supported yet."
+                )
+
+            continuous_active_state = (
+                scenario.state_sequence[-2]
+            )
+
+            active_continuous_behaviours = [
+                behaviour
+                for behaviour in scenario.behaviours
+                if (
+                    behaviour.continuous
+                    and behaviour.during_state
+                    == continuous_active_state
+                )
+            ]
+
+            if not active_continuous_behaviours:
+                raise RunExecutionModeNotSupportedError(
+                    "Scenario "
+                    f"'{scenario.scenario_id}' does not "
+                    "define continuous behaviour in "
+                    "its final active state."
+                )
 
         capabilities = (
             resolve_scenario_execution_capabilities(
@@ -265,6 +422,12 @@ class ControlService:
             historical_configuration=(
                 resolved_historical_configuration
             ),
+            generation_lifecycle=(
+                generation_lifecycle
+            ),
+            continuous_configuration=(
+                resolved_continuous_configuration
+            ),
         )
 
         await self._run_store.create(
@@ -352,6 +515,115 @@ class ControlService:
                     event_history=runner.event_history,
                 )
 
+                if (
+                    generation_lifecycle
+                    == GenerationLifecycle.CONTINUOUS
+                ):
+                    continuous_active_state = (
+                        scenario.state_sequence[-2]
+                    )
+
+                    behaviour_generators = list(
+                        zip(
+                            scenario.behaviours,
+                            generators,
+                            strict=True,
+                        )
+                    )
+
+                    prefix_generators = [
+                        generator
+                        for behaviour, generator
+                        in behaviour_generators
+                        if not (
+                            behaviour.during_state
+                            == continuous_active_state
+                            and (
+                                behaviour.continuous
+                                or behaviour.source
+                                == SourceDomain.EVIDENCE
+                            )
+                        )
+                    ]
+
+                    await runner.execute(
+                        scenario=scenario,
+                        context=context,
+                        generators=prefix_generators,
+                        publisher=publisher,
+                        progress_observer=persist_progress,
+                        event_interval_seconds=(
+                            self._event_interval_seconds
+                        ),
+                        stop_at_state=(
+                            continuous_active_state
+                        ),
+                    )
+
+                    runtime_configuration = (
+                        load_generator_runtime_configuration(
+                            config_root=(
+                                self._enterprise_root.parent
+                            )
+                        )
+                    )
+
+                    effective_frequency = (
+                        resolve_source_frequency_configuration(
+                            defaults=(
+                                runtime_configuration.frequency
+                            ),
+                            override=scenario.frequency,
+                        )
+                    )
+
+                    continuous_bindings = [
+                        ContinuousSourceBinding(
+                            behaviour=behaviour,
+                            generator=generator,
+                        )
+                        for behaviour, generator
+                        in behaviour_generators
+                        if (
+                            behaviour.continuous
+                            and behaviour.during_state
+                            == continuous_active_state
+                        )
+                    ]
+
+                    continuous_publisher = (
+                        _ContinuousProgressPublisher(
+                            delegate=publisher,
+                            state=context.scenario_state,
+                            initial_event_count=len(
+                                runner.event_history
+                            ),
+                            progress_observer=(
+                                persist_progress
+                            ),
+                        )
+                    )
+
+                    scheduler = ContinuousSourceScheduler(
+                        clock=clock,
+                        runtime=(
+                            runtime_configuration.runtime
+                        ),
+                        frequency=effective_frequency,
+                        sleep_fn=asyncio.sleep,
+                    )
+
+                    await scheduler.run(
+                        context=context,
+                        bindings=continuous_bindings,
+                        publisher=continuous_publisher,
+                    )
+
+                    raise RuntimeError(
+                        "Continuous scheduler returned "
+                        "unexpectedly."
+                    )
+
                 await runner.execute(
                     scenario=scenario,
                     context=context,
@@ -375,6 +647,8 @@ class ControlService:
                 if (
                     execution_mode
                     == RunExecutionMode.HISTORICAL
+                    or generation_lifecycle
+                    == GenerationLifecycle.CONTINUOUS
                 ):
                     latest_record = (
                         await self._latest_persisted_progress(
@@ -410,6 +684,8 @@ class ControlService:
                 if (
                     execution_mode
                     == RunExecutionMode.HISTORICAL
+                    or generation_lifecycle
+                    == GenerationLifecycle.CONTINUOUS
                 ):
                     latest_record = (
                         await self._latest_persisted_progress(
@@ -476,6 +752,12 @@ class ControlService:
             execution_mode=execution_mode,
             historical_configuration=(
                 resolved_historical_configuration
+            ),
+            generation_lifecycle=(
+                generation_lifecycle
+            ),
+            continuous_configuration=(
+                resolved_continuous_configuration
             ),
         )
 

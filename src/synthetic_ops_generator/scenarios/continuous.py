@@ -44,6 +44,34 @@ class ContinuousSourceScheduler:
         self._frequency = frequency
         self._sleep_fn = sleep_fn
 
+    def _cycle_interval(
+        self,
+        source: SourceDomain,
+    ) -> float:
+        if source == SourceDomain.METRIC:
+            return self._frequency.metrics.interval_seconds
+
+        if source == SourceDomain.INFRASTRUCTURE_TEST:
+            return self._frequency.infrastructure_tests.interval_seconds
+
+        raise ValueError(
+            "Continuous cycle interval is not "
+            f"configured for source: {source.value}"
+        )
+
+    def _new_iterator(
+        self,
+        *,
+        binding: ContinuousSourceBinding,
+        context: ScenarioContext,
+    ) -> Any:
+        if hasattr(binding.generator, "generate"):
+            gen = binding.generator.generate(context)
+        else:
+            gen = binding.generator
+
+        return gen.__aiter__() if hasattr(gen, "__aiter__") else gen
+
     def _simulated_interval(
         self,
         source: SourceDomain,
@@ -110,6 +138,9 @@ class ContinuousSourceScheduler:
             if not binding.behaviour.continuous:
                 continue
 
+            if binding.behaviour.during_state != context.scenario_state:
+                continue
+
             source = binding.behaviour.source
             if source not in (
                 SourceDomain.METRIC,
@@ -124,51 +155,122 @@ class ContinuousSourceScheduler:
             active_bindings.append(binding)
 
         if not active_bindings:
-            raise ValueError("No continuous source behaviours")
+            raise ValueError(
+                "No continuous source behaviours configured for active state"
+            )
 
         heap: list[tuple[float, int, ContinuousSourceBinding, Any]] = []
 
         for idx, binding in enumerate(active_bindings):
-            if hasattr(binding.generator, "generate"):
-                gen = binding.generator.generate(context)
-            else:
-                gen = binding.generator
-
-            it = gen.__aiter__() if hasattr(gen, "__aiter__") else gen
-            heapq.heappush(heap, (0.0, idx, binding, it))
+            iterator = self._new_iterator(
+                binding=binding,
+                context=context,
+            )
+            heapq.heappush(
+                heap,
+                (0.0, idx, binding, iterator),
+            )
 
         current_sim_offset = 0.0
 
         while heap:
-            sched_time, priority_idx, binding, it = heapq.heappop(heap)
+            (
+                sched_time,
+                priority_idx,
+                binding,
+                iterator,
+            ) = heapq.heappop(heap)
 
             if sched_time > current_sim_offset:
                 delta_sim = sched_time - current_sim_offset
+
                 wall_seconds = self._runtime.wall_clock_seconds(delta_sim)
 
                 if self._sleep_fn is not None:
-                    res = self._sleep_fn(wall_seconds)
-                    if inspect.isawaitable(res):
-                        await res
+                    result = self._sleep_fn(wall_seconds)
+
+                    if inspect.isawaitable(result):
+                        await result
 
                 self._clock.advance(delta_sim)
+
                 current_sim_offset = sched_time
+
                 context.simulation_time = self._clock.now()
 
-            try:
-                event = await it.__anext__()
-            except StopAsyncIteration:
+            source = binding.behaviour.source
+
+            if source in (
+                SourceDomain.METRIC,
+                SourceDomain.INFRASTRUCTURE_TEST,
+            ):
+                while True:
+                    try:
+                        event = await iterator.__anext__()
+
+                    except StopAsyncIteration:
+                        break
+
+                    try:
+                        await publisher.publish(event)
+
+                    except StopAsyncIteration:
+                        return
+
+                if not hasattr(binding.generator, "generate"):
+                    continue
+
+                next_iterator = self._new_iterator(
+                    binding=binding,
+                    context=context,
+                )
+
+                next_sched_time = (
+                    current_sim_offset + self._cycle_interval(source)
+                )
+
+                heapq.heappush(
+                    heap,
+                    (
+                        next_sched_time,
+                        priority_idx,
+                        binding,
+                        next_iterator,
+                    ),
+                )
+
                 continue
 
             try:
+                event = await iterator.__anext__()
+
+            except StopAsyncIteration:
+                if not hasattr(binding.generator, "generate"):
+                    continue
+
+                iterator = self._new_iterator(
+                    binding=binding,
+                    context=context,
+                )
+
+                try:
+                    event = await iterator.__anext__()
+
+                except StopAsyncIteration as exc:
+                    raise ValueError(
+                        "Continuous source generator "
+                        "produced an empty cycle"
+                    ) from exc
+
+            try:
                 await publisher.publish(event)
+
             except StopAsyncIteration:
                 return
 
-            simulated_interval = self._simulated_interval(
-                binding.behaviour.source, event
+            next_sched_time = (
+                current_sim_offset + self._log_simulated_interval(event)
             )
-            next_sched_time = current_sim_offset + simulated_interval
 
             heapq.heappush(
                 heap,
@@ -176,6 +278,6 @@ class ContinuousSourceScheduler:
                     next_sched_time,
                     priority_idx,
                     binding,
-                    it,
+                    iterator,
                 ),
             )
