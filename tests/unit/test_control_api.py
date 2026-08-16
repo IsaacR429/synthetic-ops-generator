@@ -213,7 +213,146 @@ def test_start_run_executes_scenario(
         "change_id": "CHG0000001",
         "status": "running",
         "execution_mode": "standard",
+        "generation_lifecycle": "bounded",
         "historical_configuration": None,
+        "continuous_configuration": None,
+    }
+
+
+def test_start_continuous_run_executes_scenario(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+            "generation_lifecycle": "continuous",
+        },
+    )
+
+    assert response.status_code == 202
+
+    payload = response.json()
+
+    assert payload == {
+        "scenario_id": "BANK-01",
+        "run_id": "RUN0000001",
+        "change_id": "CHG0000001",
+        "status": "running",
+        "execution_mode": "standard",
+        "generation_lifecycle": "continuous",
+        "historical_configuration": None,
+        "continuous_configuration": {
+            "stop_mode": "manual",
+            "duration_seconds": None,
+        },
+    }
+
+    stop_response = client.post(
+        f"/runs/{payload['run_id']}/stop"
+    )
+
+    assert stop_response.status_code == 200
+
+    stopped = stop_response.json()
+
+    assert stopped["run_id"] == payload["run_id"]
+    assert stopped["scenario_id"] == "BANK-01"
+    assert stopped["status"] == "stopped"
+    assert stopped["event_count"] >= 0
+
+
+def test_start_bounded_run_rejects_continuous_configuration(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "generation_lifecycle": "bounded",
+            "continuous": {
+                "stop_mode": "manual",
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+    assert (
+        "Continuous configuration can only "
+        "be supplied for continuous generation."
+        in response.text
+    )
+
+
+def test_start_continuous_historical_run_is_rejected(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "execution_mode": "historical",
+            "generation_lifecycle": "continuous",
+        },
+    )
+
+    assert response.status_code == 422
+
+    assert (
+        "Continuous lifecycle is not supported "
+        "for historical execution."
+        in response.text
+    )
+
+
+def test_start_continuous_manual_run_rejects_duration(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "generation_lifecycle": "continuous",
+            "continuous": {
+                "stop_mode": "manual",
+                "duration_seconds": 30,
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+    assert (
+        "Manual continuous execution "
+        "cannot define a duration."
+        in response.text
+    )
+
+
+def test_start_duration_continuous_run_returns_409(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "generation_lifecycle": "continuous",
+            "continuous": {
+                "stop_mode": "duration",
+                "duration_seconds": 30,
+            },
+        },
+    )
+
+    assert response.status_code == 409
+
+    assert response.json() == {
+        "detail": (
+            "Duration-based continuous "
+            "execution is not supported yet."
+        )
     }
 
 
@@ -516,11 +655,13 @@ def test_start_historical_run_executes_scenario(
         "change_id": "CHG0000001",
         "status": "running",
         "execution_mode": "historical",
+        "generation_lifecycle": "bounded",
         "historical_configuration": {
             "degradation_samples": 4,
             "plateau_samples": 2,
             "recovery_samples": 4,
         },
+        "continuous_configuration": None,
     }
 
     completed = wait_for_terminal_run(

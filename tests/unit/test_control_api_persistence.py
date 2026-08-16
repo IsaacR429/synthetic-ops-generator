@@ -110,7 +110,9 @@ def test_run_ids_survive_application_restart(
             "change_id": "CHG0000001",
             "status": "running",
             "execution_mode": "standard",
+            "generation_lifecycle": "bounded",
             "historical_configuration": None,
+            "continuous_configuration": None,
         }
 
         first_completed = (

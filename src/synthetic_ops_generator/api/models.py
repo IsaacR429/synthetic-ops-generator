@@ -8,6 +8,9 @@ from pydantic import (
 )
 
 from synthetic_ops_generator.control.configuration import (
+    ContinuousExecutionConfiguration,
+    ContinuousStopMode,
+    GenerationLifecycle,
     HistoricalExecutionConfiguration,
 )
 from synthetic_ops_generator.control.models import (
@@ -249,6 +252,25 @@ class ScenarioDetailResponse(BaseModel):
         )
 
 
+class ContinuousExecutionConfigurationResponse(
+    BaseModel
+):
+    stop_mode: ContinuousStopMode
+    duration_seconds: int | None = None
+
+    @classmethod
+    def from_configuration(
+        cls,
+        configuration: ContinuousExecutionConfiguration,
+    ) -> "ContinuousExecutionConfigurationResponse":
+        return cls(
+            stop_mode=configuration.stop_mode,
+            duration_seconds=(
+                configuration.duration_seconds
+            ),
+        )
+
+
 class HistoricalExecutionConfigurationResponse(
     BaseModel
 ):
@@ -303,6 +325,64 @@ class ScenarioCapabilitiesResponse(BaseModel):
     )
 
 
+class ContinuousExecutionConfigurationRequest(
+    BaseModel
+):
+    stop_mode: ContinuousStopMode = (
+        ContinuousStopMode.MANUAL
+    )
+
+    duration_seconds: int | None = None
+
+    @model_validator(mode="after")
+    def validate_stop_configuration(
+        self,
+    ) -> "ContinuousExecutionConfigurationRequest":
+        if (
+            self.stop_mode
+            == ContinuousStopMode.MANUAL
+        ):
+            if self.duration_seconds is not None:
+                raise ValueError(
+                    "Manual continuous execution "
+                    "cannot define a duration."
+                )
+
+            return self
+
+        if (
+            self.stop_mode
+            == ContinuousStopMode.DURATION
+        ):
+            if self.duration_seconds is None:
+                raise ValueError(
+                    "Duration-based continuous "
+                    "execution requires "
+                    "duration_seconds."
+                )
+
+            if self.duration_seconds <= 0:
+                raise ValueError(
+                    "Continuous execution duration "
+                    "must be greater than zero."
+                )
+
+            return self
+
+        raise ValueError(
+            "Unsupported continuous stop mode: "
+            f"{self.stop_mode}"
+        )
+
+    def to_configuration(
+        self,
+    ) -> ContinuousExecutionConfiguration:
+        return ContinuousExecutionConfiguration(
+            stop_mode=self.stop_mode,
+            duration_seconds=self.duration_seconds,
+        )
+
+
 class HistoricalExecutionConfigurationRequest(
     BaseModel
 ):
@@ -343,6 +423,15 @@ class StartRunRequest(BaseModel):
         RunExecutionMode.STANDARD
     )
 
+    generation_lifecycle: GenerationLifecycle = (
+        GenerationLifecycle.BOUNDED
+    )
+
+    continuous: (
+        ContinuousExecutionConfigurationRequest
+        | None
+    ) = None
+
     historical: (
         HistoricalExecutionConfigurationRequest
         | None
@@ -363,6 +452,27 @@ class StartRunRequest(BaseModel):
                 "execution."
             )
 
+        if (
+            self.generation_lifecycle
+            != GenerationLifecycle.CONTINUOUS
+            and self.continuous is not None
+        ):
+            raise ValueError(
+                "Continuous configuration can only "
+                "be supplied for continuous generation."
+            )
+
+        if (
+            self.generation_lifecycle
+            == GenerationLifecycle.CONTINUOUS
+            and self.execution_mode
+            == RunExecutionMode.HISTORICAL
+        ):
+            raise ValueError(
+                "Continuous lifecycle is not supported "
+                "for historical execution."
+            )
+
         return self
 
     def historical_configuration(
@@ -373,6 +483,14 @@ class StartRunRequest(BaseModel):
 
         return self.historical.to_configuration()
 
+    def continuous_configuration(
+        self,
+    ) -> ContinuousExecutionConfiguration | None:
+        if self.continuous is None:
+            return None
+
+        return self.continuous.to_configuration()
+
 
 class StartRunResponse(BaseModel):
     scenario_id: str
@@ -380,9 +498,15 @@ class StartRunResponse(BaseModel):
     change_id: str
     status: RunStatus
     execution_mode: RunExecutionMode
+    generation_lifecycle: GenerationLifecycle
 
     historical_configuration: (
         HistoricalExecutionConfigurationResponse
+        | None
+    ) = None
+
+    continuous_configuration: (
+        ContinuousExecutionConfigurationResponse
         | None
     ) = None
 
@@ -397,6 +521,9 @@ class StartRunResponse(BaseModel):
             change_id=result.change_id,
             status=result.status,
             execution_mode=result.execution_mode,
+            generation_lifecycle=(
+                result.generation_lifecycle
+            ),
             historical_configuration=(
                 HistoricalExecutionConfigurationResponse
                 .from_configuration(
@@ -404,6 +531,17 @@ class StartRunResponse(BaseModel):
                 )
                 if (
                     result.historical_configuration
+                    is not None
+                )
+                else None
+            ),
+            continuous_configuration=(
+                ContinuousExecutionConfigurationResponse
+                .from_configuration(
+                    result.continuous_configuration
+                )
+                if (
+                    result.continuous_configuration
                     is not None
                 )
                 else None
