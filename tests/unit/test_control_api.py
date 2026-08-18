@@ -1354,6 +1354,172 @@ def test_get_run_events_returns_retained_events_in_sequence_order(
     )
 
 
+def test_get_run_events_supports_sequence_cursor_pagination(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    completed = wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    assert completed["event_count"] > 10
+
+    first_response = client.get(
+        f"/runs/{run_id}/events",
+        params={
+            "limit": 5,
+        },
+    )
+
+    assert first_response.status_code == 200
+
+    first_page = first_response.json()
+    first_events = first_page["events"]
+
+    assert (
+        first_page["retained_event_count"]
+        == completed["event_count"]
+    )
+
+    assert first_page[
+        "returned_event_count"
+    ] == 5
+
+    assert [
+        event["sequence_number"]
+        for event in first_events
+    ] == [1, 2, 3, 4, 5]
+
+    assert first_page[
+        "next_after_sequence_number"
+    ] == 5
+
+    second_response = client.get(
+        f"/runs/{run_id}/events",
+        params={
+            "after_sequence_number": (
+                first_page[
+                    "next_after_sequence_number"
+                ]
+            ),
+            "limit": 5,
+        },
+    )
+
+    assert second_response.status_code == 200
+
+    second_page = second_response.json()
+    second_events = second_page["events"]
+
+    assert (
+        second_page["retained_event_count"]
+        == completed["event_count"]
+    )
+
+    assert second_page[
+        "returned_event_count"
+    ] == 5
+
+    assert [
+        event["sequence_number"]
+        for event in second_events
+    ] == [6, 7, 8, 9, 10]
+
+    assert second_page[
+        "next_after_sequence_number"
+    ] == 10
+
+
+def test_get_run_events_last_page_has_no_next_cursor(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    completed = wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    total = completed["event_count"]
+
+    assert total > 1
+
+    response = client.get(
+        f"/runs/{run_id}/events",
+        params={
+            "after_sequence_number": total - 2,
+            "limit": 5,
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+    events = payload["events"]
+
+    assert payload["retained_event_count"] == total
+    assert payload["returned_event_count"] == 2
+
+    assert [
+        event["sequence_number"]
+        for event in events
+    ] == [
+        total - 1,
+        total,
+    ]
+
+    assert (
+        payload["next_after_sequence_number"]
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    ("params", "expected_status"),
+    [
+        ({"limit": 0}, 422),
+        ({"limit": -1}, 422),
+        (
+            {"after_sequence_number": -1},
+            422,
+        ),
+    ],
+)
+def test_get_run_events_rejects_invalid_pagination(
+    client: TestClient,
+    params: dict[str, int],
+    expected_status: int,
+) -> None:
+    response = client.get(
+        "/runs/RUN9999999/events",
+        params=params,
+    )
+
+    assert response.status_code == expected_status
+
+
 def test_get_run_events_filters_by_source_domain(
     client: TestClient,
 ) -> None:

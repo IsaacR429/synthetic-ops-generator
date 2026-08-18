@@ -730,9 +730,20 @@ class StopRunResponse(BaseModel):
 
 class RunEventsResponse(BaseModel):
     run_id: str
+
     retained_event_count: int = Field(
         ge=0
     )
+
+    returned_event_count: int = Field(
+        ge=0
+    )
+
+    next_after_sequence_number: int | None = Field(
+        default=None,
+        ge=0,
+    )
+
     events: list[GeneratedEvent]
 
     @classmethod
@@ -741,9 +752,19 @@ class RunEventsResponse(BaseModel):
         *,
         run_id: str,
         events: tuple[GeneratedEvent, ...],
+        retained_event_count: int | None = None,
+        next_after_sequence_number: int | None = None,
     ) -> "RunEventsResponse":
         return cls(
             run_id=run_id,
-            retained_event_count=len(events),
+            retained_event_count=(
+                len(events)
+                if retained_event_count is None
+                else retained_event_count
+            ),
+            returned_event_count=len(events),
+            next_after_sequence_number=(
+                next_after_sequence_number
+            ),
             events=list(events),
         )

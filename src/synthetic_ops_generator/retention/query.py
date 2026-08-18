@@ -19,3 +19,6 @@ class EventQuery:
     event_type: str | None = None
     service: str | None = None
     component: str | None = None
+
+    after_sequence_number: int | None = None
+    limit: int | None = None

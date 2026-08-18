@@ -78,8 +78,37 @@ class SQLiteEventStore(EventStore):
                 "Run ID is required."
             )
 
+        if query.limit is not None and query.limit <= 0:
+            raise ValueError(
+                "Event query limit must be greater than zero."
+            )
+
+        if (
+            query.after_sequence_number is not None
+            and query.after_sequence_number < 0
+        ):
+            raise ValueError(
+                "Event query sequence cursor cannot be negative."
+            )
+
         return await asyncio.to_thread(
             self._query_events_sync,
+            query,
+        )
+
+    async def count_events(
+        self,
+        query: EventQuery,
+    ) -> int:
+        self._require_started()
+
+        if not query.run_id.strip():
+            raise ValueError(
+                "Run ID is required."
+            )
+
+        return await asyncio.to_thread(
+            self._count_events_sync,
             query,
         )
 
@@ -374,12 +403,20 @@ class SQLiteEventStore(EventStore):
             where_clauses.append("component = ?")
             params.append(query.component)
 
+        if query.after_sequence_number is not None:
+            where_clauses.append("sequence_number > ?")
+            params.append(query.after_sequence_number)
+
         sql = f"""
         SELECT payload
         FROM generated_events
         WHERE {" AND ".join(where_clauses)}
         ORDER BY sequence_number ASC
         """
+
+        if query.limit is not None:
+            sql += "\nLIMIT ?"
+            params.append(query.limit)
 
         with sqlite3.connect(
             self._database_path
@@ -395,6 +432,54 @@ class SQLiteEventStore(EventStore):
             )
             for row in rows
         )
+
+    def _count_events_sync(
+        self,
+        query: EventQuery,
+    ) -> int:
+        where_clauses = ["run_id = ?"]
+        params: list[Any] = [query.run_id]
+
+        if query.source_domain is not None:
+            where_clauses.append("source_domain = ?")
+            params.append(
+                query.source_domain.value
+            )
+
+        if query.source_system is not None:
+            where_clauses.append("source_system = ?")
+            params.append(query.source_system)
+
+        if query.event_type is not None:
+            where_clauses.append("event_type = ?")
+            params.append(query.event_type)
+
+        if query.service is not None:
+            where_clauses.append("service = ?")
+            params.append(query.service)
+
+        if query.component is not None:
+            where_clauses.append("component = ?")
+            params.append(query.component)
+
+        sql = f"""
+        SELECT COUNT(*)
+        FROM generated_events
+        WHERE {" AND ".join(where_clauses)}
+        """
+
+        with sqlite3.connect(
+            self._database_path
+        ) as connection:
+            row = connection.execute(
+                sql,
+                params,
+            ).fetchone()
+
+        if row is None:
+            return 0
+
+        return int(row[0])
 
     def _delete_before_sync(
         self,

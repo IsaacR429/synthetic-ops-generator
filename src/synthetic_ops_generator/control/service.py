@@ -844,6 +844,8 @@ class ControlService:
         event_type: str | None = None,
         service: str | None = None,
         component: str | None = None,
+        after_sequence_number: int | None = None,
+        limit: int | None = None,
     ) -> tuple[GeneratedEvent, ...]:
         record = await self.get_run(
             run_id
@@ -857,10 +859,37 @@ class ControlService:
                 event_type=event_type,
                 service=service,
                 component=component,
+                after_sequence_number=after_sequence_number,
+                limit=limit,
             )
         )
 
         return tuple(events)
+
+    async def count_run_events(
+        self,
+        run_id: str,
+        *,
+        source_domain: SourceDomain | None = None,
+        source_system: str | None = None,
+        event_type: str | None = None,
+        service: str | None = None,
+        component: str | None = None,
+    ) -> int:
+        record = await self.get_run(
+            run_id
+        )
+
+        return await self._store.count_events(
+            EventQuery(
+                run_id=record.run_id,
+                source_domain=source_domain,
+                source_system=source_system,
+                event_type=event_type,
+                service=service,
+                component=component,
+            )
+        )
 
     async def _persist_run_progress(
         self,

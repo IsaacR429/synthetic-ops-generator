@@ -673,6 +673,71 @@ async def test_query_events_rejects_empty_run_id(
 
 
 @pytest.mark.asyncio
+async def test_query_events_rejects_non_positive_limit(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    try:
+        with pytest.raises(ValueError):
+            await store.query_events(
+                EventQuery(
+                    run_id="RUN0000001",
+                    limit=0,
+                )
+            )
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_query_events_rejects_negative_sequence_cursor(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    try:
+        with pytest.raises(ValueError):
+            await store.query_events(
+                EventQuery(
+                    run_id="RUN0000001",
+                    after_sequence_number=-1,
+                )
+            )
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_count_events_rejects_empty_run_id(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    try:
+        with pytest.raises(ValueError):
+            await store.count_events(
+                EventQuery(
+                    run_id="",
+                )
+            )
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
 async def test_query_events_returns_events_in_sequence_order(
     tmp_path,
 ) -> None:
@@ -711,6 +776,159 @@ async def test_query_events_returns_events_in_sequence_order(
         first,
         second,
     )
+
+
+@pytest.mark.asyncio
+async def test_query_events_applies_sequence_cursor_and_limit(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    events = tuple(
+        make_event(
+            event_id=f"EVT{sequence_number:07d}",
+            sequence_number=sequence_number,
+            source_domain=SourceDomain.METRIC,
+        )
+        for sequence_number in range(1, 7)
+    )
+
+    try:
+        for event in events:
+            await store.append(event)
+
+        restored = await store.query_events(
+            EventQuery(
+                run_id="RUN0000001",
+                after_sequence_number=2,
+                limit=3,
+            )
+        )
+    finally:
+        await store.stop()
+
+    assert restored == events[2:5]
+
+
+@pytest.mark.asyncio
+async def test_query_events_combines_cursor_with_projection_filters(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    matching_before_cursor = make_event(
+        event_id="EVT0000001",
+        sequence_number=1,
+        source_domain=SourceDomain.METRIC,
+        event_type="metric.observed",
+    )
+
+    wrong_type_after_cursor = make_event(
+        event_id="EVT0000002",
+        sequence_number=3,
+        source_domain=SourceDomain.METRIC,
+        event_type="metric.threshold_breached",
+    )
+
+    matching_after_cursor = make_event(
+        event_id="EVT0000003",
+        sequence_number=4,
+        source_domain=SourceDomain.METRIC,
+        event_type="metric.observed",
+    )
+
+    try:
+        await store.append(
+            matching_before_cursor
+        )
+        await store.append(
+            wrong_type_after_cursor
+        )
+        await store.append(
+            matching_after_cursor
+        )
+
+        restored = await store.query_events(
+            EventQuery(
+                run_id="RUN0000001",
+                source_domain=SourceDomain.METRIC,
+                event_type="metric.observed",
+                after_sequence_number=2,
+            )
+        )
+    finally:
+        await store.stop()
+
+    assert restored == (
+        matching_after_cursor,
+    )
+
+
+@pytest.mark.asyncio
+async def test_count_events_counts_matching_filters_without_pagination(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    first_matching = make_event(
+        event_id="EVT0000001",
+        sequence_number=1,
+        source_domain=SourceDomain.METRIC,
+        event_type="metric.observed",
+    )
+
+    second_matching = make_event(
+        event_id="EVT0000002",
+        sequence_number=2,
+        source_domain=SourceDomain.METRIC,
+        event_type="metric.observed",
+    )
+
+    wrong_type = make_event(
+        event_id="EVT0000003",
+        sequence_number=3,
+        source_domain=SourceDomain.METRIC,
+        event_type="metric.threshold_breached",
+    )
+
+    wrong_domain = make_event(
+        event_id="EVT0000004",
+        sequence_number=4,
+        source_domain=SourceDomain.LOG,
+        event_type="log.observed",
+    )
+
+    try:
+        await store.append(first_matching)
+        await store.append(second_matching)
+        await store.append(wrong_type)
+        await store.append(wrong_domain)
+
+        count = await store.count_events(
+            EventQuery(
+                run_id="RUN0000001",
+                source_domain=SourceDomain.METRIC,
+                event_type="metric.observed",
+                after_sequence_number=1,
+                limit=1,
+            )
+        )
+    finally:
+        await store.stop()
+
+    assert count == 2
 
 
 @pytest.mark.asyncio

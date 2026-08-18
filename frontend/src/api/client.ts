@@ -3,6 +3,7 @@ import type {
   EnterpriseSummary,
   HealthResponse,
   ReplayRunResponse,
+  RunEventQuery,
   RunEventsResponse,
   RunResponse,
   RunStatus,
@@ -122,10 +123,68 @@ export function getRun(
 
 export function getRunEvents(
   runId: string,
+  query?: RunEventQuery,
 ): Promise<RunEventsResponse> {
-  return request<RunEventsResponse>(
-    `/runs/${encodePathSegment(runId)}/events`,
-  )
+  const searchParams = new URLSearchParams()
+
+  if (query?.source_domain) {
+    searchParams.set(
+      'source_domain',
+      query.source_domain,
+    )
+  }
+
+  if (query?.source_system) {
+    searchParams.set(
+      'source_system',
+      query.source_system,
+    )
+  }
+
+  if (query?.event_type) {
+    searchParams.set(
+      'event_type',
+      query.event_type,
+    )
+  }
+
+  if (query?.service) {
+    searchParams.set(
+      'service',
+      query.service,
+    )
+  }
+
+  if (query?.component) {
+    searchParams.set(
+      'component',
+      query.component,
+    )
+  }
+
+  if (
+    query?.after_sequence_number !== undefined
+  ) {
+    searchParams.set(
+      'after_sequence_number',
+      String(query.after_sequence_number),
+    )
+  }
+
+  if (query?.limit !== undefined) {
+    searchParams.set(
+      'limit',
+      String(query.limit),
+    )
+  }
+
+  const queryString = searchParams.toString()
+
+  const path =
+    `/runs/${encodePathSegment(runId)}/events` +
+    (queryString ? `?${queryString}` : '')
+
+  return request<RunEventsResponse>(path)
 }
 
 export function stopRun(

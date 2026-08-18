@@ -55,6 +55,18 @@ class RecordingEventStore(EventStore):
             if event.run_id == query.run_id
         )
 
+    async def count_events(
+        self,
+        query: EventQuery,
+    ) -> int:
+        return len(
+            [
+                event
+                for event in self.events
+                if event.run_id == query.run_id
+            ]
+        )
+
     async def delete_before(
         self,
         cutoff: datetime,

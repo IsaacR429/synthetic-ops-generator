@@ -40,6 +40,13 @@ class EventStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def count_events(
+        self,
+        query: EventQuery,
+    ) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
     async def delete_before(
         self,
         cutoff: datetime,

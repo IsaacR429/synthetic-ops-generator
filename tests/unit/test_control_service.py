@@ -329,7 +329,13 @@ async def test_control_service_queries_run_events_by_source_domain(
             source_domain=SourceDomain.METRIC,
         )
 
+        matching_count = await service.count_run_events(
+            result.run_id,
+            source_domain=SourceDomain.METRIC,
+        )
+
         assert events
+        assert matching_count == len(events)
 
         assert {
             event.run_id
@@ -348,6 +354,19 @@ async def test_control_service_queries_run_events_by_source_domain(
             event.sequence_number
             for event in events
         )
+
+        assert len(events) >= 3
+
+        cursor = events[0].sequence_number
+
+        paged_events = await service.query_run_events(
+            result.run_id,
+            source_domain=SourceDomain.METRIC,
+            after_sequence_number=cursor,
+            limit=2,
+        )
+
+        assert paged_events == events[1:3]
 
     finally:
         await active_run_manager.shutdown()
@@ -2239,6 +2258,14 @@ async def test_query_run_events_requires_existing_run(
             RunNotFoundError
         ):
             await service.query_run_events(
+                "RUN9999999",
+                source_domain=SourceDomain.METRIC,
+            )
+
+        with pytest.raises(
+            RunNotFoundError
+        ):
+            await service.count_run_events(
                 "RUN9999999",
                 source_domain=SourceDomain.METRIC,
             )

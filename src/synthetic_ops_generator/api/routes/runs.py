@@ -148,6 +148,14 @@ async def get_run_events(
         Query(alias="service"),
     ] = None,
     component: str | None = None,
+    after_sequence_number: Annotated[
+        int | None,
+        Query(ge=0),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        Query(gt=0),
+    ] = None,
 ) -> RunEventsResponse:
     has_filters = any(
         value is not None
@@ -160,13 +168,24 @@ async def get_run_events(
         )
     )
 
+    has_pagination = (
+        after_sequence_number is not None
+        or limit is not None
+    )
+
     try:
-        if not has_filters:
+        if not has_filters and not has_pagination:
             events = await service.get_run_events(
                 run_id
             )
-        else:
-            events = await service.query_run_events(
+
+            return RunEventsResponse.from_events(
+                run_id=run_id,
+                events=events,
+            )
+
+        retained_event_count = (
+            await service.count_run_events(
                 run_id,
                 source_domain=source_domain,
                 source_system=source_system,
@@ -174,15 +193,57 @@ async def get_run_events(
                 service=service_name,
                 component=component,
             )
+        )
+
+        fetch_limit = (
+            limit + 1
+            if limit is not None
+            else None
+        )
+
+        events = await service.query_run_events(
+            run_id,
+            source_domain=source_domain,
+            source_system=source_system,
+            event_type=event_type,
+            service=service_name,
+            component=component,
+            after_sequence_number=(
+                after_sequence_number
+            ),
+            limit=fetch_limit,
+        )
     except RunNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
 
+    if limit is None:
+        page_events = events
+        next_after_sequence_number = None
+    else:
+        has_more = len(events) > limit
+
+        page_events = (
+            events[:limit]
+            if has_more
+            else events
+        )
+
+        next_after_sequence_number = (
+            page_events[-1].sequence_number
+            if has_more and page_events
+            else None
+        )
+
     return RunEventsResponse.from_events(
         run_id=run_id,
-        events=events,
+        events=page_events,
+        retained_event_count=retained_event_count,
+        next_after_sequence_number=(
+            next_after_sequence_number
+        ),
     )
 
 

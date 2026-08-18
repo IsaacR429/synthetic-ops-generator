@@ -36,10 +36,15 @@ export interface ContinuousExecutionConfiguration {
 }
 
 export type SourceDomain =
-  | 'metric'
-  | 'incident'
+  | 'itsm'
   | 'deployment'
-  | 'change'
+  | 'application_test'
+  | 'infrastructure_test'
+  | 'metric'
+  | 'log'
+  | 'manual_validation'
+  | 'incident'
+  | 'evidence'
 
 export type TargetScope =
   | 'business_stream'
@@ -225,6 +230,7 @@ export interface GeneratedEvent {
   event_time: string
 
   source_system: string
+  source_domain: SourceDomain | null
 
   scenario_id: string
   run_id: string
@@ -243,9 +249,24 @@ export interface GeneratedEvent {
   data: Record<string, unknown>
 }
 
+export interface RunEventQuery {
+  source_domain?: SourceDomain
+  source_system?: string
+  event_type?: string
+  service?: string
+  component?: string
+
+  after_sequence_number?: number
+  limit?: number
+}
+
 export interface RunEventsResponse {
   run_id: string
+
   retained_event_count: number
+  returned_event_count: number
+
+  next_after_sequence_number: number | null
 
   events: GeneratedEvent[]
 }
