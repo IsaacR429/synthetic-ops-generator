@@ -15,11 +15,13 @@ from synthetic_ops_generator.control.models import (
     RunExecutionMode,
     RunRecord,
     RunStatus,
+    RunTargetSnapshot,
 )
 from synthetic_ops_generator.control.sqlite_run_store import (
     SQLiteRunStore,
 )
 from synthetic_ops_generator.domain.enums import (
+    Environment,
     OperationalState,
 )
 
@@ -75,6 +77,60 @@ async def test_sqlite_run_store_round_trip(
 
 
 @pytest.mark.asyncio
+async def test_sqlite_run_store_round_trips_target_snapshot(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+
+    try:
+        record = replace(
+            make_run_record(),
+            target=RunTargetSnapshot(
+                enterprise_id="bank_alpha",
+                business_stream_id="payments",
+                service_id="payments-api",
+                component_ids=(
+                    "payment-service",
+                    "payment-database",
+                ),
+                environment=Environment.PRODUCTION,
+            ),
+        )
+
+        await store.create(record)
+
+        stored = await store.get(
+            record.run_id
+        )
+
+        assert stored == record
+        assert stored is not None
+        assert stored.target is not None
+
+        assert (
+            stored.target.enterprise_id
+            == "bank_alpha"
+        )
+
+        assert stored.target.component_ids == (
+            "payment-service",
+            "payment-database",
+        )
+
+        assert (
+            stored.target.environment
+            == Environment.PRODUCTION
+        )
+
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
 async def test_sqlite_run_store_updates_run(
     tmp_path: Path,
 ) -> None:
@@ -85,7 +141,19 @@ async def test_sqlite_run_store_updates_run(
     await store.start()
 
     try:
-        record = make_run_record()
+        record = replace(
+            make_run_record(),
+            target=RunTargetSnapshot(
+                enterprise_id="bank_alpha",
+                business_stream_id="payments",
+                service_id="payments-api",
+                component_ids=(
+                    "payment-service",
+                    "payment-database",
+                ),
+                environment=Environment.PRODUCTION,
+            ),
+        )
 
         await store.create(record)
 
@@ -252,6 +320,72 @@ async def test_sqlite_run_store_lists_runs_by_status(
 
 
 @pytest.mark.asyncio
+async def test_sqlite_run_store_lists_all_runs_newest_first(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+
+    try:
+        oldest = make_run_record()
+
+        newer = replace(
+            oldest,
+            run_id="RUN0000002",
+            change_id="CHG0000002",
+            started_at=datetime(
+                2026,
+                8,
+                14,
+                0,
+                10,
+                tzinfo=UTC,
+            ),
+        )
+
+        newest_same_time = replace(
+            newer,
+            run_id="RUN0000003",
+            change_id="CHG0000003",
+            status=RunStatus.COMPLETED,
+            completed_at=datetime(
+                2026,
+                8,
+                14,
+                0,
+                15,
+                tzinfo=UTC,
+            ),
+            current_state=(
+                OperationalState.COMPLETED
+            ),
+            event_count=32,
+            validation_passed=True,
+        )
+
+        await store.create(oldest)
+        await store.create(newer)
+        await store.create(newest_same_time)
+
+        records = await store.list_all()
+
+        assert [
+            record.run_id
+            for record in records
+        ] == [
+            "RUN0000003",
+            "RUN0000002",
+            "RUN0000001",
+        ]
+
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
 async def test_sqlite_run_store_returns_empty_status_list(
     tmp_path: Path,
 ) -> None:
@@ -408,12 +542,18 @@ async def test_sqlite_run_store_migrates_old_schema_without_execution_mode(
                 ).fetchall()
             }
         assert "execution_mode" in columns
+        assert "enterprise_id" in columns
+        assert "business_stream_id" in columns
+        assert "service_id" in columns
+        assert "target_component_ids" in columns
+        assert "target_environment" in columns
 
         stored = await store.get(
             "RUN0000001"
         )
 
         assert stored is not None
+        assert stored.target is None
 
         assert (
             stored.execution_mode

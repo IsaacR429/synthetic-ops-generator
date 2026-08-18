@@ -30,6 +30,7 @@ from synthetic_ops_generator.core.sqlite_identifiers import (
 )
 from synthetic_ops_generator.domain.enums import (
     OperationalState,
+    SourceDomain,
 )
 from synthetic_ops_generator.events.envelope import (
     GeneratedEvent,
@@ -276,6 +277,85 @@ async def test_control_service_executes_and_retains_bank_01(
 
 
 @pytest.mark.asyncio
+async def test_control_service_queries_run_events_by_source_domain(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        result = await service.start_run(
+            scenario_id="BANK-01",
+            random_seed=42,
+        )
+
+        await wait_for_terminal_run(
+            service,
+            result.run_id,
+        )
+
+        events = await service.query_run_events(
+            result.run_id,
+            source_domain=SourceDomain.METRIC,
+        )
+
+        assert events
+
+        assert {
+            event.run_id
+            for event in events
+        } == {result.run_id}
+
+        assert {
+            event.source_domain
+            for event in events
+        } == {SourceDomain.METRIC}
+
+        assert [
+            event.sequence_number
+            for event in events
+        ] == sorted(
+            event.sequence_number
+            for event in events
+        )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
 async def test_control_service_uses_persistent_run_ids(
     tmp_path: Path,
 ) -> None:
@@ -462,6 +542,34 @@ async def test_control_service_gets_persisted_run(
         assert record.scenario_id == "BANK-01"
         assert record.status == RunStatus.COMPLETED
         assert record.event_count == 32
+
+        assert record.target is not None
+
+        assert (
+            record.target.enterprise_id
+            == "bank_alpha"
+        )
+
+        assert (
+            record.target.business_stream_id
+            == "payments"
+        )
+
+        assert (
+            record.target.service_id
+            == "payment_service"
+        )
+
+        assert record.target.component_ids == (
+            "payment_api",
+            "payment_database",
+            "payment_worker",
+        )
+
+        assert (
+            record.target.environment.value
+            == "production"
+        )
 
     finally:
         await active_run_manager.shutdown()
@@ -2085,6 +2193,54 @@ async def test_get_run_events_requires_existing_run(
         ):
             await service.get_run_events(
                 "RUN9999999"
+            )
+
+    finally:
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_query_run_events_requires_existing_run(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+        )
+
+        with pytest.raises(
+            RunNotFoundError
+        ):
+            await service.query_run_events(
+                "RUN9999999",
+                source_domain=SourceDomain.METRIC,
             )
 
     finally:

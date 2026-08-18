@@ -43,11 +43,14 @@ def build_context(
     )
 
 
-def build_behaviour() -> ScenarioBehaviour:
+def build_behaviour(
+    *,
+    profile_id: str = "approved_change",
+) -> ScenarioBehaviour:
     return ScenarioBehaviour(
         source=SourceDomain.ITSM,
         during_state=OperationalState.NORMAL,
-        profile_id="approved_change",
+        profile_id=profile_id,
     )
 
 
@@ -86,6 +89,33 @@ def test_approved_change_generates_two_itsm_events() -> None:
     assert events[1].event_type == "itsm.approval.approved"
 
 
+def test_missing_required_approval_generates_two_itsm_events() -> None:
+    generator = ITSMGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(
+            profile_id="missing_required_approval",
+        ),
+        service_owner="Payments Operations",
+        component_ids=["payment_api"],
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(),
+        )
+    )
+
+    assert len(events) == 2
+
+    assert events[0].event_type == "itsm.change.created"
+    assert events[1].event_type == "itsm.approval.missing"
+
+    assert {
+        event.source_domain for event in events
+    } == {SourceDomain.ITSM}
+
+
 def test_itsm_events_share_run_and_change_correlation() -> None:
     context = build_context()
 
@@ -114,6 +144,10 @@ def test_itsm_events_share_run_and_change_correlation() -> None:
     assert {
         event.chg_id for event in events
     } == {"CHG0000001"}
+
+    assert {
+        event.source_domain for event in events
+    } == {SourceDomain.ITSM}
 
     assert {
         event.business_stream for event in events

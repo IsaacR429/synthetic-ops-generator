@@ -19,6 +19,7 @@ from synthetic_ops_generator.control.models import (
     RunRecord,
     RunStartResult,
     RunStatus,
+    RunTargetSnapshot,
     StopRunResult,
 )
 from synthetic_ops_generator.domain.enterprise import (
@@ -313,6 +314,18 @@ class HistoricalExecutionCapabilityResponse(
     ) = None
 
 
+class ContinuousExecutionCapabilityResponse(
+    BaseModel
+):
+    supported: bool
+    unavailable_reason: str | None = None
+
+    configuration: (
+        ContinuousExecutionConfigurationResponse
+        | None
+    ) = None
+
+
 class ScenarioCapabilitiesResponse(BaseModel):
     scenario_id: str
 
@@ -320,8 +333,16 @@ class ScenarioCapabilitiesResponse(BaseModel):
         RunExecutionMode
     ]
 
+    generation_lifecycles: list[
+        GenerationLifecycle
+    ]
+
     historical: (
         HistoricalExecutionCapabilityResponse
+    )
+
+    continuous: (
+        ContinuousExecutionCapabilityResponse
     )
 
 
@@ -549,6 +570,37 @@ class StartRunResponse(BaseModel):
         )
 
 
+class RunTargetResponse(BaseModel):
+    enterprise_id: str
+    business_stream_id: str
+    service_id: str
+
+    component_ids: list[str] = Field(
+        default_factory=list
+    )
+
+    environment: Environment
+
+    @classmethod
+    def from_snapshot(
+        cls,
+        snapshot: RunTargetSnapshot,
+    ) -> "RunTargetResponse":
+        return cls(
+            enterprise_id=(
+                snapshot.enterprise_id
+            ),
+            business_stream_id=(
+                snapshot.business_stream_id
+            ),
+            service_id=snapshot.service_id,
+            component_ids=list(
+                snapshot.component_ids
+            ),
+            environment=snapshot.environment,
+        )
+
+
 class RunResponse(BaseModel):
     run_id: str
     scenario_id: str
@@ -556,6 +608,7 @@ class RunResponse(BaseModel):
 
     status: RunStatus
     execution_mode: RunExecutionMode
+    generation_lifecycle: GenerationLifecycle
 
     started_at: datetime
     completed_at: datetime | None
@@ -568,10 +621,17 @@ class RunResponse(BaseModel):
     random_seed: int
     event_interval_seconds: float
 
+    target: RunTargetResponse | None = None
+
     error_message: str | None = None
 
     historical_configuration: (
         HistoricalExecutionConfigurationResponse
+        | None
+    ) = None
+
+    continuous_configuration: (
+        ContinuousExecutionConfigurationResponse
         | None
     ) = None
 
@@ -586,6 +646,9 @@ class RunResponse(BaseModel):
             change_id=record.change_id,
             status=record.status,
             execution_mode=record.execution_mode,
+            generation_lifecycle=(
+                record.generation_lifecycle
+            ),
             started_at=record.started_at,
             completed_at=record.completed_at,
             current_state=record.current_state,
@@ -597,6 +660,13 @@ class RunResponse(BaseModel):
             event_interval_seconds=(
                 record.event_interval_seconds
             ),
+            target=(
+                RunTargetResponse.from_snapshot(
+                    record.target
+                )
+                if record.target is not None
+                else None
+            ),
             error_message=record.error_message,
             historical_configuration=(
                 HistoricalExecutionConfigurationResponse
@@ -604,6 +674,17 @@ class RunResponse(BaseModel):
                     record.historical_configuration
                 )
                 if record.historical_configuration is not None
+                else None
+            ),
+            continuous_configuration=(
+                ContinuousExecutionConfigurationResponse
+                .from_configuration(
+                    record.continuous_configuration
+                )
+                if (
+                    record.continuous_configuration
+                    is not None
+                )
                 else None
             ),
         )

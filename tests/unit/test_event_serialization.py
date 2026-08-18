@@ -4,7 +4,10 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from synthetic_ops_generator.domain.enums import Environment
+from synthetic_ops_generator.domain.enums import (
+    Environment,
+    SourceDomain,
+)
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.events.serialization import (
     deserialize_generated_event,
@@ -25,6 +28,7 @@ def make_event() -> GeneratedEvent:
             tzinfo=UTC,
         ),
         source_system="synthetic_observability",
+        source_domain=SourceDomain.METRIC,
         scenario_id="BANK-01",
         run_id="RUN0000001",
         chg_id="CHG0000001",
@@ -59,6 +63,7 @@ def test_serializes_generated_event_to_utf8_json_bytes() -> None:
     assert decoded["event_type"] == "metric.observed"
     assert decoded["schema_version"] == "1.0"
     assert decoded["environment"] == "production"
+    assert decoded["source_domain"] == "metric"
     assert decoded["sequence_number"] == 1
     assert decoded["synthetic"] is True
 
@@ -123,3 +128,18 @@ def test_deserialization_validates_event_contract() -> None:
         deserialize_generated_event(
             invalid_payload
         )
+
+
+def test_deserializes_legacy_event_without_source_domain() -> None:
+    event = make_event()
+
+    payload = event.model_dump(
+        mode="json"
+    )
+    payload.pop("source_domain")
+
+    restored = deserialize_generated_event(
+        json.dumps(payload).encode("utf-8")
+    )
+
+    assert restored.source_domain is None

@@ -3,6 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from synthetic_ops_generator.api.models import (
+    ContinuousExecutionCapabilityResponse,
+    ContinuousExecutionConfigurationResponse,
     HistoricalExecutionCapabilityResponse,
     HistoricalExecutionConfigurationResponse,
     ScenarioCapabilitiesResponse,
@@ -10,7 +12,9 @@ from synthetic_ops_generator.api.models import (
     ScenarioSummaryResponse,
 )
 from synthetic_ops_generator.control.configuration import (
+    DEFAULT_CONTINUOUS_EXECUTION_CONFIGURATION,
     DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION,
+    GenerationLifecycle,
 )
 from synthetic_ops_generator.control.models import (
     RunExecutionMode,
@@ -110,9 +114,21 @@ async def get_scenario_capabilities(
             RunExecutionMode.HISTORICAL
         )
 
+    generation_lifecycles = [
+        GenerationLifecycle.BOUNDED
+    ]
+
+    if capabilities.continuous_supported:
+        generation_lifecycles.append(
+            GenerationLifecycle.CONTINUOUS
+        )
+
     return ScenarioCapabilitiesResponse(
         scenario_id=scenario.scenario_id,
         execution_modes=execution_modes,
+        generation_lifecycles=(
+            generation_lifecycles
+        ),
         historical=(
             HistoricalExecutionCapabilityResponse(
                 supported=(
@@ -132,6 +148,30 @@ async def get_scenario_capabilities(
                         DEFAULT_HISTORICAL_EXECUTION_CONFIGURATION
                     )
                     if capabilities.historical_supported
+                    else None
+                ),
+            )
+        ),
+        continuous=(
+            ContinuousExecutionCapabilityResponse(
+                supported=(
+                    capabilities.continuous_supported
+                ),
+                unavailable_reason=(
+                    None
+                    if capabilities.continuous_supported
+                    else (
+                        "Scenario does not define "
+                        "continuous behaviour in its "
+                        "final active state."
+                    )
+                ),
+                configuration=(
+                    ContinuousExecutionConfigurationResponse
+                    .from_configuration(
+                        DEFAULT_CONTINUOUS_EXECUTION_CONFIGURATION
+                    )
+                    if capabilities.continuous_supported
                     else None
                 ),
             )

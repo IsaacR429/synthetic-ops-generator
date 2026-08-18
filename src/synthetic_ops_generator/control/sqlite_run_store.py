@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,11 +14,13 @@ from synthetic_ops_generator.control.models import (
     RunExecutionMode,
     RunRecord,
     RunStatus,
+    RunTargetSnapshot,
 )
 from synthetic_ops_generator.control.run_store import (
     RunStore,
 )
 from synthetic_ops_generator.domain.enums import (
+    Environment,
     OperationalState,
 )
 
@@ -78,6 +81,15 @@ class SQLiteRunStore(RunStore):
         return await asyncio.to_thread(
             self._get_sync,
             run_id,
+        )
+
+    async def list_all(
+        self,
+    ) -> tuple[RunRecord, ...]:
+        self._require_started()
+
+        return await asyncio.to_thread(
+            self._list_all_sync,
         )
 
     async def list_by_status(
@@ -161,7 +173,12 @@ class SQLiteRunStore(RunStore):
                         CHECK(
                             continuous_duration_seconds IS NULL
                             OR continuous_duration_seconds > 0
-                        )
+                        ),
+                    enterprise_id TEXT,
+                    business_stream_id TEXT,
+                    service_id TEXT,
+                    target_component_ids TEXT,
+                    target_environment TEXT
                 )
                 """
             )
@@ -175,6 +192,10 @@ class SQLiteRunStore(RunStore):
             )
 
             self._ensure_generation_lifecycle_columns(
+                connection
+            )
+
+            self._ensure_target_snapshot_columns(
                 connection
             )
 
@@ -345,6 +366,57 @@ class SQLiteRunStore(RunStore):
                 """
             )
 
+    @staticmethod
+    def _ensure_target_snapshot_columns(
+        connection: sqlite3.Connection,
+    ) -> None:
+        columns = {
+            str(row[1])
+            for row in connection.execute(
+                "PRAGMA table_info(runs)"
+            ).fetchall()
+        }
+
+        if "enterprise_id" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN enterprise_id TEXT
+                """
+            )
+
+        if "business_stream_id" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN business_stream_id TEXT
+                """
+            )
+
+        if "service_id" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN service_id TEXT
+                """
+            )
+
+        if "target_component_ids" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN target_component_ids TEXT
+                """
+            )
+
+        if "target_environment" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE runs
+                ADD COLUMN target_environment TEXT
+                """
+            )
+
     def _create_sync(
         self,
         record: RunRecord,
@@ -373,9 +445,18 @@ class SQLiteRunStore(RunStore):
                     historical_recovery_samples,
                     generation_lifecycle,
                     continuous_stop_mode,
-                    continuous_duration_seconds
+                    continuous_duration_seconds,
+                    enterprise_id,
+                    business_stream_id,
+                    service_id,
+                    target_component_ids,
+                    target_environment
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?
+                )
                 """,
                 self._record_values(record),
             )
@@ -408,7 +489,12 @@ class SQLiteRunStore(RunStore):
                     historical_recovery_samples,
                     generation_lifecycle,
                     continuous_stop_mode,
-                    continuous_duration_seconds
+                    continuous_duration_seconds,
+                    enterprise_id,
+                    business_stream_id,
+                    service_id,
+                    target_component_ids,
+                    target_environment
                 FROM runs
                 WHERE run_id = ?
                 """,
@@ -419,6 +505,49 @@ class SQLiteRunStore(RunStore):
             return None
 
         return self._row_to_record(row)
+
+    def _list_all_sync(
+        self,
+    ) -> tuple[RunRecord, ...]:
+        with sqlite3.connect(
+            self._database_path
+        ) as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    run_id,
+                    scenario_id,
+                    change_id,
+                    status,
+                    started_at,
+                    completed_at,
+                    current_state,
+                    event_count,
+                    validation_passed,
+                    random_seed,
+                    event_interval_seconds,
+                    error_message,
+                    execution_mode,
+                    historical_degradation_samples,
+                    historical_plateau_samples,
+                    historical_recovery_samples,
+                    generation_lifecycle,
+                    continuous_stop_mode,
+                    continuous_duration_seconds,
+                    enterprise_id,
+                    business_stream_id,
+                    service_id,
+                    target_component_ids,
+                    target_environment
+                FROM runs
+                ORDER BY started_at DESC, run_id DESC
+                """
+            ).fetchall()
+
+        return tuple(
+            self._row_to_record(row)
+            for row in rows
+        )
 
     def _list_by_status_sync(
         self,
@@ -448,7 +577,12 @@ class SQLiteRunStore(RunStore):
                     historical_recovery_samples,
                     generation_lifecycle,
                     continuous_stop_mode,
-                    continuous_duration_seconds
+                    continuous_duration_seconds,
+                    enterprise_id,
+                    business_stream_id,
+                    service_id,
+                    target_component_ids,
+                    target_environment
                 FROM runs
                 WHERE status = ?
                 ORDER BY started_at, run_id
@@ -628,6 +762,30 @@ class SQLiteRunStore(RunStore):
                 is not None
                 else None
             ),
+            *SQLiteRunStore._target_values(record),
+        )
+
+    @staticmethod
+    def _target_values(
+        record: RunRecord,
+    ) -> tuple[object, ...]:
+        if record.target is None:
+            return (
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+
+        return (
+            record.target.enterprise_id,
+            record.target.business_stream_id,
+            record.target.service_id,
+            json.dumps(
+                list(record.target.component_ids)
+            ),
+            record.target.environment.value,
         )
 
     @staticmethod
@@ -683,6 +841,10 @@ class SQLiteRunStore(RunStore):
                 "continuous execution configuration."
             )
 
+        target = SQLiteRunStore._target_from_row(
+            row
+        )
+
         return RunRecord(
             run_id=str(row[0]),
             scenario_id=str(row[1]),
@@ -711,6 +873,7 @@ class SQLiteRunStore(RunStore):
             event_interval_seconds=float(
                 row[10]
             ),
+            target=target,
             error_message=(
                 str(row[11])
                 if row[11] is not None
@@ -725,6 +888,70 @@ class SQLiteRunStore(RunStore):
             ),
             continuous_configuration=(
                 continuous_configuration
+            ),
+        )
+
+    @staticmethod
+    def _target_from_row(
+        row: tuple[object, ...],
+    ) -> RunTargetSnapshot | None:
+        if len(row) <= 19:
+            return None
+
+        if len(row) < 24:
+            raise ValueError(
+                "Persisted Run target snapshot "
+                "columns are incomplete."
+            )
+
+        target_values = row[19:24]
+
+        if all(
+            value is None
+            for value in target_values
+        ):
+            return None
+
+        if any(
+            value is None
+            for value in target_values
+        ):
+            raise ValueError(
+                "Persisted Run target snapshot "
+                "is incomplete."
+            )
+
+        try:
+            component_ids = json.loads(
+                str(target_values[3])
+            )
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "Persisted Run target component IDs "
+                "are invalid."
+            ) from exc
+
+        if (
+            not isinstance(component_ids, list)
+            or not all(
+                isinstance(component_id, str)
+                for component_id in component_ids
+            )
+        ):
+            raise ValueError(
+                "Persisted Run target component IDs "
+                "must be a list of strings."
+            )
+
+        return RunTargetSnapshot(
+            enterprise_id=str(target_values[0]),
+            business_stream_id=str(
+                target_values[1]
+            ),
+            service_id=str(target_values[2]),
+            component_ids=tuple(component_ids),
+            environment=Environment(
+                str(target_values[4])
             ),
         )
 

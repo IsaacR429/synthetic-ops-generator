@@ -7,6 +7,7 @@ from synthetic_ops_generator.domain.enums import (
     Industry,
     OperationalState,
     RiskLevel,
+    SourceDomain,
 )
 from synthetic_ops_generator.oracle.models import ExpectedScenarioResult
 
@@ -19,18 +20,6 @@ class ScenarioFamily(StrEnum):
     GOVERNANCE_AUDIT = "governance_audit"
     PREDICTIVE_INTELLIGENCE = "predictive_intelligence"
     EXECUTIVE_INTELLIGENCE = "executive_intelligence"
-
-
-class SourceDomain(StrEnum):
-    ITSM = "itsm"
-    DEPLOYMENT = "deployment"
-    APPLICATION_TEST = "application_test"
-    INFRASTRUCTURE_TEST = "infrastructure_test"
-    METRIC = "metric"
-    LOG = "log"
-    MANUAL_VALIDATION = "manual_validation"
-    INCIDENT = "incident"
-    EVIDENCE = "evidence"
 
 
 class ScenarioTarget(BaseModel):

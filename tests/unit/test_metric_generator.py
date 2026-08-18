@@ -331,6 +331,10 @@ def test_metric_events_are_service_scoped() -> None:
     } == {"payment_service"}
 
     assert {
+        event.source_domain for event in events
+    } == {SourceDomain.METRIC}
+
+    assert {
         event.component for event in events
     } == {None}
 

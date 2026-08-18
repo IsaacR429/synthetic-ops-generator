@@ -161,6 +161,10 @@ def test_infrastructure_events_share_correlation() -> None:
     } == {"CHG0000001"}
 
     assert {
+        event.source_domain for event in events
+    } == {SourceDomain.INFRASTRUCTURE_TEST}
+
+    assert {
         event.business_stream for event in events
     } == {"payments"}
 

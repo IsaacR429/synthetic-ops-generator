@@ -33,6 +33,12 @@ class RunStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def list_all(
+        self,
+    ) -> tuple[RunRecord, ...]:
+        raise NotImplementedError
+
+    @abstractmethod
     async def list_by_status(
         self,
         status: RunStatus,

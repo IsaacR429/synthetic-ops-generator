@@ -216,6 +216,7 @@ class LogGenerator(SourceGenerator):
                 event_type="log.observed",
                 event_time=context.simulation_time,
                 source_system=self.source_system,
+                source_domain=self._behaviour.source,
                 scenario_id=context.scenario_id,
                 run_id=context.run_id,
                 chg_id=context.chg_id,

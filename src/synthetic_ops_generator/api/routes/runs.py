@@ -4,6 +4,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Query,
     Request,
     status,
 )
@@ -16,6 +17,9 @@ from synthetic_ops_generator.api.models import (
     StartRunResponse,
     StopRunResponse,
 )
+from synthetic_ops_generator.control.models import (
+    RunStatus,
+)
 from synthetic_ops_generator.control.service import (
     ControlService,
     RunExecutionModeNotSupportedError,
@@ -23,6 +27,9 @@ from synthetic_ops_generator.control.service import (
     RunNotReplayableError,
     RunNotStoppableError,
     ScenarioNotFoundError,
+)
+from synthetic_ops_generator.domain.enums import (
+    SourceDomain,
 )
 
 router = APIRouter(
@@ -86,6 +93,24 @@ async def start_run(
 
 
 @router.get(
+    "",
+    response_model=list[RunResponse],
+)
+async def list_runs(
+    service: ControlServiceDependency,
+    status: RunStatus | None = None,
+) -> list[RunResponse]:
+    records = await service.list_runs(
+        status=status
+    )
+
+    return [
+        RunResponse.from_record(record)
+        for record in records
+    ]
+
+
+@router.get(
     "/{run_id}",
     response_model=RunResponse,
 )
@@ -115,11 +140,40 @@ async def get_run(
 async def get_run_events(
     run_id: str,
     service: ControlServiceDependency,
+    source_domain: SourceDomain | None = None,
+    source_system: str | None = None,
+    event_type: str | None = None,
+    service_name: Annotated[
+        str | None,
+        Query(alias="service"),
+    ] = None,
+    component: str | None = None,
 ) -> RunEventsResponse:
-    try:
-        events = await service.get_run_events(
-            run_id
+    has_filters = any(
+        value is not None
+        for value in (
+            source_domain,
+            source_system,
+            event_type,
+            service_name,
+            component,
         )
+    )
+
+    try:
+        if not has_filters:
+            events = await service.get_run_events(
+                run_id
+            )
+        else:
+            events = await service.query_run_events(
+                run_id,
+                source_domain=source_domain,
+                source_system=source_system,
+                event_type=event_type,
+                service=service_name,
+                component=component,
+            )
     except RunNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

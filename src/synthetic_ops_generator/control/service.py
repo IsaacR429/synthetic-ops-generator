@@ -28,6 +28,7 @@ from synthetic_ops_generator.control.models import (
     RunRecord,
     RunStartResult,
     RunStatus,
+    RunTargetSnapshot,
     StopRunResult,
 )
 from synthetic_ops_generator.control.run_store import RunStore
@@ -40,6 +41,7 @@ from synthetic_ops_generator.core.randomness import (
 )
 from synthetic_ops_generator.domain.enums import (
     OperationalState,
+    SourceDomain,
 )
 from synthetic_ops_generator.events.envelope import (
     GeneratedEvent,
@@ -60,6 +62,7 @@ from synthetic_ops_generator.replay.service import (
     ReplayService,
 )
 from synthetic_ops_generator.retention.base import EventStore
+from synthetic_ops_generator.retention.query import EventQuery
 from synthetic_ops_generator.scenarios.capabilities import (
     resolve_scenario_execution_capabilities,
 )
@@ -69,9 +72,6 @@ from synthetic_ops_generator.scenarios.catalogue import (
 from synthetic_ops_generator.scenarios.continuous import (
     ContinuousSourceBinding,
     ContinuousSourceScheduler,
-)
-from synthetic_ops_generator.scenarios.models import (
-    SourceDomain,
 )
 from synthetic_ops_generator.scenarios.runner import (
     ScenarioRunner,
@@ -417,6 +417,23 @@ class ControlService:
             random_seed=random_seed,
             event_interval_seconds=(
                 self._event_interval_seconds
+            ),
+            target=RunTargetSnapshot(
+                enterprise_id=(
+                    scenario.target.enterprise_id
+                ),
+                business_stream_id=(
+                    scenario.target.business_stream_id
+                ),
+                service_id=(
+                    scenario.target.service_id
+                ),
+                component_ids=tuple(
+                    scenario.target.component_ids
+                ),
+                environment=(
+                    scenario.target.environment
+                ),
             ),
             execution_mode=execution_mode,
             historical_configuration=(
@@ -792,6 +809,18 @@ class ControlService:
 
         return record
 
+    async def list_runs(
+        self,
+        *,
+        status: RunStatus | None = None,
+    ) -> tuple[RunRecord, ...]:
+        if status is None:
+            return await self._run_store.list_all()
+
+        return await self._run_store.list_by_status(
+            status
+        )
+
     async def get_run_events(
         self,
         run_id: str,
@@ -802,6 +831,33 @@ class ControlService:
 
         events = await self._store.get_run_events(
             record.run_id
+        )
+
+        return tuple(events)
+
+    async def query_run_events(
+        self,
+        run_id: str,
+        *,
+        source_domain: SourceDomain | None = None,
+        source_system: str | None = None,
+        event_type: str | None = None,
+        service: str | None = None,
+        component: str | None = None,
+    ) -> tuple[GeneratedEvent, ...]:
+        record = await self.get_run(
+            run_id
+        )
+
+        events = await self._store.query_events(
+            EventQuery(
+                run_id=record.run_id,
+                source_domain=source_domain,
+                source_system=source_system,
+                event_type=event_type,
+                service=service,
+                component=component,
+            )
         )
 
         return tuple(events)

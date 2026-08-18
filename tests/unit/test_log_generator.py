@@ -163,6 +163,11 @@ def test_log_events_preserve_run_correlation() -> None:
         for event in events
     } == {"payment_service"}
 
+    assert {
+        event.source_domain
+        for event in events
+    } == {SourceDomain.LOG}
+
 
 def test_normal_operational_logs_are_info_severity() -> None:
     generator = LogGenerator(

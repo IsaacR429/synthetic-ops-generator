@@ -6,12 +6,14 @@ import {
   getRun,
   getScenarioCapabilities,
   listEnterprises,
+  listRuns,
   listScenarios,
   startRun,
   stopRun,
 } from '../api/client'
 import type {
   EnterpriseSummary,
+  GenerationLifecycle,
   RunExecutionMode,
   RunResponse,
   RunStatus,
@@ -75,6 +77,8 @@ export function RunConfigurationPage() {
 
   const [executionMode, setExecutionMode] =
     useState<RunExecutionMode>('standard')
+  const [generationLifecycle, setGenerationLifecycle] =
+    useState<GenerationLifecycle>('bounded')
   const [randomSeedInput, setRandomSeedInput] = useState('42')
   const [degradationSamplesInput, setDegradationSamplesInput] = useState('')
   const [plateauSamplesInput, setPlateauSamplesInput] = useState('')
@@ -84,6 +88,44 @@ export function RunConfigurationPage() {
   const [startingRun, setStartingRun] = useState(false)
   const [stoppingRun, setStoppingRun] = useState(false)
   const [executionError, setExecutionError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    async function recoverActiveRun() {
+      try {
+        const runningRuns = await listRuns('running')
+
+        if (!active || runningRuns.length === 0) {
+          return
+        }
+
+        const latestRunningRun = runningRuns.reduce(
+          (latest, run) =>
+            new Date(run.started_at).getTime() >
+            new Date(latest.started_at).getTime()
+              ? run
+              : latest,
+        )
+
+        setActiveRun((currentRun) =>
+          currentRun ?? latestRunningRun,
+        )
+      } catch {
+        if (active) {
+          setExecutionError(
+            'StreamOps could not recover the active Run.',
+          )
+        }
+      }
+    }
+
+    void recoverActiveRun()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -186,6 +228,15 @@ export function RunConfigurationPage() {
       setExecutionMode(defaultMode)
     }
 
+    const defaultLifecycle =
+      capabilities.generation_lifecycles.includes('bounded')
+        ? 'bounded'
+        : capabilities.generation_lifecycles[0]
+
+    if (defaultLifecycle) {
+      setGenerationLifecycle(defaultLifecycle)
+    }
+
     const historicalDefaults = capabilities.historical.configuration
 
     if (historicalDefaults) {
@@ -284,10 +335,23 @@ export function RunConfigurationPage() {
   const executionModeSupported =
     capabilities?.execution_modes.includes(executionMode) ?? false
 
+  const generationLifecycleSupported =
+    capabilities?.generation_lifecycles.includes(
+      generationLifecycle,
+    ) ?? false
+
+  const executionConfigurationCompatible =
+    !(
+      executionMode === 'historical' &&
+      generationLifecycle === 'continuous'
+    )
+
   const configurationReady =
     selectedScenario !== undefined &&
     capabilities !== null &&
     executionModeSupported &&
+    generationLifecycleSupported &&
+    executionConfigurationCompatible &&
     randomSeedValid &&
     historicalConfigurationValid
 
@@ -306,6 +370,7 @@ export function RunConfigurationPage() {
         scenario_id: selectedScenarioId,
         random_seed: randomSeed,
         execution_mode: executionMode,
+        generation_lifecycle: generationLifecycle,
         historical: {
           degradation_samples: degradationSamples,
           plateau_samples: plateauSamples,
@@ -318,11 +383,13 @@ export function RunConfigurationPage() {
       scenario_id: selectedScenarioId,
       random_seed: randomSeed,
       execution_mode: executionMode,
+      generation_lifecycle: generationLifecycle,
     }
   }, [
     configurationReady,
     degradationSamples,
     executionMode,
+    generationLifecycle,
     plateauSamples,
     randomSeed,
     recoverySamples,
@@ -656,10 +723,53 @@ export function RunConfigurationPage() {
                             className="mt-2 w-full rounded-lg border border-violet-400/15 bg-[#090711] px-3 py-2.5 text-sm text-white focus:border-violet-400/40 focus:outline-none"
                           >
                             {capabilities.execution_modes.map((mode) => (
-                              <option key={mode} value={mode}>
+                              <option
+                                key={mode}
+                                value={mode}
+                                disabled={
+                                  mode === 'historical' &&
+                                  generationLifecycle === 'continuous'
+                                }
+                              >
                                 {formatLabel(mode)}
                               </option>
                             ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label
+                            htmlFor="generation-lifecycle"
+                            className="mb-2 block text-sm font-medium"
+                          >
+                            Generation lifecycle
+                          </label>
+
+                          <select
+                            id="generation-lifecycle"
+                            value={generationLifecycle}
+                            onChange={(event) =>
+                              setGenerationLifecycle(
+                                event.target.value as GenerationLifecycle,
+                              )
+                            }
+                            disabled={!capabilities}
+                            className="w-full rounded-lg border px-3 py-2"
+                          >
+                            {capabilities?.generation_lifecycles.map(
+                              (lifecycle) => (
+                                <option
+                                  key={lifecycle}
+                                  value={lifecycle}
+                                  disabled={
+                                    lifecycle === 'continuous' &&
+                                    executionMode === 'historical'
+                                  }
+                                >
+                                  {formatLabel(lifecycle)}
+                                </option>
+                              ),
+                            )}
                           </select>
                         </div>
 

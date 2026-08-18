@@ -263,6 +263,209 @@ def test_start_continuous_run_executes_scenario(
     assert stopped["event_count"] >= 0
 
 
+def test_get_continuous_run_returns_lifecycle_configuration(
+    client: TestClient,
+) -> None:
+    started_response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+            "generation_lifecycle": "continuous",
+        },
+    )
+
+    assert started_response.status_code == 202
+
+    started = started_response.json()
+    run_id = started["run_id"]
+
+    response = client.get(
+        f"/runs/{run_id}"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert (
+        payload["generation_lifecycle"]
+        == "continuous"
+    )
+
+    assert payload["continuous_configuration"] == {
+        "stop_mode": "manual",
+        "duration_seconds": None,
+    }
+
+    assert payload["historical_configuration"] is None
+
+    stop_response = client.post(
+        f"/runs/{run_id}/stop"
+    )
+
+    assert stop_response.status_code == 200
+    assert stop_response.json()["status"] == "stopped"
+
+
+def test_list_running_runs_tracks_continuous_run(
+    client: TestClient,
+) -> None:
+    started_response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+            "generation_lifecycle": "continuous",
+        },
+    )
+
+    assert started_response.status_code == 202
+
+    run_id = started_response.json()["run_id"]
+
+    running_response = client.get(
+        "/runs?status=running"
+    )
+
+    assert running_response.status_code == 200
+
+    running_runs = running_response.json()
+
+    matching_run = next(
+        (
+            run
+            for run in running_runs
+            if run["run_id"] == run_id
+        ),
+        None,
+    )
+
+    assert matching_run is not None
+    assert matching_run["status"] == "running"
+    assert (
+        matching_run["generation_lifecycle"]
+        == "continuous"
+    )
+    assert matching_run[
+        "continuous_configuration"
+    ] == {
+        "stop_mode": "manual",
+        "duration_seconds": None,
+    }
+
+    stop_response = client.post(
+        f"/runs/{run_id}/stop"
+    )
+
+    assert stop_response.status_code == 200
+
+    running_after_stop_response = client.get(
+        "/runs?status=running"
+    )
+
+    assert (
+        running_after_stop_response.status_code
+        == 200
+    )
+
+    running_after_stop = (
+        running_after_stop_response.json()
+    )
+
+    assert all(
+        run["run_id"] != run_id
+        for run in running_after_stop
+    )
+
+
+def test_list_runs_returns_persisted_catalogue(
+    client: TestClient,
+) -> None:
+    completed_response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert completed_response.status_code == 202
+
+    completed_run_id = (
+        completed_response.json()["run_id"]
+    )
+
+    completed = wait_for_terminal_run(
+        client,
+        completed_run_id,
+    )
+
+    assert completed["status"] == "completed"
+
+    continuous_response = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 43,
+            "generation_lifecycle": "continuous",
+        },
+    )
+
+    assert continuous_response.status_code == 202
+
+    continuous_run_id = (
+        continuous_response.json()["run_id"]
+    )
+
+    stop_response = client.post(
+        f"/runs/{continuous_run_id}/stop"
+    )
+
+    assert stop_response.status_code == 200
+    assert stop_response.json()["status"] == "stopped"
+
+    catalogue_response = client.get(
+        "/runs"
+    )
+
+    assert catalogue_response.status_code == 200
+
+    catalogue = catalogue_response.json()
+
+    assert [
+        run["run_id"]
+        for run in catalogue
+    ] == [
+        continuous_run_id,
+        completed_run_id,
+    ]
+
+    assert [
+        run["status"]
+        for run in catalogue
+    ] == [
+        "stopped",
+        "completed",
+    ]
+
+    assert all(
+        run["target"]
+        == {
+            "enterprise_id": "bank_alpha",
+            "business_stream_id": "payments",
+            "service_id": "payment_service",
+            "component_ids": [
+                "payment_api",
+                "payment_database",
+                "payment_worker",
+            ],
+            "environment": "production",
+        }
+        for run in catalogue
+    )
+
+
 def test_start_bounded_run_rejects_continuous_configuration(
     client: TestClient,
 ) -> None:
@@ -448,6 +651,18 @@ def test_get_run_returns_persisted_metadata(
 
     assert payload["random_seed"] == 42
     assert payload["event_interval_seconds"] == 5.0
+
+    assert payload["target"] == {
+        "enterprise_id": "bank_alpha",
+        "business_stream_id": "payments",
+        "service_id": "payment_service",
+        "component_ids": [
+            "payment_api",
+            "payment_database",
+            "payment_worker",
+        ],
+        "environment": "production",
+    }
 
     assert payload["started_at"] is not None
     assert payload["completed_at"] is not None
@@ -839,6 +1054,10 @@ def test_get_historical_scenario_capabilities(
             "standard",
             "historical",
         ],
+        "generation_lifecycles": [
+            "bounded",
+            "continuous",
+        ],
         "historical": {
             "supported": True,
             "unavailable_reason": None,
@@ -846,6 +1065,14 @@ def test_get_historical_scenario_capabilities(
                 "degradation_samples": 4,
                 "plateau_samples": 2,
                 "recovery_samples": 4,
+            },
+        },
+        "continuous": {
+            "supported": True,
+            "unavailable_reason": None,
+            "configuration": {
+                "stop_mode": "manual",
+                "duration_seconds": None,
             },
         },
     }
@@ -865,12 +1092,62 @@ def test_get_non_historical_scenario_capabilities(
         "execution_modes": [
             "standard",
         ],
+        "generation_lifecycles": [
+            "bounded",
+            "continuous",
+        ],
         "historical": {
             "supported": False,
             "unavailable_reason": (
                 "Managed historical execution "
                 "currently requires an incident "
                 "and rollback scenario."
+            ),
+            "configuration": None,
+        },
+        "continuous": {
+            "supported": True,
+            "unavailable_reason": None,
+            "configuration": {
+                "stop_mode": "manual",
+                "duration_seconds": None,
+            },
+        },
+    }
+
+
+def test_get_non_continuous_scenario_capabilities(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/scenarios/INS-01/capabilities"
+    )
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "scenario_id": "INS-01",
+        "execution_modes": [
+            "standard",
+        ],
+        "generation_lifecycles": [
+            "bounded",
+        ],
+        "historical": {
+            "supported": False,
+            "unavailable_reason": (
+                "Managed historical execution "
+                "currently requires an incident "
+                "and rollback scenario."
+            ),
+            "configuration": None,
+        },
+        "continuous": {
+            "supported": False,
+            "unavailable_reason": (
+                "Scenario does not define "
+                "continuous behaviour in its "
+                "final active state."
             ),
             "configuration": None,
         },
@@ -1075,6 +1352,194 @@ def test_get_run_events_returns_retained_events_in_sequence_order(
             len(events) + 1,
         )
     )
+
+
+def test_get_run_events_filters_by_source_domain(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    completed = wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    response = client.get(
+        f"/runs/{run_id}/events",
+        params={
+            "source_domain": "metric",
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+    events = payload["events"]
+
+    assert payload["run_id"] == run_id
+    assert events
+
+    assert {
+        event["run_id"]
+        for event in events
+    } == {run_id}
+
+    assert {
+        event["source_domain"]
+        for event in events
+    } == {"metric"}
+
+    assert (
+        payload["retained_event_count"]
+        == len(events)
+    )
+
+    assert (
+        payload["retained_event_count"]
+        < completed["event_count"]
+    )
+
+    assert [
+        event["sequence_number"]
+        for event in events
+    ] == sorted(
+        event["sequence_number"]
+        for event in events
+    )
+
+
+def test_get_run_events_rejects_invalid_source_domain(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    response = client.get(
+        f"/runs/{run_id}/events",
+        params={
+            "source_domain": "banana",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("parameter", "value"),
+    [
+        ("source_system", "missing_source"),
+        ("event_type", "missing.event"),
+        ("service", "missing_service"),
+        ("component", "missing_component"),
+    ],
+)
+def test_get_run_events_filters_by_string_projection(
+    client: TestClient,
+    parameter: str,
+    value: str,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    completed = wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    assert completed["event_count"] > 0
+
+    response = client.get(
+        f"/runs/{run_id}/events",
+        params={
+            parameter: value,
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["run_id"] == run_id
+    assert payload["retained_event_count"] == 0
+    assert payload["events"] == []
+
+
+def test_get_run_events_combines_filters_with_and_semantics(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    metric_response = client.get(
+        f"/runs/{run_id}/events",
+        params={
+            "source_domain": "metric",
+        },
+    )
+
+    assert metric_response.status_code == 200
+    assert (
+        metric_response.json()["retained_event_count"]
+        > 0
+    )
+
+    combined_response = client.get(
+        f"/runs/{run_id}/events",
+        params={
+            "source_domain": "metric",
+            "event_type": "missing.event",
+        },
+    )
+
+    assert combined_response.status_code == 200
+
+    payload = combined_response.json()
+
+    assert payload["run_id"] == run_id
+    assert payload["retained_event_count"] == 0
+    assert payload["events"] == []
 
 
 def test_get_custom_historical_run_events(

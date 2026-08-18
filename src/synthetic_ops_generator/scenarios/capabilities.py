@@ -31,6 +31,7 @@ _REQUIRED_HISTORICAL_PROFILES = {
 class ScenarioExecutionCapabilities:
     standard_supported: bool
     historical_supported: bool
+    continuous_supported: bool
 
 
 def _profiles_by_source(
@@ -70,9 +71,23 @@ def resolve_scenario_execution_capabilities(
         in _REQUIRED_HISTORICAL_PROFILES.items()
     )
 
+    continuous_active_state = (
+        scenario.state_sequence[-2]
+    )
+
+    continuous_supported = any(
+        behaviour.continuous
+        and behaviour.during_state
+        == continuous_active_state
+        for behaviour in scenario.behaviours
+    )
+
     return ScenarioExecutionCapabilities(
         standard_supported=True,
         historical_supported=(
             historical_supported
+        ),
+        continuous_supported=(
+            continuous_supported
         ),
     )

@@ -8,6 +8,7 @@ from synthetic_ops_generator.control.configuration import (
     HistoricalExecutionConfiguration,
 )
 from synthetic_ops_generator.domain.enums import (
+    Environment,
     OperationalState,
 )
 
@@ -22,6 +23,17 @@ class RunStatus(StrEnum):
 class RunExecutionMode(StrEnum):
     STANDARD = "standard"
     HISTORICAL = "historical"
+
+
+@dataclass(frozen=True)
+class RunTargetSnapshot:
+    enterprise_id: str
+    business_stream_id: str
+    service_id: str
+
+    component_ids: tuple[str, ...]
+
+    environment: Environment
 
 
 @dataclass(frozen=True)
@@ -42,6 +54,8 @@ class RunRecord:
 
     random_seed: int
     event_interval_seconds: float
+
+    target: RunTargetSnapshot | None = None
 
     error_message: str | None = None
 

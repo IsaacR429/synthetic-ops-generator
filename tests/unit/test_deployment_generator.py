@@ -118,6 +118,10 @@ def test_deployment_events_share_run_and_change_correlation() -> None:
     } == {"CHG0000001"}
 
     assert {
+        event.source_domain for event in events
+    } == {SourceDomain.DEPLOYMENT}
+
+    assert {
         event.business_stream for event in events
     } == {"payments"}
 

@@ -3,7 +3,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from synthetic_ops_generator.domain.enums import Environment
+from synthetic_ops_generator.domain.enums import (
+    Environment,
+    SourceDomain,
+)
 
 
 class GeneratedEvent(BaseModel):
@@ -14,6 +17,7 @@ class GeneratedEvent(BaseModel):
     event_time: datetime
 
     source_system: str = Field(min_length=1)
+    source_domain: SourceDomain | None = None
 
     scenario_id: str = Field(min_length=1)
     run_id: str = Field(min_length=1)

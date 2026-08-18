@@ -12,6 +12,18 @@ class Environment(StrEnum):
     PRODUCTION = "production"
 
 
+class SourceDomain(StrEnum):
+    ITSM = "itsm"
+    DEPLOYMENT = "deployment"
+    APPLICATION_TEST = "application_test"
+    INFRASTRUCTURE_TEST = "infrastructure_test"
+    METRIC = "metric"
+    LOG = "log"
+    MANUAL_VALIDATION = "manual_validation"
+    INCIDENT = "incident"
+    EVIDENCE = "evidence"
+
+
 class RiskLevel(StrEnum):
     LOW = "low"
     MEDIUM = "medium"

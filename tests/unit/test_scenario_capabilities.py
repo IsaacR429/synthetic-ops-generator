@@ -54,3 +54,40 @@ def test_scenario_execution_capabilities(
         capabilities.historical_supported
         is historical_supported
     )
+
+
+@pytest.mark.parametrize(
+    (
+        "scenario_id",
+        "continuous_supported",
+    ),
+    [
+        ("BANK-01", True),
+        ("BANK-02", True),
+        ("INS-01", False),
+    ],
+)
+def test_continuous_execution_capability(
+    scenario_id: str,
+    continuous_supported: bool,
+) -> None:
+    catalogue = ScenarioCatalogue(
+        CONFIG_ROOT / "scenarios"
+    )
+
+    scenario = catalogue.get_scenario(
+        scenario_id
+    )
+
+    assert scenario is not None
+
+    capabilities = (
+        resolve_scenario_execution_capabilities(
+            scenario
+        )
+    )
+
+    assert (
+        capabilities.continuous_supported
+        is continuous_supported
+    )

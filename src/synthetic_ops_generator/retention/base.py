@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from synthetic_ops_generator.events.envelope import GeneratedEvent
+from synthetic_ops_generator.retention.query import EventQuery
 
 
 class EventStore(ABC):
@@ -28,6 +29,13 @@ class EventStore(ABC):
     async def get_run_events(
         self,
         run_id: str,
+    ) -> Sequence[GeneratedEvent]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def query_events(
+        self,
+        query: EventQuery,
     ) -> Sequence[GeneratedEvent]:
         raise NotImplementedError
 

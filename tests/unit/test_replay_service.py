@@ -34,6 +34,9 @@ class FailingPublisher(EventPublisher):
         self.published.append(event)
 
 
+from synthetic_ops_generator.retention.query import EventQuery
+
+
 class RecordingEventStore(EventStore):
     def __init__(
         self,
@@ -58,6 +61,16 @@ class RecordingEventStore(EventStore):
             event
             for event in self.events
             if event.run_id == run_id
+        )
+
+    async def query_events(
+        self,
+        query: EventQuery,
+    ) -> tuple[GeneratedEvent, ...]:
+        return tuple(
+            event
+            for event in self.events
+            if event.run_id == query.run_id
         )
 
     async def delete_before(

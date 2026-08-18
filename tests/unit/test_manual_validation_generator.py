@@ -160,6 +160,11 @@ def test_manual_validation_events_preserve_correlation() -> None:
     } == {"CHG0000001"}
 
     assert {
+        event.source_domain
+        for event in events
+    } == {SourceDomain.MANUAL_VALIDATION}
+
+    assert {
         event.service
         for event in events
     } == {"payment_service"}

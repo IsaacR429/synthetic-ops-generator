@@ -14,6 +14,7 @@ from synthetic_ops_generator.core.identifiers import (
 from synthetic_ops_generator.core.randomness import (
     SimulationRandom,
 )
+from synthetic_ops_generator.domain.enums import SourceDomain
 from synthetic_ops_generator.history.event_adapter import (
     build_historical_healthy_metric_events,
     build_historical_metric_events,
@@ -221,6 +222,11 @@ def test_historical_dataset_becomes_metric_observed_events(
     assert all(
         event.source_system
         == "synthetic_observability"
+        for event in events
+    )
+
+    assert all(
+        event.source_domain == SourceDomain.METRIC
         for event in events
     )
 
@@ -444,6 +450,11 @@ def test_healthy_dataset_becomes_metric_observed_events() -> None:
 
     assert all(
         event.source_system == "synthetic_observability"
+        for event in events
+    )
+
+    assert all(
+        event.source_domain == SourceDomain.METRIC
         for event in events
     )
 

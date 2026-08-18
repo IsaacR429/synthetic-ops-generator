@@ -429,6 +429,11 @@ def test_evidence_preserves_run_correlation() -> None:
         for event in events
     } == {"CHG0000001"}
 
+    assert {
+        event.source_domain
+        for event in events
+    } == {SourceDomain.EVIDENCE}
+
 
 def test_evidence_uses_scenario_sequence() -> None:
     ids = IdFactory()

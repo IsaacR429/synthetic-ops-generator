@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.domain.enums import SourceDomain
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.history.healthy_change_dataset import (
     HistoricalHealthyChangeDataset,
@@ -99,6 +100,7 @@ def iter_historical_metric_events(
                 event_type=METRIC_EVENT_TYPE,
                 event_time=point.timestamp,
                 source_system=METRIC_SOURCE_SYSTEM,
+                source_domain=SourceDomain.METRIC,
                 scenario_id=context.scenario_id,
                 run_id=context.run_id,
                 chg_id=context.chg_id,
@@ -288,6 +290,7 @@ def iter_historical_healthy_metric_events(
                 event_type=METRIC_EVENT_TYPE,
                 event_time=point.timestamp,
                 source_system=METRIC_SOURCE_SYSTEM,
+                source_domain=SourceDomain.METRIC,
                 scenario_id=context.scenario_id,
                 run_id=context.run_id,
                 chg_id=context.chg_id,

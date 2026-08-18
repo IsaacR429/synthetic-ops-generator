@@ -22,6 +22,19 @@ export type RunExecutionMode =
   | 'standard'
   | 'historical'
 
+export type GenerationLifecycle =
+  | 'bounded'
+  | 'continuous'
+
+export type ContinuousStopMode =
+  | 'manual'
+  | 'duration'
+
+export interface ContinuousExecutionConfiguration {
+  stop_mode: ContinuousStopMode
+  duration_seconds: number | null
+}
+
 export type SourceDomain =
   | 'metric'
   | 'incident'
@@ -99,17 +112,32 @@ export interface HistoricalExecutionCapability {
   configuration: HistoricalExecutionConfiguration | null
 }
 
+export interface ContinuousExecutionCapability {
+  supported: boolean
+  unavailable_reason: string | null
+  configuration:
+    | ContinuousExecutionConfiguration
+    | null
+}
+
 export interface ScenarioCapabilities {
   scenario_id: string
+
   execution_modes: RunExecutionMode[]
+  generation_lifecycles: GenerationLifecycle[]
+
   historical: HistoricalExecutionCapability
+  continuous: ContinuousExecutionCapability
 }
 
 export interface StartRunRequest {
   scenario_id: string
   random_seed?: number
   execution_mode?: RunExecutionMode
+  generation_lifecycle?: GenerationLifecycle
+
   historical?: HistoricalExecutionConfiguration | null
+  continuous?: ContinuousExecutionConfiguration | null
 }
 
 export interface StartRunResponse {
@@ -119,10 +147,25 @@ export interface StartRunResponse {
 
   status: RunStatus
   execution_mode: RunExecutionMode
+  generation_lifecycle: GenerationLifecycle
 
   historical_configuration:
     | HistoricalExecutionConfiguration
     | null
+
+  continuous_configuration:
+    | ContinuousExecutionConfiguration
+    | null
+}
+
+export interface RunTarget {
+  enterprise_id: string
+  business_stream_id: string
+  service_id: string
+
+  component_ids: string[]
+
+  environment: Environment
 }
 
 export interface RunResponse {
@@ -132,6 +175,7 @@ export interface RunResponse {
 
   status: RunStatus
   execution_mode: RunExecutionMode
+  generation_lifecycle: GenerationLifecycle
 
   started_at: string
   completed_at: string | null
@@ -144,10 +188,16 @@ export interface RunResponse {
   random_seed: number
   event_interval_seconds: number
 
+  target: RunTarget | null
+
   error_message: string | null
 
   historical_configuration:
     | HistoricalExecutionConfiguration
+    | null
+
+  continuous_configuration:
+    | ContinuousExecutionConfiguration
     | null
 }
 

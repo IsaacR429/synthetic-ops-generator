@@ -93,6 +93,16 @@ async def test_control_service_starts_and_stops_continuous_run(
 
         assert started.status == RunStatus.RUNNING
 
+        running_records = await service.list_runs(
+            status=RunStatus.RUNNING
+        )
+
+        assert len(running_records) == 1
+        assert (
+            running_records[0].run_id
+            == started.run_id
+        )
+
         # Give the continuous run time to execute bounded prefix and generate continuous events
         await asyncio.sleep(0.5)
 
@@ -113,6 +123,30 @@ async def test_control_service_starts_and_stops_continuous_run(
         )
         assert stopped.status == RunStatus.STOPPED
         assert stopped.event_count > 0
+
+        running_records_after_stop = (
+            await service.list_runs(
+                status=RunStatus.RUNNING
+            )
+        )
+
+        assert running_records_after_stop == ()
+
+        all_records_after_stop = (
+            await service.list_runs()
+        )
+
+        stopped_record = next(
+            (
+                record
+                for record in all_records_after_stop
+                if record.run_id == started.run_id
+            ),
+            None,
+        )
+
+        assert stopped_record is not None
+        assert stopped_record.status == RunStatus.STOPPED
 
         final_record = await service.get_run(
             started.run_id

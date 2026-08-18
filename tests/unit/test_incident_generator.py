@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -88,6 +88,54 @@ def test_incident_created_profile_generates_one_event() -> None:
     assert events[0].source_system == "synthetic_itsm"
 
 
+def test_incident_resolved_profile_resolves_existing_incident() -> None:
+    context = build_context()
+    ids = IdFactory()
+
+    create_generator = IncidentGenerator(
+        ids=ids,
+        behaviour=build_behaviour(),
+    )
+
+    created_events = asyncio.run(
+        collect_events(
+            create_generator,
+            context,
+        )
+    )
+
+    assert context.incident_id == "INC0000001"
+
+    context.simulation_time += timedelta(seconds=30)
+
+    resolve_generator = IncidentGenerator(
+        ids=ids,
+        behaviour=build_behaviour(
+            profile_id="incident_resolved",
+        ),
+        event_history=created_events,
+    )
+
+    resolved_events = asyncio.run(
+        collect_events(
+            resolve_generator,
+            context,
+        )
+    )
+
+    assert len(resolved_events) == 1
+
+    resolved_event = resolved_events[0]
+
+    assert resolved_event.event_type == "itsm.incident.resolved"
+    assert (
+        resolved_event.data["incident"]["incident_id"]
+        == "INC0000001"
+    )
+    assert resolved_event.data["incident"]["status"] == "resolved"
+    assert resolved_event.source_domain == SourceDomain.INCIDENT
+
+
 def test_incident_receives_central_incident_id() -> None:
     context = build_context()
 
@@ -148,6 +196,7 @@ def test_incident_preserves_change_and_run_correlation() -> None:
     assert event.scenario_id == "TEST-INC-01"
     assert event.run_id == "RUN0000001"
     assert event.chg_id == "CHG0000001"
+    assert event.source_domain == SourceDomain.INCIDENT
     assert event.business_stream == "payments"
     assert event.service == "payment_service"
     assert event.component == "payment_api"

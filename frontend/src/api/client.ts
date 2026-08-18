@@ -5,6 +5,7 @@ import type {
   ReplayRunResponse,
   RunEventsResponse,
   RunResponse,
+  RunStatus,
   ScenarioCapabilities,
   ScenarioDetail,
   ScenarioSummary,
@@ -99,6 +100,16 @@ export function startRun(
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+export function listRuns(
+  status?: RunStatus,
+): Promise<RunResponse[]> {
+  const path = status
+    ? `/runs?status=${encodeURIComponent(status)}`
+    : '/runs'
+
+  return request<RunResponse[]>(path)
 }
 
 export function getRun(
