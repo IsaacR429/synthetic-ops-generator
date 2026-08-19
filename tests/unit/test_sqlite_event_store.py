@@ -11,7 +11,10 @@ from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.events.serialization import (
     serialize_generated_event,
 )
-from synthetic_ops_generator.retention.query import EventQuery
+from synthetic_ops_generator.retention.query import (
+    EventActivityQuery,
+    EventQuery,
+)
 from synthetic_ops_generator.retention.sqlite import SQLiteEventStore
 
 
@@ -929,6 +932,348 @@ async def test_count_events_counts_matching_filters_without_pagination(
         await store.stop()
 
     assert count == 2
+
+
+@pytest.mark.asyncio
+async def test_aggregate_event_activity_groups_events_into_buckets(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    start_time = datetime(
+        2026,
+        8,
+        13,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    events = (
+        make_event(
+            event_id="EVT0000001",
+            sequence_number=1,
+            event_time=start_time
+            + timedelta(minutes=2),
+        ),
+        make_event(
+            event_id="EVT0000002",
+            sequence_number=2,
+            event_time=start_time
+            + timedelta(minutes=4),
+        ),
+        make_event(
+            event_id="EVT0000003",
+            run_id="RUN0000002",
+            sequence_number=1,
+            event_time=start_time
+            + timedelta(minutes=7),
+        ),
+    )
+
+    try:
+        for event in events:
+            await store.append(event)
+
+        activity = await store.aggregate_event_activity(
+            EventActivityQuery(
+                start_time=start_time,
+                end_time=start_time
+                + timedelta(minutes=15),
+                bucket_seconds=300,
+            )
+        )
+    finally:
+        await store.stop()
+
+    assert len(activity) == 2
+
+    assert activity[0].started_at == start_time
+    assert activity[0].event_count == 2
+
+    assert activity[1].started_at == (
+        start_time + timedelta(minutes=5)
+    )
+    assert activity[1].event_count == 1
+
+
+@pytest.mark.asyncio
+async def test_aggregate_event_activity_places_boundary_event_in_next_bucket(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    start_time = datetime(
+        2026,
+        8,
+        13,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    boundary_event = make_event(
+        event_time=start_time
+        + timedelta(minutes=5),
+    )
+
+    try:
+        await store.append(boundary_event)
+
+        activity = await store.aggregate_event_activity(
+            EventActivityQuery(
+                start_time=start_time,
+                end_time=start_time
+                + timedelta(minutes=10),
+                bucket_seconds=300,
+            )
+        )
+    finally:
+        await store.stop()
+
+    assert len(activity) == 1
+
+    assert activity[0].started_at == (
+        start_time + timedelta(minutes=5)
+    )
+    assert activity[0].event_count == 1
+
+
+@pytest.mark.asyncio
+async def test_aggregate_event_activity_uses_half_open_window_and_omits_empty_buckets(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    start_time = datetime(
+        2026,
+        8,
+        13,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    events = (
+        make_event(
+            event_id="EVT0000001",
+            sequence_number=1,
+            event_time=start_time
+            - timedelta(seconds=1),
+        ),
+        make_event(
+            event_id="EVT0000002",
+            sequence_number=2,
+            event_time=start_time
+            + timedelta(minutes=12),
+        ),
+        make_event(
+            event_id="EVT0000003",
+            sequence_number=3,
+            event_time=start_time
+            + timedelta(minutes=15),
+        ),
+    )
+
+    try:
+        for event in events:
+            await store.append(event)
+
+        activity = await store.aggregate_event_activity(
+            EventActivityQuery(
+                start_time=start_time,
+                end_time=start_time
+                + timedelta(minutes=15),
+                bucket_seconds=300,
+            )
+        )
+    finally:
+        await store.stop()
+
+    assert len(activity) == 1
+
+    assert activity[0].started_at == (
+        start_time + timedelta(minutes=10)
+    )
+    assert activity[0].event_count == 1
+
+
+@pytest.mark.asyncio
+async def test_aggregate_event_activity_rejects_naive_start_time(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="start time must be timezone-aware",
+        ):
+            await store.aggregate_event_activity(
+                EventActivityQuery(
+                    start_time=datetime(
+                        2026,
+                        8,
+                        13,
+                        10,
+                        0,
+                    ),
+                    end_time=datetime(
+                        2026,
+                        8,
+                        13,
+                        11,
+                        0,
+                        tzinfo=UTC,
+                    ),
+                    bucket_seconds=300,
+                )
+            )
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_aggregate_event_activity_rejects_naive_end_time(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="end time must be timezone-aware",
+        ):
+            await store.aggregate_event_activity(
+                EventActivityQuery(
+                    start_time=datetime(
+                        2026,
+                        8,
+                        13,
+                        10,
+                        0,
+                        tzinfo=UTC,
+                    ),
+                    end_time=datetime(
+                        2026,
+                        8,
+                        13,
+                        11,
+                        0,
+                    ),
+                    bucket_seconds=300,
+                )
+            )
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "end_offset",
+    [
+        timedelta(0),
+        timedelta(minutes=-1),
+    ],
+)
+async def test_aggregate_event_activity_rejects_invalid_window(
+    tmp_path,
+    end_offset: timedelta,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    start_time = datetime(
+        2026,
+        8,
+        13,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="start time must be before end time",
+        ):
+            await store.aggregate_event_activity(
+                EventActivityQuery(
+                    start_time=start_time,
+                    end_time=start_time + end_offset,
+                    bucket_seconds=300,
+                )
+            )
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bucket_seconds",
+    [0, -1],
+)
+async def test_aggregate_event_activity_rejects_non_positive_bucket_size(
+    tmp_path,
+    bucket_seconds: int,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="bucket size must be greater than zero",
+        ):
+            await store.aggregate_event_activity(
+                EventActivityQuery(
+                    start_time=datetime(
+                        2026,
+                        8,
+                        13,
+                        10,
+                        0,
+                        tzinfo=UTC,
+                    ),
+                    end_time=datetime(
+                        2026,
+                        8,
+                        13,
+                        11,
+                        0,
+                        tzinfo=UTC,
+                    ),
+                    bucket_seconds=bucket_seconds,
+                )
+            )
+    finally:
+        await store.stop()
 
 
 @pytest.mark.asyncio

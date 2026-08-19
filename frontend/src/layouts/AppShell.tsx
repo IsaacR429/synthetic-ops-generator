@@ -34,13 +34,23 @@ export function AppShell() {
                 />
               </div>
 
-              <div>
-                <div className="text-[16px] font-semibold tracking-[-0.02em] text-white">
-                  StreamOps
+              <div className="min-w-0">
+                <div className="flex items-center">
+                  <span className="text-[17px] font-semibold tracking-[-0.035em] text-white">
+                    Stream
+                  </span>
+
+                  <span className="text-[17px] font-semibold tracking-[-0.035em] text-violet-300">
+                    Ops
+                  </span>
                 </div>
 
-                <div className="mt-0.5 text-[11px] font-medium tracking-[0.01em] text-slate-500">
-                  Synthetic Event Generation
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="h-px w-4 bg-violet-400/50" />
+
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Synthetic Event Generation
+                  </span>
                 </div>
               </div>
             </div>
@@ -99,7 +109,7 @@ export function AppShell() {
             <ApiStatus />
           </header>
 
-          <main className="min-w-0 flex-1 px-7 py-7">
+          <main className="min-w-0 flex-1 bg-gradient-to-br from-[#17182b] via-[#141527] to-[#111321] px-7 py-7">
             <Outlet />
           </main>
         </div>

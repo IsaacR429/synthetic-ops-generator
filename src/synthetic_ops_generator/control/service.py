@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from synthetic_ops_generator.config.enterprise_loader import (
@@ -62,7 +62,11 @@ from synthetic_ops_generator.replay.service import (
     ReplayService,
 )
 from synthetic_ops_generator.retention.base import EventStore
-from synthetic_ops_generator.retention.query import EventQuery
+from synthetic_ops_generator.retention.query import (
+    EventActivityBucket,
+    EventActivityQuery,
+    EventQuery,
+)
 from synthetic_ops_generator.scenarios.capabilities import (
     resolve_scenario_execution_capabilities,
 )
@@ -890,6 +894,80 @@ class ControlService:
                 component=component,
             )
         )
+
+    async def get_event_activity(
+        self,
+        *,
+        start_time: datetime,
+        end_time: datetime,
+        bucket_seconds: int,
+    ) -> tuple[EventActivityBucket, ...]:
+        if (
+            start_time.tzinfo is None
+            or start_time.utcoffset() is None
+        ):
+            raise ValueError(
+                "Event activity start time must be timezone-aware."
+            )
+
+        if (
+            end_time.tzinfo is None
+            or end_time.utcoffset() is None
+        ):
+            raise ValueError(
+                "Event activity end time must be timezone-aware."
+            )
+
+        if start_time >= end_time:
+            raise ValueError(
+                "Event activity start time must be before end time."
+            )
+
+        if bucket_seconds <= 0:
+            raise ValueError(
+                "Event activity bucket size must be greater than zero."
+            )
+
+        sparse_activity = (
+            await self._store.aggregate_event_activity(
+                EventActivityQuery(
+                    start_time=start_time,
+                    end_time=end_time,
+                    bucket_seconds=bucket_seconds,
+                )
+            )
+        )
+
+        start_utc = start_time.astimezone(UTC)
+        end_utc = end_time.astimezone(UTC)
+
+        activity_by_start = {
+            bucket.started_at.astimezone(UTC):
+            bucket.event_count
+            for bucket in sparse_activity
+        }
+
+        bucket_width = timedelta(
+            seconds=bucket_seconds
+        )
+
+        activity: list[EventActivityBucket] = []
+        bucket_start = start_utc
+
+        while bucket_start < end_utc:
+            activity.append(
+                EventActivityBucket(
+                    started_at=bucket_start,
+                    event_count=activity_by_start.get(
+                        bucket_start,
+                        0,
+                    ),
+                )
+            )
+
+            bucket_start += bucket_width
+
+        return tuple(activity)
 
     async def _persist_run_progress(
         self,

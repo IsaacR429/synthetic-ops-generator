@@ -274,3 +274,25 @@ export interface RunEventsResponse {
 export interface HealthResponse {
   status: string
 }
+
+export type EventActivityWindow =
+  | '1h'
+  | '6h'
+  | '24h'
+  | '7d'
+
+export interface EventActivityBucket {
+  started_at: string
+  event_count: number
+}
+
+export interface EventActivityResponse {
+  window: EventActivityWindow
+
+  start_time: string
+  end_time: string
+
+  bucket_seconds: number
+
+  buckets: EventActivityBucket[]
+}

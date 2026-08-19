@@ -1,4 +1,8 @@
-import { useEffect, useState } from 'react'
+import {
+  type ReactNode,
+  useEffect,
+  useState,
+} from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { ApiError, getRun, stopRun } from '../api/client'
@@ -22,6 +26,23 @@ function runStatusClasses(status: RunStatus): string {
   return classes[status]
 }
 
+function runStatusDotClasses(
+  status: RunStatus,
+): string {
+  const classes: Record<RunStatus, string> = {
+    running:
+      'bg-violet-300 shadow-[0_0_14px_rgba(196,181,253,0.35)]',
+    completed:
+      'bg-emerald-300',
+    failed:
+      'bg-red-300',
+    stopped:
+      'bg-amber-300',
+  }
+
+  return classes[status]
+}
+
 function formatRunTime(value: string | null): string {
   if (!value) return '—'
   return new Intl.DateTimeFormat(undefined, {
@@ -29,6 +50,45 @@ function formatRunTime(value: string | null): string {
     minute: '2-digit',
     second: '2-digit',
   }).format(new Date(value))
+}
+
+interface DetailRowProps {
+  label: string
+  value: ReactNode
+  mono?: boolean
+  emphasis?: 'default' | 'cyan' | 'green'
+}
+
+function DetailRow({
+  label,
+  value,
+  mono = false,
+  emphasis = 'default',
+}: DetailRowProps) {
+  const valueClass =
+    emphasis === 'cyan'
+      ? 'text-cyan-100'
+      : emphasis === 'green'
+        ? 'text-emerald-300'
+        : 'text-slate-200'
+
+  return (
+    <div className="flex items-center justify-between gap-6">
+      <dt className="text-[11px] text-slate-500">
+        {label}
+      </dt>
+
+      <dd
+        className={[
+          'text-right text-[12px] font-medium',
+          mono ? 'font-mono' : '',
+          valueClass,
+        ].join(' ')}
+      >
+        {value}
+      </dd>
+    </div>
+  )
 }
 
 export function RunDetailPage() {
@@ -136,14 +196,68 @@ export function RunDetailPage() {
 
               {run && (
                 <span
-                  className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${runStatusClasses(
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${runStatusClasses(
                     run.status,
                   )}`}
                 >
+                  <span
+                    className={`size-1.5 rounded-full ${runStatusDotClasses(
+                      run.status,
+                    )}`}
+                  />
                   {formatLabel(run.status)}
                 </span>
               )}
             </div>
+
+            {run && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                <span className="font-mono text-violet-200">
+                  {run.scenario_id}
+                </span>
+
+                <span className="text-slate-700">
+                  ·
+                </span>
+
+                <span className="text-slate-400">
+                  {formatLabel(
+                    run.execution_mode,
+                  )}
+                </span>
+
+                <span className="text-slate-700">
+                  ·
+                </span>
+
+                <span
+                  className={
+                    run.generation_lifecycle ===
+                    'continuous'
+                      ? 'text-cyan-300'
+                      : 'text-slate-400'
+                  }
+                >
+                  {formatLabel(
+                    run.generation_lifecycle,
+                  )}
+                </span>
+
+                {run.target && (
+                  <>
+                    <span className="text-slate-700">
+                      ·
+                    </span>
+
+                    <span className="text-slate-500">
+                      {formatLabel(
+                        run.target.environment,
+                      )}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {run && (
@@ -155,18 +269,30 @@ export function RunDetailPage() {
                   onClick={() => {
                     void handleStopRun()
                   }}
-                  className="rounded-lg border border-red-400/15 bg-red-500/[0.06] px-4 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/[0.12] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg border border-red-400/15 bg-red-500/[0.04] px-4 py-2.5 text-[10px] font-medium text-red-300 transition-all hover:border-red-400/25 hover:bg-red-500/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {stoppingRun ? 'Stopping...' : 'Stop Run'}
+                  {stoppingRun
+                    ? 'Stopping...'
+                    : 'Stop Run'}
                 </button>
               )}
 
               <button
                 type="button"
-                onClick={() => navigate(`/runs/${run.run_id}/events`)}
-                className="rounded-lg border border-violet-400/20 bg-violet-500/[0.07] px-4 py-2 text-xs font-medium text-violet-200 transition-colors hover:bg-violet-500/[0.12]"
+                onClick={() =>
+                  navigate(
+                    `/runs/${run.run_id}/events`,
+                  )
+                }
+                className="group rounded-lg border border-violet-400/15 bg-gradient-to-r from-violet-500/[0.08] to-cyan-500/[0.025] px-4 py-2.5 text-[10px] font-medium text-violet-100 transition-all hover:border-violet-400/25 hover:bg-violet-500/[0.10]"
               >
-                Inspect Events →
+                <span className="flex items-center gap-2">
+                  Inspect Events
+
+                  <span className="text-violet-300/60 transition-transform group-hover:translate-x-0.5">
+                    →
+                  </span>
+                </span>
               </button>
             </div>
           )}
@@ -187,161 +313,215 @@ export function RunDetailPage() {
             Run not found.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 backdrop-blur-md">
-            <div className="grid grid-cols-1 gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="bg-[#0b0914] p-5">
-                <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
-                  Execution State
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {/* EXECUTION STATE */}
+              <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#111428]/65 p-5">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-violet-400/55 via-cyan-400/20 to-transparent" />
+
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-300/60">
+                    Execution Metadata
+                  </div>
+
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    Execution State
+                  </div>
                 </div>
 
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Scenario</dt>
-                    <dd className="font-mono text-slate-200">{run.scenario_id}</dd>
-                  </div>
+                <dl className="mt-5 space-y-3.5 border-t border-white/[0.06] pt-4">
+                  <DetailRow
+                    label="Scenario"
+                    value={run.scenario_id}
+                    mono
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Current State</dt>
-                    <dd className="text-slate-200">
-                      {formatLabel(run.current_state)}
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Current State"
+                    value={formatLabel(
+                      run.current_state,
+                    )}
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Events</dt>
-                    <dd className="font-mono text-slate-200">{run.event_count}</dd>
-                  </div>
+                  <DetailRow
+                    label="Events"
+                    value={run.event_count}
+                    mono
+                    emphasis="cyan"
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Validation</dt>
-                    <dd className="text-slate-200">
-                      {run.validation_passed === null
+                  <DetailRow
+                    label="Validation"
+                    value={
+                      run.validation_passed === null
                         ? run.status === 'running'
                           ? 'Pending'
                           : 'Not reported'
                         : run.validation_passed
                           ? 'Passed'
-                          : 'Failed'}
-                    </dd>
-                  </div>
+                          : 'Failed'
+                    }
+                    emphasis={
+                      run.validation_passed
+                        ? 'green'
+                        : 'default'
+                    }
+                  />
                 </dl>
               </div>
 
-              <div className="bg-[#0b0914] p-5">
-                <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
-                  Configuration
+              {/* CONFIGURATION */}
+              <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#111428]/65 p-5">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-400/40 via-violet-400/20 to-transparent" />
+
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-300/60">
+                    Execution Metadata
+                  </div>
+
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    Configuration
+                  </div>
                 </div>
 
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Execution Mode</dt>
-                    <dd className="text-slate-200">
-                      {formatLabel(run.execution_mode)}
-                    </dd>
-                  </div>
+                <dl className="mt-5 space-y-3.5 border-t border-white/[0.06] pt-4">
+                  <DetailRow
+                    label="Execution Mode"
+                    value={formatLabel(
+                      run.execution_mode,
+                    )}
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Lifecycle</dt>
-                    <dd className="text-slate-200">
-                      {formatLabel(run.generation_lifecycle)}
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Lifecycle"
+                    value={formatLabel(
+                      run.generation_lifecycle,
+                    )}
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Interval</dt>
-                    <dd className="font-mono text-slate-200">
-                      {run.event_interval_seconds}s
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Interval"
+                    value={`${run.event_interval_seconds}s`}
+                    mono
+                  />
 
                   {run.continuous_configuration && (
-                    <div className="flex justify-between gap-6">
-                      <dt className="text-slate-500">Stop Mode</dt>
-                      <dd className="text-slate-200">
-                        {formatLabel(run.continuous_configuration.stop_mode)}
-                      </dd>
-                    </div>
+                    <DetailRow
+                      label="Stop Mode"
+                      value={formatLabel(
+                        run.continuous_configuration
+                          .stop_mode,
+                      )}
+                    />
                   )}
                 </dl>
               </div>
 
-              <div className="bg-[#0b0914] p-5">
-                <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
-                  Target Scope
+              {/* TARGET SCOPE */}
+              <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#111428]/65 p-5">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-violet-400/40 via-cyan-400/20 to-transparent" />
+
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-300/60">
+                    Target Discovery
+                  </div>
+
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    Target Scope
+                  </div>
                 </div>
 
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Enterprise</dt>
-                    <dd className="font-mono text-slate-200">
-                      {run.target?.enterprise_id ?? '—'}
-                    </dd>
-                  </div>
+                <dl className="mt-5 space-y-3.5 border-t border-white/[0.06] pt-4">
+                  <DetailRow
+                    label="Enterprise"
+                    value={
+                      run.target?.enterprise_id ??
+                      '—'
+                    }
+                    mono
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Business Stream</dt>
-                    <dd className="font-mono text-slate-200">
-                      {run.target?.business_stream_id ?? '—'}
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Business Stream"
+                    value={
+                      run.target
+                        ?.business_stream_id ??
+                      '—'
+                    }
+                    mono
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Service</dt>
-                    <dd className="font-mono text-slate-200">
-                      {run.target?.service_id ?? '—'}
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Service"
+                    value={
+                      run.target?.service_id ??
+                      '—'
+                    }
+                    mono
+                    emphasis="cyan"
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Environment</dt>
-                    <dd className="text-slate-200">
-                      {run.target
-                        ? formatLabel(run.target.environment)
-                        : '—'}
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Environment"
+                    value={
+                      run.target
+                        ? formatLabel(
+                            run.target.environment,
+                          )
+                        : '—'
+                    }
+                  />
                 </dl>
               </div>
 
-              <div className="bg-[#0b0914] p-5">
-                <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
-                  Timing
+              {/* TIMING */}
+              <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#111428]/65 p-5">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-slate-400/35 via-violet-400/10 to-transparent" />
+
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Execution Metadata
+                  </div>
+
+                  <div className="mt-1 text-sm font-semibold text-white">
+                    Timing
+                  </div>
                 </div>
 
-                <dl className="mt-4 space-y-3 text-sm">
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Started</dt>
-                    <dd className="text-right text-slate-200">
-                      {formatRunTime(run.started_at)}
-                    </dd>
-                  </div>
+                <dl className="mt-5 space-y-3.5 border-t border-white/[0.06] pt-4">
+                  <DetailRow
+                    label="Started"
+                    value={formatRunTime(
+                      run.started_at,
+                    )}
+                    mono
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Completed</dt>
-                    <dd className="text-right text-slate-200">
-                      {formatRunTime(run.completed_at)}
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Completed"
+                    value={formatRunTime(
+                      run.completed_at,
+                    )}
+                    mono
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Change</dt>
-                    <dd className="font-mono text-slate-200">
-                      {run.change_id}
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Change"
+                    value={run.change_id}
+                    mono
+                  />
 
-                  <div className="flex justify-between gap-6">
-                    <dt className="text-slate-500">Seed</dt>
-                    <dd className="font-mono text-slate-200">
-                      {run.random_seed}
-                    </dd>
-                  </div>
+                  <DetailRow
+                    label="Seed"
+                    value={run.random_seed}
+                    mono
+                  />
                 </dl>
               </div>
             </div>
 
             {run.error_message && (
-              <div className="border-t border-red-400/10 bg-red-500/[0.04] px-5 py-4 text-sm text-red-300">
+              <div className="rounded-xl border border-red-400/10 bg-red-500/[0.04] p-5 text-sm text-red-300">
                 {run.error_message}
               </div>
             )}

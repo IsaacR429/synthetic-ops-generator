@@ -8,7 +8,11 @@ from synthetic_ops_generator.publishers.retention import (
     RetentionPublisher,
 )
 from synthetic_ops_generator.retention.base import EventStore
-from synthetic_ops_generator.retention.query import EventQuery
+from synthetic_ops_generator.retention.query import (
+    EventActivityBucket,
+    EventActivityQuery,
+    EventQuery,
+)
 
 
 class RecordingEventStore(EventStore):
@@ -66,6 +70,12 @@ class RecordingEventStore(EventStore):
                 if event.run_id == query.run_id
             ]
         )
+
+    async def aggregate_event_activity(
+        self,
+        query: EventActivityQuery,
+    ) -> tuple[EventActivityBucket, ...]:
+        return ()
 
     async def delete_before(
         self,

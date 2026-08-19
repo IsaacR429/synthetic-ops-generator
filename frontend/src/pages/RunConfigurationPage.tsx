@@ -504,144 +504,317 @@ export function RunConfigurationPage() {
       {!loadingDiscovery && !discoveryError && (
         <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="space-y-6 lg:col-span-5">
-            <div className="rounded-xl border border-violet-400/10 bg-gradient-to-br from-violet-500/[0.04] via-white/[0.02] to-transparent p-6 shadow-[0_18px_50px_rgba(49,16,101,0.06)]">
-              <label className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-400/80">
-                1. Select Enterprise
-              </label>
+            <div className="group relative overflow-hidden rounded-2xl border border-violet-400/10 bg-[#111428]/80 p-5 shadow-[0_14px_40px_rgba(2,6,23,0.16)]">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-violet-500/[0.13] via-fuchsia-500/[0.035] to-transparent" />
 
-              <select
-                value={selectedEnterpriseId}
-                onChange={(e) => handleEnterpriseChange(e.target.value)}
-                className="mt-3 w-full rounded-lg border border-violet-400/15 bg-[#0b0914] px-3.5 py-2.5 text-sm text-white focus:border-violet-400/40 focus:outline-none"
-              >
-                <option value="">-- Choose Enterprise --</option>
-                {enterprises.map((enterprise) => (
-                  <option
-                    key={enterprise.enterprise_id}
-                    value={enterprise.enterprise_id}
-                  >
-                    {enterprise.name} ({formatLabel(enterprise.industry)})
-                  </option>
-                ))}
-              </select>
+              <div className="pointer-events-none absolute left-0 top-0 h-px w-full bg-gradient-to-r from-violet-400/70 via-fuchsia-400/30 to-transparent" />
 
-              {selectedEnterprise && (
-                <div className="mt-3 text-xs text-slate-400">
-                  Target Industry:{' '}
-                  <span className="font-medium text-slate-200">
-                    {formatLabel(selectedEnterprise.industry)}
-                  </span>
+              <div className="relative">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-8 items-center justify-center rounded-lg border border-violet-400/20 bg-violet-500/10 font-mono text-xs font-semibold text-violet-200">
+                    01
+                  </div>
+
+                  <div>
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-violet-300/70">
+                      Target Discovery
+                    </div>
+
+                    <div className="mt-0.5 text-sm font-semibold text-white">
+                      Select Enterprise
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                <div className="mt-5">
+                  <select
+                    value={selectedEnterpriseId}
+                    onChange={(e) =>
+                      handleEnterpriseChange(e.target.value)
+                    }
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#090b17]/85 px-4 py-3 text-sm text-slate-100 shadow-inner outline-none transition-all hover:border-violet-400/20 focus:border-violet-400/40 focus:ring-2 focus:ring-violet-500/10"
+                  >
+                    <option value="">
+                      -- Choose Enterprise --
+                    </option>
+
+                    {enterprises.map((enterprise) => (
+                      <option
+                        key={enterprise.enterprise_id}
+                        value={enterprise.enterprise_id}
+                      >
+                        {enterprise.name} (
+                        {formatLabel(enterprise.industry)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <span className="size-1.5 rounded-full bg-violet-300/70" />
+                  <div className="h-px flex-1 bg-gradient-to-r from-violet-400/35 to-transparent" />
+                </div>
+
+                {selectedEnterprise && (
+                  <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                    <span className="text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                      Industry
+                    </span>
+
+                    <span className="text-xs font-medium text-slate-200">
+                      {formatLabel(
+                        selectedEnterprise.industry,
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="rounded-xl border border-violet-400/10 bg-gradient-to-br from-violet-500/[0.04] via-white/[0.02] to-transparent p-6 shadow-[0_18px_50px_rgba(49,16,101,0.06)]">
-              <label className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-400/80">
-                2. Select Scenario
-              </label>
+            <div className="group relative overflow-hidden rounded-2xl border border-cyan-400/10 bg-[#111428]/80 p-5 shadow-[0_14px_40px_rgba(2,6,23,0.16)]">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-cyan-500/[0.10] via-indigo-500/[0.035] to-transparent" />
 
-              <select
-                disabled={!selectedEnterpriseId}
-                value={selectedScenarioId}
-                onChange={(e) => handleScenarioChange(e.target.value)}
-                className="mt-3 w-full rounded-lg border border-violet-400/15 bg-[#0b0914] px-3.5 py-2.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50 focus:border-violet-400/40 focus:outline-none"
-              >
-                <option value="">
-                  {selectedEnterpriseId
-                    ? '-- Choose Scenario --'
-                    : '-- Select Enterprise First --'}
-                </option>
-                {availableScenarios.map((scenario) => (
-                  <option
-                    key={scenario.scenario_id}
-                    value={scenario.scenario_id}
-                  >
-                    {scenario.scenario_id} - {scenario.name}
-                  </option>
-                ))}
-              </select>
+              <div className="pointer-events-none absolute left-0 top-0 h-px w-full bg-gradient-to-r from-cyan-400/65 via-indigo-400/25 to-transparent" />
 
-              {availableScenarios.length > 0 && (
-                <div className="mt-3 text-xs text-slate-400">
-                  {availableScenarios.length} scenario(s) available for{' '}
-                  {selectedEnterprise?.name}.
+              <div className="relative">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-8 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-500/10 font-mono text-xs font-semibold text-cyan-200">
+                    02
+                  </div>
+
+                  <div>
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-cyan-300/65">
+                      Signal Definition
+                    </div>
+
+                    <div className="mt-0.5 text-sm font-semibold text-white">
+                      Select Scenario
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                <div className="mt-5">
+                  <select
+                    disabled={!selectedEnterpriseId}
+                    value={selectedScenarioId}
+                    onChange={(e) =>
+                      handleScenarioChange(e.target.value)
+                    }
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#090b17]/85 px-4 py-3 text-sm text-slate-100 shadow-inner outline-none transition-all hover:border-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40 focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-500/10"
+                  >
+                    <option value="">
+                      {selectedEnterpriseId
+                        ? '-- Choose Scenario --'
+                        : '-- Select Enterprise First --'}
+                    </option>
+
+                    {availableScenarios.map((scenario) => (
+                      <option
+                        key={scenario.scenario_id}
+                        value={scenario.scenario_id}
+                      >
+                        {scenario.scenario_id} -{' '}
+                        {scenario.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <span
+                    className={[
+                      'size-1.5 rounded-full',
+                      selectedEnterpriseId
+                        ? 'bg-cyan-300/70'
+                        : 'bg-slate-600',
+                    ].join(' ')}
+                  />
+
+                  <div className="h-px flex-1 bg-gradient-to-r from-cyan-400/30 to-transparent" />
+                </div>
+
+                {availableScenarios.length > 0 && (
+                  <div className="mt-3 flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                    <span className="text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                      Available
+                    </span>
+
+                    <span className="font-mono text-xs text-cyan-200">
+                      {availableScenarios.length}{' '}
+                      {availableScenarios.length === 1
+                        ? 'scenario'
+                        : 'scenarios'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="lg:col-span-7">
             {!selectedScenario ? (
-              <div className="flex h-full min-h-[300px] items-center justify-center rounded-xl border border-dashed border-violet-400/15 bg-violet-500/[0.015] p-8 text-center text-sm text-slate-500">
-                Select an enterprise and scenario to inspect details and
-                execution capabilities.
-              </div>
-            ) : (
-              <div className="relative overflow-hidden rounded-xl border border-violet-400/10 bg-gradient-to-br from-violet-500/[0.06] via-white/[0.02] to-transparent p-6 shadow-[0_18px_50px_rgba(49,16,101,0.08)]">
-                <div className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-violet-600/10 blur-3xl" />
+              <div className="relative flex h-full min-h-[300px] overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101326]/55">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-500/[0.07] via-transparent to-cyan-500/[0.045]" />
 
-                <div className="relative">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="font-mono text-xs font-semibold text-violet-400">
-                        {selectedScenario.scenario_id}
-                      </div>
+                <div className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-violet-500/[0.08] blur-3xl" />
 
-                      <h3 className="mt-1 text-lg font-semibold text-white">
-                        {selectedScenario.name}
-                      </h3>
-                    </div>
+                <div className="pointer-events-none absolute -bottom-20 left-1/3 size-48 rounded-full bg-cyan-500/[0.06] blur-3xl" />
 
-                    <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-300">
-                      {selectedEnterprise?.name}
-                    </span>
+                <div className="relative flex w-full flex-col items-center justify-center px-8 py-12 text-center">
+                  <div className="relative flex size-16 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/10">
+                    <div className="absolute size-10 rounded-full border border-violet-400/15" />
+
+                    <div className="absolute size-6 rounded-full border border-cyan-400/20" />
+
+                    <div className="size-2 rounded-full bg-gradient-to-br from-violet-300 to-cyan-300 shadow-[0_0_20px_rgba(103,232,249,0.28)]" />
                   </div>
 
-                  <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                    {selectedScenario.description}
+                  <div className="mt-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-300/65">
+                    Scenario Intelligence
+                  </div>
+
+                  <div className="mt-2 text-base font-semibold text-slate-200">
+                    Configure the operational signal
+                  </div>
+
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                    Select an enterprise and scenario to
+                    inspect its target, execution modes,
+                    lifecycle capabilities, and generation
+                    controls.
                   </p>
 
-                  <div className="mt-4 border-t border-white/8 pt-4">
-                    <div className="text-xs font-semibold text-white">
-                      Target scope
+                  <div className="mt-6 flex items-center gap-2">
+                    <span className="size-1.5 rounded-full bg-violet-400/70" />
+                    <span className="h-px w-8 bg-gradient-to-r from-violet-400/40 to-cyan-400/30" />
+                    <span className="size-1.5 rounded-full bg-cyan-400/70" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111428]/80 p-6 shadow-[0_18px_55px_rgba(2,6,23,0.18)]">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-br from-violet-500/[0.12] via-indigo-500/[0.045] to-cyan-500/[0.025]" />
+
+                <div className="pointer-events-none absolute left-0 top-0 h-px w-full bg-gradient-to-r from-violet-400/75 via-fuchsia-400/35 to-cyan-400/30" />
+
+                <div className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-violet-500/[0.08] blur-3xl" />
+
+                <div className="pointer-events-none absolute -bottom-32 left-1/3 size-56 rounded-full bg-cyan-500/[0.045] blur-3xl" />
+
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="size-1.5 rounded-full bg-violet-300 shadow-[0_0_12px_rgba(196,181,253,0.35)]" />
+
+                        <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-300/80">
+                          {selectedScenario.scenario_id}
+                        </div>
+
+                        <span className="h-px w-8 bg-gradient-to-r from-violet-400/45 to-transparent" />
+                      </div>
+
+                      <h3 className="mt-3 text-xl font-semibold tracking-[-0.025em] text-white">
+                        {selectedScenario.name}
+                      </h3>
+
+                      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+                        {selectedScenario.description}
+                      </p>
                     </div>
 
-                    <div className="mt-2 text-xs text-slate-400">
-                      Enterprise:{' '}
-                      <span className="font-mono font-medium text-slate-200">
-                        {selectedScenario.enterprise_id}
-                      </span>
+                    <div className="shrink-0 rounded-xl border border-violet-400/15 bg-violet-500/[0.08] px-3 py-2">
+                      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-violet-300/55">
+                        Enterprise
+                      </div>
+
+                      <div className="mt-1 text-xs font-medium text-violet-100">
+                        {selectedEnterprise?.name}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="mt-5 border-t border-white/8 pt-5">
-                    <div className="text-xs font-semibold text-white">
-                      Execution capabilities
+                  <div className="mt-6 grid grid-cols-1 gap-3 border-t border-white/[0.07] pt-5 sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] px-4 py-3">
+                      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Target Enterprise
+                      </div>
+
+                      <div className="mt-2 font-mono text-xs text-violet-200">
+                        {selectedScenario.enterprise_id}
+                      </div>
+                    </div>
+
+                    <div className="relative overflow-hidden rounded-xl border border-cyan-400/[0.08] bg-cyan-500/[0.025] px-4 py-3">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-cyan-400/70 to-transparent" />
+
+                      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Operational Signal
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-2 text-xs text-cyan-100">
+                        <span className="size-1.5 rounded-full bg-cyan-300" />
+                        Synthetic generation target
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 border-t border-white/[0.07] pt-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-300/60">
+                          Capability Matrix
+                        </div>
+
+                        <div className="mt-1 text-sm font-semibold text-white">
+                          Execution Capabilities
+                        </div>
+                      </div>
+
+                      {capabilities && (
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                          <span className="size-1.5 rounded-full bg-emerald-300" />
+                          Discovered
+                        </div>
+                      )}
                     </div>
 
                     {loadingCapabilities && (
-                      <div className="mt-3 text-xs text-slate-500">
+                      <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.018] px-4 py-3 text-xs text-slate-500">
                         Discovering capabilities...
                       </div>
                     )}
 
                     {capabilityError && (
-                      <div className="mt-3 text-xs text-red-300">
+                      <div className="mt-4 rounded-xl border border-red-500/15 bg-red-500/[0.06] px-4 py-3 text-xs text-red-300">
                         {capabilityError}
                       </div>
                     )}
 
                     {capabilities && (
                       <>
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="mt-4 flex flex-wrap gap-2">
                           {capabilities.execution_modes.map((mode) => (
                             <span
                               key={mode}
-                              className="rounded-full border border-violet-400/15 bg-violet-500/[0.07] px-3 py-1 text-[11px] font-medium text-violet-200"
+                              className="inline-flex items-center gap-2 rounded-lg border border-violet-400/15 bg-violet-500/[0.07] px-3 py-2 text-[10px] font-medium text-violet-100"
                             >
+                              <span className="size-1.5 rounded-full bg-violet-300/80" />
                               {formatLabel(mode)}
                             </span>
                           ))}
+
+                          {capabilities.generation_lifecycles.map(
+                            (lifecycle) => (
+                              <span
+                                key={lifecycle}
+                                className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/15 bg-cyan-500/[0.055] px-3 py-2 text-[10px] font-medium text-cyan-100"
+                              >
+                                <span className="size-1.5 rounded-full bg-cyan-300/80" />
+                                {formatLabel(lifecycle)}
+                              </span>
+                            ),
+                          )}
                         </div>
 
                         {capabilities.historical.supported &&
@@ -698,18 +871,31 @@ export function RunConfigurationPage() {
                   </div>
 
                   {capabilities && (
-                    <div className="mt-5 border-t border-white/8 pt-5">
-                      <div className="text-xs font-semibold text-white">
-                        Run parameters
+                    <div className="mt-5 border-t border-white/[0.07] pt-5">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-300/60">
+                            Generation Control
+                          </div>
+
+                          <div className="mt-1 text-sm font-semibold text-white">
+                            Run Parameters
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                          <span className="size-1.5 rounded-full bg-cyan-300/80" />
+                          Runtime configuration
+                        </div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl border border-violet-400/[0.10] bg-violet-500/[0.025] p-3.5">
                           <label
                             htmlFor="execution-mode"
-                            className="text-[11px] font-medium text-slate-400"
+                            className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-500"
                           >
-                            Execution mode
+                            Execution Mode
                           </label>
 
                           <select
@@ -720,7 +906,7 @@ export function RunConfigurationPage() {
                                 event.target.value as RunExecutionMode,
                               )
                             }
-                            className="mt-2 w-full rounded-lg border border-violet-400/15 bg-[#090711] px-3 py-2.5 text-sm text-white focus:border-violet-400/40 focus:outline-none"
+                            className="mt-2.5 w-full rounded-lg border border-violet-400/15 bg-[#090b17]/90 px-3.5 py-2.5 text-sm font-medium text-slate-100 outline-none transition-all hover:border-violet-400/25 focus:border-violet-400/45 focus:ring-2 focus:ring-violet-500/10"
                           >
                             {capabilities.execution_modes.map((mode) => (
                               <option
@@ -737,12 +923,12 @@ export function RunConfigurationPage() {
                           </select>
                         </div>
 
-                        <div>
+                        <div className="rounded-xl border border-cyan-400/[0.10] bg-cyan-500/[0.025] p-3.5">
                           <label
                             htmlFor="generation-lifecycle"
-                            className="mb-2 block text-sm font-medium"
+                            className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-500"
                           >
-                            Generation lifecycle
+                            Generation Lifecycle
                           </label>
 
                           <select
@@ -754,7 +940,7 @@ export function RunConfigurationPage() {
                               )
                             }
                             disabled={!capabilities}
-                            className="w-full rounded-lg border px-3 py-2"
+                            className="mt-2.5 w-full rounded-lg border border-cyan-400/15 bg-[#090b17]/90 px-3.5 py-2.5 text-sm font-medium text-slate-100 outline-none transition-all hover:border-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-40 focus:border-cyan-400/45 focus:ring-2 focus:ring-cyan-500/10"
                           >
                             {capabilities?.generation_lifecycles.map(
                               (lifecycle) => (
@@ -773,12 +959,19 @@ export function RunConfigurationPage() {
                           </select>
                         </div>
 
-                        <div>
+                        <div className="rounded-xl border border-white/[0.07] bg-white/[0.018] p-3.5 sm:col-span-2">
                           <label
                             htmlFor="random-seed"
-                            className="text-[11px] font-medium text-slate-400"
+                            className="flex items-center justify-between gap-4"
                           >
-                            Random seed
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-500">
+                              Random Seed
+                            </span>
+
+                            <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.10em] text-slate-600">
+                              <span className="size-1 rounded-full bg-violet-300/70" />
+                              Deterministic input
+                            </span>
                           </label>
 
                           <input
@@ -789,7 +982,7 @@ export function RunConfigurationPage() {
                             onChange={(event) =>
                               setRandomSeedInput(event.target.value)
                             }
-                            className="mt-2 w-full rounded-lg border border-violet-400/15 bg-[#090711] px-3 py-2.5 text-sm text-white focus:border-violet-400/40 focus:outline-none"
+                            className="mt-2.5 w-full rounded-lg border border-white/[0.08] bg-[#090b17]/90 px-3.5 py-2.5 font-mono text-sm font-medium text-slate-100 outline-none transition-all hover:border-white/20 focus:border-violet-400/45 focus:ring-2 focus:ring-violet-500/10"
                           />
                         </div>
                       </div>
@@ -801,104 +994,169 @@ export function RunConfigurationPage() {
                       )}
 
                       {executionMode === 'historical' && (
-                        <div className="mt-5 border-t border-white/6 pt-4">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-violet-400/80">
-                            Historical perturbation curve
-                          </div>
+                        <div className="mt-5 overflow-hidden rounded-xl border border-violet-400/[0.10] bg-violet-500/[0.025]">
+                          <div className="border-b border-white/[0.06] px-4 py-3.5">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-300/65">
+                                  Historical Simulation
+                                </div>
 
-                          <div className="mt-3 grid grid-cols-3 gap-3">
-                            <div>
-                              <label
-                                htmlFor="degradation-samples"
-                                className="text-[11px] font-medium text-slate-400"
-                              >
-                                Degradation
-                              </label>
+                                <div className="mt-1 text-sm font-semibold text-white">
+                                  Perturbation Curve
+                                </div>
+                              </div>
 
-                              <input
-                                id="degradation-samples"
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={degradationSamplesInput}
-                                onChange={(event) =>
-                                  setDegradationSamplesInput(event.target.value)
-                                }
-                                className="mt-2 w-full rounded-lg border border-violet-400/15 bg-[#090711] px-3 py-2.5 text-sm text-white focus:border-violet-400/40 focus:outline-none"
-                              />
-                            </div>
-
-                            <div>
-                              <label
-                                htmlFor="plateau-samples"
-                                className="text-[11px] font-medium text-slate-400"
-                              >
-                                Plateau
-                              </label>
-
-                              <input
-                                id="plateau-samples"
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={plateauSamplesInput}
-                                onChange={(event) =>
-                                  setPlateauSamplesInput(event.target.value)
-                                }
-                                className="mt-2 w-full rounded-lg border border-violet-400/15 bg-[#090711] px-3 py-2.5 text-sm text-white focus:border-violet-400/40 focus:outline-none"
-                              />
-                            </div>
-
-                            <div>
-                              <label
-                                htmlFor="recovery-samples"
-                                className="text-[11px] font-medium text-slate-400"
-                              >
-                                Recovery
-                              </label>
-
-                              <input
-                                id="recovery-samples"
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={recoverySamplesInput}
-                                onChange={(event) =>
-                                  setRecoverySamplesInput(event.target.value)
-                                }
-                                className="mt-2 w-full rounded-lg border border-violet-400/15 bg-[#090711] px-3 py-2.5 text-sm text-white focus:border-violet-400/40 focus:outline-none"
-                              />
+                              <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.10em] text-slate-600">
+                                <span className="size-1.5 rounded-full bg-violet-300/70" />
+                                Synthetic timeline
+                              </div>
                             </div>
                           </div>
 
-                          {!historicalConfigurationValid && (
-                            <div className="mt-3 text-[11px] leading-5 text-red-300">
-                              Degradation must be greater than zero. Plateau and
-                              recovery must be zero or greater.
+                          <div className="relative px-4 py-5">
+                            <div className="pointer-events-none absolute left-[16%] right-[16%] top-[31px] h-px bg-gradient-to-r from-rose-400/25 via-amber-400/25 to-emerald-400/25" />
+
+                            <div className="relative grid grid-cols-1 gap-3 sm:grid-cols-3">
+                              <div className="rounded-xl border border-rose-400/[0.10] bg-rose-500/[0.025] p-3.5">
+                                <div className="mb-3 flex items-center gap-2">
+                                  <span className="size-2 rounded-full bg-rose-300/80" />
+
+                                  <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-rose-200/70">
+                                    Degradation
+                                  </span>
+                                </div>
+
+                                <input
+                                  id="degradation-samples"
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  value={degradationSamplesInput}
+                                  onChange={(event) =>
+                                    setDegradationSamplesInput(
+                                      event.target.value,
+                                    )
+                                  }
+                                  className="w-full rounded-lg border border-rose-400/10 bg-[#090b17]/90 px-3.5 py-2.5 font-mono text-sm text-rose-100 outline-none transition-all hover:border-rose-400/20 focus:border-rose-400/40 focus:ring-2 focus:ring-rose-500/10"
+                                />
+                              </div>
+
+                              <div className="rounded-xl border border-amber-400/[0.10] bg-amber-500/[0.02] p-3.5">
+                                <div className="mb-3 flex items-center gap-2">
+                                  <span className="size-2 rounded-full bg-amber-300/80" />
+
+                                  <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-amber-200/70">
+                                    Plateau
+                                  </span>
+                                </div>
+
+                                <input
+                                  id="plateau-samples"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={plateauSamplesInput}
+                                  onChange={(event) =>
+                                    setPlateauSamplesInput(
+                                      event.target.value,
+                                    )
+                                  }
+                                  className="w-full rounded-lg border border-amber-400/10 bg-[#090b17]/90 px-3.5 py-2.5 font-mono text-sm text-amber-100 outline-none transition-all hover:border-amber-400/20 focus:border-amber-400/40 focus:ring-2 focus:ring-amber-500/10"
+                                />
+                              </div>
+
+                              <div className="rounded-xl border border-emerald-400/[0.10] bg-emerald-500/[0.02] p-3.5">
+                                <div className="mb-3 flex items-center gap-2">
+                                  <span className="size-2 rounded-full bg-emerald-300/80" />
+
+                                  <span className="text-[9px] font-semibold uppercase tracking-[0.13em] text-emerald-200/70">
+                                    Recovery
+                                  </span>
+                                </div>
+
+                                <input
+                                  id="recovery-samples"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={recoverySamplesInput}
+                                  onChange={(event) =>
+                                    setRecoverySamplesInput(
+                                      event.target.value,
+                                    )
+                                  }
+                                  className="w-full rounded-lg border border-emerald-400/10 bg-[#090b17]/90 px-3.5 py-2.5 font-mono text-sm text-emerald-100 outline-none transition-all hover:border-emerald-400/20 focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-500/10"
+                                />
+                              </div>
                             </div>
-                          )}
+
+                            {!historicalConfigurationValid && (
+                              <div className="mt-4 rounded-lg border border-red-400/10 bg-red-500/[0.04] px-3.5 py-3 text-[11px] leading-5 text-red-300">
+                                Degradation must be greater than zero.
+                                Plateau and recovery must be zero or greater.
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
 
-                      <div className="mt-6 rounded-lg border border-white/8 bg-black/15 p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <div className="text-xs font-semibold text-white">
-                              Configuration status
+                      <div
+                        className={[
+                          'relative mt-6 overflow-hidden rounded-xl border p-4',
+                          configurationReady
+                            ? 'border-emerald-400/[0.12] bg-emerald-500/[0.025]'
+                            : 'border-white/[0.07] bg-white/[0.018]',
+                        ].join(' ')}
+                      >
+                        {configurationReady && (
+                          <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-emerald-300/80 via-cyan-400/30 to-transparent" />
+                        )}
+
+                        <div className="flex items-center justify-between gap-5">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={[
+                                'flex size-9 items-center justify-center rounded-lg border',
+                                configurationReady
+                                  ? 'border-emerald-400/15 bg-emerald-500/[0.07]'
+                                  : 'border-white/[0.07] bg-white/[0.02]',
+                              ].join(' ')}
+                            >
+                              <span
+                                className={[
+                                  'size-2 rounded-full',
+                                  configurationReady
+                                    ? 'bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,0.30)]'
+                                    : 'bg-slate-600',
+                                ].join(' ')}
+                              />
                             </div>
 
-                            <div className="mt-1 text-[11px] text-slate-500">
-                              {configurationReady
-                                ? 'Run configuration is valid and ready for execution.'
-                                : 'Complete the required configuration before execution.'}
+                            <div>
+                              <div className="text-[9px] font-semibold uppercase tracking-[0.15em] text-slate-500">
+                                Configuration State
+                              </div>
+
+                              <div className="mt-1 text-sm font-semibold text-white">
+                                {configurationReady
+                                  ? 'Ready for execution'
+                                  : 'Configuration incomplete'}
+                              </div>
+
+                              <div className="mt-1 text-[11px] text-slate-500">
+                                {configurationReady
+                                  ? 'Selected capabilities and parameters are compatible.'
+                                  : 'Complete the required configuration before execution.'}
+                              </div>
                             </div>
                           </div>
 
                           <div
                             className={[
-                              'rounded-full border px-3 py-1',
-                              'text-[10px] font-semibold',
-                              'uppercase tracking-[0.10em]',
+                              'rounded-lg border px-3 py-1.5',
+                              'text-[9px] font-semibold',
+                              'uppercase tracking-[0.14em]',
                               configurationReady
                                 ? [
                                     'border-emerald-400/15',
@@ -906,8 +1164,8 @@ export function RunConfigurationPage() {
                                     'text-emerald-300',
                                   ].join(' ')
                                 : [
-                                    'border-slate-600/30',
-                                    'bg-white/[0.025]',
+                                    'border-white/[0.07]',
+                                    'bg-white/[0.02]',
                                     'text-slate-500',
                                   ].join(' '),
                             ].join(' ')}
@@ -918,70 +1176,111 @@ export function RunConfigurationPage() {
                       </div>
 
                       {startRunRequest && (
-                        <details className="mt-4 rounded-lg border border-violet-400/10 bg-black/10">
-                          <summary className="cursor-pointer px-4 py-3 text-[11px] font-medium text-violet-300">
-                            Request preview
+                        <details className="group mt-3 overflow-hidden rounded-xl border border-violet-400/[0.08] bg-violet-500/[0.018]">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className="flex size-7 items-center justify-center rounded-md border border-violet-400/10 bg-violet-500/[0.05] font-mono text-[10px] text-violet-300">
+                                {'{ }'}
+                              </div>
+
+                              <div>
+                                <div className="text-[10px] font-semibold text-violet-100">
+                                  Request Preview
+                                </div>
+
+                                <div className="mt-0.5 text-[9px] text-slate-600">
+                                  Canonical Start Run request
+                                </div>
+                              </div>
+                            </div>
+
+                            <span className="text-xs text-violet-300/60 transition-transform group-open:rotate-90">
+                              →
+                            </span>
                           </summary>
 
-                          <pre className="overflow-x-auto border-t border-white/6 px-4 py-4 font-mono text-[11px] leading-5 text-slate-400">
-                            {JSON.stringify(startRunRequest, null, 2)}
+                          <pre className="max-h-72 overflow-auto border-t border-white/[0.06] bg-[#090b17]/70 px-4 py-4 font-mono text-[11px] leading-5 text-slate-400">
+                            {JSON.stringify(
+                              startRunRequest,
+                              null,
+                              2,
+                            )}
                           </pre>
                         </details>
                       )}
 
-                      <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/8 pt-5">
-                        <div>
-                          <div className="text-xs font-semibold text-white">
-                            Execute Run
+                      <div className="relative mt-5 overflow-hidden rounded-xl border border-violet-400/[0.10] bg-gradient-to-r from-violet-500/[0.055] via-indigo-500/[0.025] to-cyan-500/[0.018] p-4">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-violet-300/80 to-cyan-400/20" />
+
+                        <div className="flex flex-wrap items-center justify-between gap-5">
+                          <div>
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-300/65">
+                              Execution Control
+                            </div>
+
+                            <div className="mt-1.5 text-sm font-semibold text-white">
+                              Start synthetic run
+                            </div>
+
+                            <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                              Submit the validated configuration to the
+                              StreamOps control plane.
+                            </p>
                           </div>
 
-                          <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                            Submit this configuration to the StreamOps control
-                            plane.
-                          </p>
-                        </div>
+                          <button
+                            type="button"
+                            disabled={
+                              !startRunRequest ||
+                              startingRun ||
+                              activeRun?.status === 'running'
+                            }
+                            onClick={() => {
+                              void handleStartRun()
+                            }}
+                            className={[
+                              'group relative overflow-hidden rounded-xl px-5 py-3',
+                              'text-xs font-semibold transition-all duration-200',
+                              !startRunRequest ||
+                              startingRun ||
+                              activeRun?.status === 'running'
+                                ? [
+                                    'cursor-not-allowed',
+                                    'border border-white/[0.06]',
+                                    'bg-white/[0.025]',
+                                    'text-slate-600',
+                                  ].join(' ')
+                                : [
+                                    'border border-violet-400/25',
+                                    'bg-gradient-to-r',
+                                    'from-violet-600/90',
+                                    'via-purple-500/85',
+                                    'to-indigo-500/80',
+                                    'text-white',
+                                    'shadow-[0_12px_35px_rgba(124,58,237,0.22)]',
+                                    'hover:-translate-y-0.5',
+                                    'hover:shadow-[0_16px_40px_rgba(124,58,237,0.28)]',
+                                  ].join(' '),
+                            ].join(' ')}
+                          >
+                            <span className="relative flex items-center gap-3">
+                              <span>
+                                {startingRun
+                                  ? 'Starting...'
+                                  : activeRun?.status === 'running'
+                                    ? 'Run Active'
+                                    : 'Start Run'}
+                              </span>
 
-                        <button
-                          type="button"
-                          disabled={
-                            !startRunRequest ||
-                            startingRun ||
-                            activeRun?.status === 'running'
-                          }
-                          onClick={() => {
-                            void handleStartRun()
-                          }}
-                          className={[
-                            'rounded-lg px-5 py-2.5',
-                            'text-xs font-semibold',
-                            'transition-all duration-200',
-                            !startRunRequest ||
-                            startingRun ||
-                            activeRun?.status === 'running'
-                              ? [
-                                  'cursor-not-allowed',
-                                  'border border-white/6',
-                                  'bg-white/[0.025]',
-                                  'text-slate-600',
-                                ].join(' ')
-                              : [
-                                  'border border-violet-400/25',
-                                  'bg-gradient-to-r',
-                                  'from-violet-600/80',
-                                  'to-purple-500/70',
-                                  'text-white',
-                                  'shadow-[0_10px_30px_rgba(124,58,237,0.20)]',
-                                  'hover:from-violet-500/90',
-                                  'hover:to-purple-500/80',
-                                ].join(' '),
-                          ].join(' ')}
-                        >
-                          {startingRun
-                            ? 'Starting...'
-                            : activeRun?.status === 'running'
-                              ? 'Run Active'
-                              : 'Start Run'}
-                        </button>
+                              {!startingRun &&
+                                activeRun?.status !== 'running' && (
+                                  <span className="text-violet-100/70">
+                                    →
+                                  </span>
+                                )}
+                            </span>
+                          </button>
+                        </div>
                       </div>
 
                       {executionError && (
@@ -991,14 +1290,14 @@ export function RunConfigurationPage() {
                       )}
 
                       {activeRun && (
-                        <div className="mt-6 overflow-hidden rounded-lg border border-violet-400/15 bg-[#0b0914] shadow-[0_12px_40px_rgba(49,16,101,0.12)]">
-                          <div className="flex items-center justify-between gap-4 border-b border-white/8 bg-white/[0.02] px-5 py-4">
+                        <div className="mt-6 overflow-hidden rounded-xl border border-violet-400/15 bg-[#0b0914] shadow-[0_14px_45px_rgba(2,6,23,0.22)]">
+                          <div className="flex items-center justify-between gap-4 border-b border-white/[0.07] bg-white/[0.02] px-5 py-4">
                             <div>
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-400/80">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-300/70">
                                 Live Execution
                               </div>
 
-                              <div className="mt-1 flex items-center gap-2">
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
                                 <span className="font-mono text-sm font-semibold text-white">
                                   {activeRun.run_id}
                                 </span>
@@ -1029,9 +1328,9 @@ export function RunConfigurationPage() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-px bg-white/6 sm:grid-cols-4">
-                            <div className="bg-[#0b0914]/90 p-4">
-                              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
+                          <div className="grid grid-cols-2 gap-px bg-white/[0.06] sm:grid-cols-4">
+                            <div className="p-4">
+                              <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-600">
                                 Current State
                               </div>
 
@@ -1040,32 +1339,43 @@ export function RunConfigurationPage() {
                               </div>
                             </div>
 
-                            <div className="bg-[#0b0914]/90 p-4">
-                              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
+                            <div className="p-4">
+                              <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-600">
                                 Events
                               </div>
 
-                              <div className="mt-2 text-sm font-semibold text-white">
+                              <div className="mt-2 font-mono text-sm font-semibold text-cyan-200">
                                 {activeRun.event_count}
                               </div>
                             </div>
 
-                            <div className="bg-[#0b0914]/90 p-4">
-                              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
+                            <div className="p-4">
+                              <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-600">
                                 Started
                               </div>
 
-                              <div className="mt-2 text-sm font-semibold text-white">
-                                {formatRunTime(activeRun.started_at)}
+                              <div className="mt-2 font-mono text-xs font-medium text-slate-200">
+                                {formatRunTime(
+                                  activeRun.started_at,
+                                )}
                               </div>
                             </div>
 
-                            <div className="bg-[#0b0914]/90 p-4">
-                              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
+                            <div className="p-4">
+                              <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-600">
                                 Validation
                               </div>
 
-                              <div className="mt-2 text-sm font-semibold text-white">
+                              <div
+                                className={[
+                                  'mt-2 text-sm font-semibold',
+                                  activeRun.validation_passed === true
+                                    ? 'text-emerald-300'
+                                    : activeRun.validation_passed === false
+                                      ? 'text-red-300'
+                                      : 'text-slate-300',
+                                ].join(' ')}
+                              >
                                 {activeRun.validation_passed === null
                                   ? activeRun.status === 'running'
                                     ? 'Pending'
@@ -1078,34 +1388,61 @@ export function RunConfigurationPage() {
                           </div>
 
                           {activeRun.error_message && (
-                            <div className="border-t border-red-400/10 bg-red-500/[0.04] px-5 py-3 text-[11px] leading-5 text-red-300">
+                            <div className="border-t border-red-400/[0.10] bg-red-500/[0.04] px-5 py-3 text-[11px] leading-5 text-red-300">
                               {activeRun.error_message}
                             </div>
                           )}
 
-                          <div className="flex items-center justify-end gap-3 border-t border-white/8 px-5 py-4">
-                            {activeRun.status === 'running' && (
+                          <div className="relative flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] px-5 py-4">
+                            <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.12em] text-slate-600">
+                              <span
+                                className={[
+                                  'size-1.5 rounded-full',
+                                  activeRun.status === 'running'
+                                    ? 'bg-cyan-300'
+                                    : 'bg-slate-600',
+                                ].join(' ')}
+                              />
+
+                              {activeRun.status === 'running'
+                                ? 'Telemetry active'
+                                : 'Execution retained'}
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              {activeRun.status === 'running' && (
+                                <button
+                                  type="button"
+                                  disabled={stoppingRun}
+                                  onClick={() => {
+                                    void handleStopRun()
+                                  }}
+                                  className="rounded-lg border border-red-400/15 bg-red-500/[0.04] px-4 py-2.5 text-[10px] font-medium text-red-300 transition-all hover:border-red-400/25 hover:bg-red-500/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {stoppingRun
+                                    ? 'Stopping...'
+                                    : 'Stop Run'}
+                                </button>
+                              )}
+
                               <button
                                 type="button"
-                                disabled={stoppingRun}
-                                onClick={() => {
-                                  void handleStopRun()
-                                }}
-                                className="rounded-lg border border-red-400/15 bg-red-500/[0.04] px-4 py-2 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={() =>
+                                  navigate(
+                                    `/runs/${activeRun.run_id}`,
+                                  )
+                                }
+                                className="group rounded-lg border border-violet-400/15 bg-violet-500/[0.055] px-4 py-2.5 text-[10px] font-medium text-violet-100 transition-all hover:border-violet-400/25 hover:bg-violet-500/[0.10]"
                               >
-                                {stoppingRun ? 'Stopping...' : 'Stop Run'}
-                              </button>
-                            )}
+                                <span className="flex items-center gap-2">
+                                  Inspect Run
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                navigate(`/runs/${activeRun.run_id}`)
-                              }
-                              className="rounded-lg border border-violet-400/20 bg-violet-500/[0.07] px-4 py-2 text-[11px] font-medium text-violet-200 transition-colors hover:bg-violet-500/[0.12]"
-                            >
-                              Inspect Run →
-                            </button>
+                                  <span className="text-violet-300/60 transition-transform group-hover:translate-x-0.5">
+                                    →
+                                  </span>
+                                </span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )}

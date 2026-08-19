@@ -39,6 +39,9 @@ from synthetic_ops_generator.domain.enums import (
 from synthetic_ops_generator.events.envelope import (
     GeneratedEvent,
 )
+from synthetic_ops_generator.retention.query import (
+    EventActivityBucket,
+)
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
     ScenarioFamily,
@@ -767,4 +770,61 @@ class RunEventsResponse(BaseModel):
                 next_after_sequence_number
             ),
             events=list(events),
+        )
+
+
+EventActivityWindow = Literal[
+    "1h",
+    "6h",
+    "24h",
+    "7d",
+]
+
+
+class EventActivityBucketResponse(BaseModel):
+    started_at: datetime
+    event_count: int = Field(ge=0)
+
+    @classmethod
+    def from_bucket(
+        cls,
+        bucket: EventActivityBucket,
+    ) -> "EventActivityBucketResponse":
+        return cls(
+            started_at=bucket.started_at,
+            event_count=bucket.event_count,
+        )
+
+
+class EventActivityResponse(BaseModel):
+    window: EventActivityWindow
+
+    start_time: datetime
+    end_time: datetime
+
+    bucket_seconds: int = Field(gt=0)
+
+    buckets: list[EventActivityBucketResponse]
+
+    @classmethod
+    def from_activity(
+        cls,
+        *,
+        window: EventActivityWindow,
+        start_time: datetime,
+        end_time: datetime,
+        bucket_seconds: int,
+        buckets: tuple[EventActivityBucket, ...],
+    ) -> "EventActivityResponse":
+        return cls(
+            window=window,
+            start_time=start_time,
+            end_time=end_time,
+            bucket_seconds=bucket_seconds,
+            buckets=[
+                EventActivityBucketResponse.from_bucket(
+                    bucket
+                )
+                for bucket in buckets
+            ],
         )

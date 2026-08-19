@@ -3,7 +3,11 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from synthetic_ops_generator.events.envelope import GeneratedEvent
-from synthetic_ops_generator.retention.query import EventQuery
+from synthetic_ops_generator.retention.query import (
+    EventActivityBucket,
+    EventActivityQuery,
+    EventQuery,
+)
 
 
 class EventStore(ABC):
@@ -44,6 +48,13 @@ class EventStore(ABC):
         self,
         query: EventQuery,
     ) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def aggregate_event_activity(
+        self,
+        query: EventActivityQuery,
+    ) -> Sequence[EventActivityBucket]:
         raise NotImplementedError
 
     @abstractmethod

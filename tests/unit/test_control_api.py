@@ -1,5 +1,6 @@
 import time
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -7,6 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from synthetic_ops_generator.api.app import create_app
+from synthetic_ops_generator.api.routes import (
+    events as events_routes,
+)
 from synthetic_ops_generator.control.models import (
     RunStatus,
     StopRunResult,
@@ -1769,3 +1773,133 @@ def test_get_run_events_returns_404_for_unknown_run(
             "Run 'RUN9999999' was not found."
         )
     }
+
+
+def test_get_event_activity_returns_zero_filled_series(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/events/activity",
+        params={
+            "window": "1h",
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["window"] == "1h"
+    assert payload["bucket_seconds"] == 300
+
+    assert len(payload["buckets"]) == 12
+
+    assert {
+        bucket["event_count"]
+        for bucket in payload["buckets"]
+    } == {0}
+
+
+@pytest.mark.parametrize(
+    (
+        "window",
+        "expected_bucket_seconds",
+        "expected_bucket_count",
+    ),
+    [
+        ("1h", 300, 12),
+        ("6h", 1800, 12),
+        ("24h", 3600, 24),
+        ("7d", 21600, 28),
+    ],
+)
+def test_get_event_activity_supports_configured_windows(
+    client: TestClient,
+    window: str,
+    expected_bucket_seconds: int,
+    expected_bucket_count: int,
+) -> None:
+    response = client.get(
+        "/events/activity",
+        params={
+            "window": window,
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["window"] == window
+    assert (
+        payload["bucket_seconds"]
+        == expected_bucket_seconds
+    )
+    assert (
+        len(payload["buckets"])
+        == expected_bucket_count
+    )
+
+
+def test_get_event_activity_rejects_unknown_window(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/events/activity",
+        params={
+            "window": "30d",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_get_event_activity_includes_current_partial_bucket(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FrozenDateTime(datetime):
+        @classmethod
+        def now(
+            cls,
+            tz: object = None,
+        ) -> datetime:
+            return cls(
+                2026,
+                8,
+                19,
+                18,
+                17,
+                tzinfo=UTC,
+            )
+
+    monkeypatch.setattr(
+        events_routes,
+        "datetime",
+        FrozenDateTime,
+    )
+
+    response = client.get(
+        "/events/activity",
+        params={
+            "window": "1h",
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["start_time"] == (
+        "2026-08-19T17:20:00Z"
+    )
+    assert payload["end_time"] == (
+        "2026-08-19T18:20:00Z"
+    )
+    assert payload["bucket_seconds"] == 300
+
+    assert len(payload["buckets"]) == 12
+
+    assert payload["buckets"][-1]["started_at"] == (
+        "2026-08-19T18:15:00Z"
+    )

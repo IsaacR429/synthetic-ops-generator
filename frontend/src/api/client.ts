@@ -1,6 +1,8 @@
 import type {
   EnterpriseDetail,
   EnterpriseSummary,
+  EventActivityResponse,
+  EventActivityWindow,
   HealthResponse,
   ReplayRunResponse,
   RunEventQuery,
@@ -206,5 +208,17 @@ export function replayRun(
     {
       method: 'POST',
     },
+  )
+}
+
+export function getEventActivity(
+  window: EventActivityWindow = '24h',
+): Promise<EventActivityResponse> {
+  const searchParams = new URLSearchParams({
+    window,
+  })
+
+  return request<EventActivityResponse>(
+    `/events/activity?${searchParams.toString()}`,
   )
 }

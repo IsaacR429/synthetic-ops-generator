@@ -1,7 +1,7 @@
 import asyncio
 import sqlite3
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +11,11 @@ from synthetic_ops_generator.events.serialization import (
     serialize_generated_event,
 )
 from synthetic_ops_generator.retention.base import EventStore
-from synthetic_ops_generator.retention.query import EventQuery
+from synthetic_ops_generator.retention.query import (
+    EventActivityBucket,
+    EventActivityQuery,
+    EventQuery,
+)
 
 
 class SQLiteEventStore(EventStore):
@@ -109,6 +113,43 @@ class SQLiteEventStore(EventStore):
 
         return await asyncio.to_thread(
             self._count_events_sync,
+            query,
+        )
+
+    async def aggregate_event_activity(
+        self,
+        query: EventActivityQuery,
+    ) -> tuple[EventActivityBucket, ...]:
+        self._require_started()
+
+        if (
+            query.start_time.tzinfo is None
+            or query.start_time.utcoffset() is None
+        ):
+            raise ValueError(
+                "Event activity start time must be timezone-aware."
+            )
+
+        if (
+            query.end_time.tzinfo is None
+            or query.end_time.utcoffset() is None
+        ):
+            raise ValueError(
+                "Event activity end time must be timezone-aware."
+            )
+
+        if query.start_time >= query.end_time:
+            raise ValueError(
+                "Event activity start time must be before end time."
+            )
+
+        if query.bucket_seconds <= 0:
+            raise ValueError(
+                "Event activity bucket size must be greater than zero."
+            )
+
+        return await asyncio.to_thread(
+            self._aggregate_event_activity_sync,
             query,
         )
 
@@ -480,6 +521,62 @@ class SQLiteEventStore(EventStore):
             return 0
 
         return int(row[0])
+
+    def _aggregate_event_activity_sync(
+        self,
+        query: EventActivityQuery,
+    ) -> tuple[EventActivityBucket, ...]:
+        start_time = query.start_time.astimezone(UTC)
+        end_time = query.end_time.astimezone(UTC)
+
+        start_iso = start_time.isoformat()
+        end_iso = end_time.isoformat()
+
+        sql = """
+        SELECT
+            CAST(
+                (
+                    unixepoch(event_time, 'subsec')
+                    - unixepoch(?, 'subsec')
+                ) / ?
+                AS INTEGER
+            ) AS bucket_index,
+            COUNT(*)
+        FROM generated_events
+        WHERE event_time >= ?
+          AND event_time < ?
+        GROUP BY bucket_index
+        ORDER BY bucket_index ASC
+        """
+
+        with sqlite3.connect(
+            self._database_path
+        ) as connection:
+            rows = connection.execute(
+                sql,
+                (
+                    start_iso,
+                    query.bucket_seconds,
+                    start_iso,
+                    end_iso,
+                ),
+            ).fetchall()
+
+        return tuple(
+            EventActivityBucket(
+                started_at=(
+                    start_time
+                    + timedelta(
+                        seconds=(
+                            int(bucket_index)
+                            * query.bucket_seconds
+                        )
+                    )
+                ),
+                event_count=int(event_count),
+            )
+            for bucket_index, event_count in rows
+        )
 
     def _delete_before_sync(
         self,

@@ -8,6 +8,11 @@ from synthetic_ops_generator.publishers.base import EventPublisher
 from synthetic_ops_generator.publishers.memory import InMemoryPublisher
 from synthetic_ops_generator.replay.service import ReplayService
 from synthetic_ops_generator.retention.base import EventStore
+from synthetic_ops_generator.retention.query import (
+    EventActivityBucket,
+    EventActivityQuery,
+    EventQuery,
+)
 
 
 class FailingPublisher(EventPublisher):
@@ -32,9 +37,6 @@ class FailingPublisher(EventPublisher):
             )
 
         self.published.append(event)
-
-
-from synthetic_ops_generator.retention.query import EventQuery
 
 
 class RecordingEventStore(EventStore):
@@ -84,6 +86,12 @@ class RecordingEventStore(EventStore):
                 if event.run_id == query.run_id
             ]
         )
+
+    async def aggregate_event_activity(
+        self,
+        query: EventActivityQuery,
+    ) -> tuple[EventActivityBucket, ...]:
+        return ()
 
     async def delete_before(
         self,

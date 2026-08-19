@@ -22,6 +22,23 @@ function runStatusClasses(status: RunStatus): string {
   return classes[status]
 }
 
+function runStatusDotClasses(
+  status: RunStatus,
+): string {
+  const classes: Record<RunStatus, string> = {
+    running:
+      'bg-violet-300 shadow-[0_0_10px_rgba(196,181,253,0.35)]',
+    completed:
+      'bg-emerald-300',
+    failed:
+      'bg-red-300',
+    stopped:
+      'bg-amber-300',
+  }
+
+  return classes[status]
+}
+
 function formatRunTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
@@ -30,12 +47,92 @@ function formatRunTime(value: string): string {
   }).format(new Date(value))
 }
 
+interface RunStatusSummaryProps {
+  label: string
+  count: number
+  tone: 'violet' | 'emerald' | 'amber' | 'red'
+}
+
+const RUN_STATUS_TONES = {
+  violet: {
+    dot: 'bg-violet-300',
+    text: 'text-violet-100',
+    glow: 'from-violet-400/60',
+  },
+
+  emerald: {
+    dot: 'bg-emerald-300',
+    text: 'text-emerald-100',
+    glow: 'from-emerald-400/60',
+  },
+
+  amber: {
+    dot: 'bg-amber-300',
+    text: 'text-amber-100',
+    glow: 'from-amber-400/60',
+  },
+
+  red: {
+    dot: 'bg-red-300',
+    text: 'text-red-100',
+    glow: 'from-red-400/60',
+  },
+}
+
+function RunStatusSummary({
+  label,
+  count,
+  tone,
+}: RunStatusSummaryProps) {
+  const style = RUN_STATUS_TONES[tone]
+
+  return (
+    <div className="relative flex min-w-0 flex-1 items-center gap-3 px-4 py-3">
+      <div
+        className={`size-1.5 shrink-0 rounded-full ${style.dot}`}
+      />
+
+      <div className="min-w-0">
+        <div className="text-[9px] font-semibold uppercase tracking-[0.15em] text-slate-600">
+          {label}
+        </div>
+
+        <div
+          className={`mt-0.5 font-mono text-sm font-semibold ${style.text}`}
+        >
+          {count}
+        </div>
+      </div>
+
+      <div
+        className={`pointer-events-none absolute bottom-0 left-4 h-px w-10 bg-gradient-to-r ${style.glow} to-transparent`}
+      />
+    </div>
+  )
+}
+
 export function RunsPage() {
   const navigate = useNavigate()
 
   const [runs, setRuns] = useState<RunResponse[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+
+  const runningCount = runs.filter(
+    (run) => run.status === 'running',
+  ).length
+
+  const completedCount = runs.filter(
+    (run) => run.status === 'completed',
+  ).length
+
+  const stoppedCount = runs.filter(
+    (run) => run.status === 'stopped',
+  ).length
+
+  const failedCount = runs.filter(
+    (run) => run.status === 'failed',
+  ).length
 
   useEffect(() => {
     let active = true
@@ -88,6 +185,53 @@ export function RunsPage() {
       </div>
 
       <div className="mt-8">
+        {!loading && !error && runs.length > 0 && (
+          <div className="mb-4 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111428]/65 shadow-[0_12px_35px_rgba(2,6,23,0.14)]">
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+              <div>
+                <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-300/60">
+                  Operational State
+                </div>
+
+                <div className="mt-1 text-xs font-medium text-slate-300">
+                  Durable execution catalogue
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.12em] text-slate-600">
+                <span className="size-1.5 rounded-full bg-cyan-300/70" />
+                {runs.length} retained runs
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 divide-x divide-y divide-white/[0.05] sm:grid-cols-4 sm:divide-y-0">
+              <RunStatusSummary
+                label="Running"
+                count={runningCount}
+                tone="violet"
+              />
+
+              <RunStatusSummary
+                label="Completed"
+                count={completedCount}
+                tone="emerald"
+              />
+
+              <RunStatusSummary
+                label="Stopped"
+                count={stoppedCount}
+                tone="amber"
+              />
+
+              <RunStatusSummary
+                label="Failed"
+                count={failedCount}
+                tone="red"
+              />
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="rounded-xl border border-white/10 bg-slate-900/50 p-6 text-sm text-slate-400">
             Loading runs...
@@ -101,9 +245,10 @@ export function RunsPage() {
             No runs have been executed yet.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 backdrop-blur-md">
+          <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#111428]/70 shadow-[0_16px_45px_rgba(2,6,23,0.16)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-violet-400/55 via-cyan-400/20 to-transparent" />
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-white/10 bg-white/[0.02] text-xs font-semibold text-slate-400">
+              <thead className="border-b border-white/[0.07] bg-white/[0.018] text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">Run</th>
 
@@ -128,10 +273,20 @@ export function RunsPage() {
                   <tr
                     key={run.run_id}
                     onClick={() => navigate(`/runs/${run.run_id}`)}
-                    className="cursor-pointer text-slate-300 transition-colors hover:bg-white/[0.035]"
+                    className="group cursor-pointer text-slate-300 transition-all duration-150 hover:bg-gradient-to-r hover:from-violet-500/[0.035] hover:via-cyan-500/[0.018] hover:to-transparent"
                   >
-                    <td className="whitespace-nowrap px-4 py-4 font-mono text-xs text-violet-200">
-                      {run.run_id}
+                    <td className="whitespace-nowrap px-4 py-4">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={`size-1.5 shrink-0 rounded-full ${runStatusDotClasses(
+                            run.status,
+                          )}`}
+                        />
+
+                        <span className="font-mono text-[11px] font-medium text-violet-100 transition-colors group-hover:text-white">
+                          {run.run_id}
+                        </span>
+                      </div>
                     </td>
 
                     <td className="whitespace-nowrap px-4 py-4">
@@ -147,7 +302,25 @@ export function RunsPage() {
                     </td>
 
                     <td className="whitespace-nowrap px-4 py-4">
-                      {formatLabel(run.generation_lifecycle)}
+                      <span
+                        className={[
+                          'inline-flex rounded-md border px-2 py-1',
+                          'text-[10px] font-medium',
+                          run.generation_lifecycle === 'continuous'
+                            ? [
+                                'border-cyan-400/10',
+                                'bg-cyan-500/[0.035]',
+                                'text-cyan-100',
+                              ].join(' ')
+                            : [
+                                'border-white/[0.06]',
+                                'bg-white/[0.02]',
+                                'text-slate-300',
+                              ].join(' '),
+                        ].join(' ')}
+                      >
+                        {formatLabel(run.generation_lifecycle)}
+                      </span>
                     </td>
 
                     <td className="whitespace-nowrap px-4 py-4">
@@ -164,8 +337,10 @@ export function RunsPage() {
                       {formatRunTime(run.started_at)}
                     </td>
 
-                    <td className="whitespace-nowrap px-4 py-4 text-right font-mono text-xs">
-                      {run.event_count}
+                    <td className="whitespace-nowrap px-4 py-4 text-right">
+                      <span className="font-mono text-[11px] font-semibold text-cyan-100">
+                        {run.event_count ?? '—'}
+                      </span>
                     </td>
                   </tr>
                 ))}

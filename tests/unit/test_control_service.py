@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -29,6 +29,7 @@ from synthetic_ops_generator.core.sqlite_identifiers import (
     SQLiteIdFactory,
 )
 from synthetic_ops_generator.domain.enums import (
+    Environment,
     OperationalState,
     SourceDomain,
 )
@@ -2271,5 +2272,268 @@ async def test_query_run_events_requires_existing_run(
             )
 
     finally:
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_get_event_activity_zero_fills_missing_buckets(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+
+    start_time = datetime(
+        2026,
+        8,
+        13,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    first = GeneratedEvent(
+        event_id="EVT0000001",
+        event_type="metric.observed",
+        event_time=start_time + timedelta(minutes=2),
+        source_system="synthetic_observability",
+        source_domain=SourceDomain.METRIC,
+        scenario_id="BANK-01",
+        run_id="RUN0000001",
+        chg_id="CHG0000001",
+        business_stream="payments",
+        service="payment_service",
+        component="payment_api",
+        environment=Environment.PRODUCTION,
+        sequence_number=1,
+        data={},
+    )
+
+    second = GeneratedEvent(
+        event_id="EVT0000002",
+        event_type="metric.observed",
+        event_time=start_time + timedelta(minutes=12),
+        source_system="synthetic_observability",
+        source_domain=SourceDomain.METRIC,
+        scenario_id="BANK-02",
+        run_id="RUN0000002",
+        chg_id="CHG0000002",
+        business_stream="payments",
+        service="payment_service",
+        component="payment_api",
+        environment=Environment.PRODUCTION,
+        sequence_number=1,
+        data={},
+    )
+
+    try:
+        await store.append(first)
+        await store.append(second)
+
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        activity = await service.get_event_activity(
+            start_time=start_time,
+            end_time=start_time
+            + timedelta(minutes=15),
+            bucket_seconds=300,
+        )
+
+        assert [
+            bucket.started_at
+            for bucket in activity
+        ] == [
+            start_time,
+            start_time + timedelta(minutes=5),
+            start_time + timedelta(minutes=10),
+        ]
+
+        assert [
+            bucket.event_count
+            for bucket in activity
+        ] == [
+            1,
+            0,
+            1,
+        ]
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_get_event_activity_zero_fills_empty_window(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+
+    start_time = datetime(
+        2026,
+        8,
+        13,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        activity = await service.get_event_activity(
+            start_time=start_time,
+            end_time=start_time
+            + timedelta(minutes=15),
+            bucket_seconds=300,
+        )
+
+        assert [
+            bucket.started_at
+            for bucket in activity
+        ] == [
+            start_time,
+            start_time + timedelta(minutes=5),
+            start_time + timedelta(minutes=10),
+        ]
+
+        assert [
+            bucket.event_count
+            for bucket in activity
+        ] == [
+            0,
+            0,
+            0,
+        ]
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bucket_seconds",
+    [0, -1],
+)
+async def test_get_event_activity_rejects_non_positive_bucket_size(
+    tmp_path: Path,
+    bucket_seconds: int,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="bucket size must be greater than zero",
+        ):
+            await service.get_event_activity(
+                start_time=datetime(
+                    2026,
+                    8,
+                    13,
+                    10,
+                    0,
+                    tzinfo=UTC,
+                ),
+                end_time=datetime(
+                    2026,
+                    8,
+                    13,
+                    11,
+                    0,
+                    tzinfo=UTC,
+                ),
+                bucket_seconds=bucket_seconds,
+            )
+    finally:
+        await active_run_manager.shutdown()
         await run_store.stop()
         await store.stop()

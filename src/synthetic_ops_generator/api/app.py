@@ -7,6 +7,9 @@ from fastapi import FastAPI
 from synthetic_ops_generator.api.routes.enterprises import (
     router as enterprises_router,
 )
+from synthetic_ops_generator.api.routes.events import (
+    router as events_router,
+)
 from synthetic_ops_generator.api.routes.health import (
     router as health_router,
 )
@@ -187,6 +190,7 @@ def create_app(
     app.include_router(health_router)
     app.include_router(enterprises_router)
     app.include_router(scenarios_router)
+    app.include_router(events_router)
     app.include_router(runs_router)
 
     return app

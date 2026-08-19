@@ -541,35 +541,106 @@ export function EventInspectionPage() {
             {error}
           </div>
         ) : run && runEvents ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-5">
-              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
-                Run Status
+          <div className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#111428]/70 shadow-[0_14px_40px_rgba(2,6,23,0.14)]">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.06] px-5 py-3.5">
+              <div>
+                <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-300/60">
+                  Inspection Context
+                </div>
+
+                <div className="mt-1 flex items-center gap-2 text-xs text-slate-300">
+                  <span className="font-mono text-white">
+                    {run.run_id}
+                  </span>
+
+                  <span className="text-slate-600">
+                    ·
+                  </span>
+
+                  <span className="font-mono">
+                    {run.scenario_id}
+                  </span>
+                </div>
               </div>
 
-              <div className="mt-2 text-sm font-medium text-slate-200">
-                {run.status}
+              <div className="flex items-center gap-2">
+                <span
+                  className={[
+                    'size-1.5 rounded-full',
+                    run.status === 'running'
+                      ? 'bg-violet-300 shadow-[0_0_12px_rgba(196,181,253,0.35)]'
+                      : run.status === 'completed'
+                        ? 'bg-emerald-300'
+                        : run.status === 'stopped'
+                          ? 'bg-amber-300'
+                          : 'bg-red-300',
+                  ].join(' ')}
+                />
+
+                <span
+                  className={[
+                    'text-[9px] font-semibold uppercase tracking-[0.12em]',
+                    run.status === 'running'
+                      ? 'text-violet-200'
+                      : run.status === 'completed'
+                        ? 'text-emerald-300'
+                        : run.status === 'stopped'
+                          ? 'text-amber-300'
+                          : 'text-red-300',
+                  ].join(' ')}
+                >
+                  {run.status}
+                </span>
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-5">
-              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
-                Generated Events
+            <div className="grid grid-cols-1 divide-y divide-white/[0.05] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="relative px-5 py-4">
+                <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                  Run Status
+                </div>
+
+                <div className="mt-1.5 text-sm font-semibold capitalize text-slate-200">
+                  {run.status}
+                </div>
+
+                <div
+                  className={[
+                    'absolute bottom-0 left-5 h-px w-10 bg-gradient-to-r to-transparent',
+                    run.status === 'running'
+                      ? 'from-violet-400/70'
+                      : run.status === 'completed'
+                        ? 'from-emerald-400/70'
+                        : run.status === 'stopped'
+                          ? 'from-amber-400/70'
+                          : 'from-red-400/70',
+                  ].join(' ')}
+                />
               </div>
 
-              <div className="mt-2 font-mono text-lg text-slate-200">
-                {run.event_count}
-              </div>
-            </div>
+              <div className="relative px-5 py-4">
+                <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                  Generated Events
+                </div>
 
-            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-5">
-              <div className="text-[10px] uppercase tracking-[0.10em] text-slate-600">
-                Retained Events
+                <div className="mt-1.5 font-mono text-lg font-semibold text-cyan-100">
+                  {run.event_count ?? '—'}
+                </div>
+
+                <div className="absolute bottom-0 left-5 h-px w-10 bg-gradient-to-r from-cyan-400/70 to-transparent" />
               </div>
 
-              <div className="mt-2 font-mono text-lg text-slate-200">
-                {totalRetainedEventCount ??
-                  runEvents.retained_event_count}
+              <div className="relative px-5 py-4">
+                <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                  Retained Events
+                </div>
+
+                <div className="mt-1.5 font-mono text-lg font-semibold text-violet-100">
+                  {totalRetainedEventCount ??
+                    runEvents.retained_event_count}
+                </div>
+
+                <div className="absolute bottom-0 left-5 h-px w-10 bg-gradient-to-r from-violet-400/70 to-transparent" />
               </div>
             </div>
           </div>
@@ -580,91 +651,142 @@ export function EventInspectionPage() {
         )}
 
         {!loading && !error && runEvents && (
-          <div className="mt-6 rounded-xl border border-white/10 bg-slate-900/50 p-5">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <div>
-                <label
-                  htmlFor="source-domain-filter"
-                  className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                >
-                  Source Domain
-                </label>
+          <div className="mt-6 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111428]/65 shadow-[0_14px_40px_rgba(2,6,23,0.14)]">
+            {/* CONSOLE HEADER */}
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-6 items-center justify-center rounded-md border border-violet-400/20 bg-violet-500/10 font-mono text-xs font-medium text-violet-200">
+                  Q
+                </div>
 
-                <select
-                  id="source-domain-filter"
-                  value={selectedSourceDomain}
-                  onChange={(event) =>
-                    setSelectedSourceDomain(
-                      event.target.value as
-                        | SourceDomain
-                        | '',
-                    )
-                  }
-                  className="w-full rounded-lg border border-white/10 bg-[#0b0914] px-3 py-2.5 text-sm text-slate-200 focus:border-violet-400/40 focus:outline-none"
-                >
-                  <option value="">
-                    All Domains
-                  </option>
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-300/60">
+                    Event Query Console
+                  </div>
 
-                  {SOURCE_DOMAIN_OPTIONS.map(
-                    (option) => (
-                      <option
-                        key={option.value}
-                        value={option.value}
-                      >
-                        {option.label}
-                      </option>
-                    ),
-                  )}
-                </select>
+                  <div className="text-xs font-semibold text-white">
+                    Projection & Scope Filter
+                  </div>
+                </div>
               </div>
 
-              <FilterInput
-                id="source-system-filter"
-                label="Source System"
-                value={sourceSystemInput}
-                placeholder="e.g. synthetic_observability"
-                onChange={setSourceSystemInput}
-              />
-
-              <FilterInput
-                id="event-type-filter"
-                label="Event Type"
-                value={eventTypeInput}
-                placeholder="e.g. metric.observed"
-                onChange={setEventTypeInput}
-              />
-
-              <FilterInput
-                id="service-filter"
-                label="Service"
-                value={serviceInput}
-                placeholder="e.g. payment_service"
-                onChange={setServiceInput}
-              />
-
-              <FilterInput
-                id="component-filter"
-                label="Component"
-                value={componentInput}
-                placeholder="e.g. payment_api"
-                onChange={setComponentInput}
-              />
+              <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                <span className="size-1.5 rounded-full bg-cyan-300/80" />
+                Live index filtering
+              </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4">
-              <div className="text-xs text-slate-500">
-                {runEvents.retained_event_count}{' '}
-                {appliedQuery
-                  ? 'matching'
-                  : 'retained'}{' '}
-                event
-                {runEvents.retained_event_count === 1
-                  ? ''
-                  : 's'}
+            {/* INPUT GRID */}
+            <div className="p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div>
+                  <label
+                    htmlFor="source-domain-filter"
+                    className="mb-2 block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500"
+                  >
+                    Source Domain
+                  </label>
+
+                  <select
+                    id="source-domain-filter"
+                    value={selectedSourceDomain}
+                    onChange={(event) =>
+                      setSelectedSourceDomain(
+                        event.target.value as
+                          | SourceDomain
+                          | '',
+                      )
+                    }
+                    className="w-full rounded-lg border border-white/[0.08] bg-[#090b17] px-3 py-2 text-xs text-slate-200 transition-colors focus:border-violet-400/40 focus:outline-none"
+                  >
+                    <option value="">
+                      All Domains
+                    </option>
+
+                    {SOURCE_DOMAIN_OPTIONS.map(
+                      (option) => (
+                        <option
+                          key={option.value}
+                          value={option.value}
+                        >
+                          {option.label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </div>
+
+                <FilterInput
+                  id="source-system-filter"
+                  label="Source System"
+                  value={sourceSystemInput}
+                  placeholder="e.g. synthetic_observability"
+                  onChange={setSourceSystemInput}
+                />
+
+                <FilterInput
+                  id="event-type-filter"
+                  label="Event Type"
+                  value={eventTypeInput}
+                  placeholder="e.g. metric.observed"
+                  onChange={setEventTypeInput}
+                />
+
+                <FilterInput
+                  id="service-filter"
+                  label="Service"
+                  value={serviceInput}
+                  placeholder="e.g. payment_service"
+                  onChange={setServiceInput}
+                />
+
+                <FilterInput
+                  id="component-filter"
+                  label="Component"
+                  value={componentInput}
+                  placeholder="e.g. payment_api"
+                  onChange={setComponentInput}
+                />
+              </div>
+            </div>
+
+            {/* QUERY FOOTER */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.06] bg-[#0d1020]/35 px-5 py-3.5">
+              <div className="flex items-center gap-5">
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-600">
+                    Query Result
+                  </div>
+
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="font-mono text-sm font-semibold text-cyan-100">
+                      {runEvents.retained_event_count}
+                    </span>
+
+                    <span className="text-[10px] text-slate-500">
+                      retained events
+                    </span>
+                  </div>
+                </div>
+
+                {appliedQuery && (
+                  <div className="hidden h-8 w-px bg-white/[0.06] sm:block" />
+                )}
+
+                {appliedQuery && (
+                  <div className="hidden sm:block">
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-600">
+                      Query Mode
+                    </div>
+
+                    <div className="mt-1 text-[10px] font-medium text-violet-200">
+                      Projection filters · AND
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleClearFilters}
@@ -672,17 +794,23 @@ export function EventInspectionPage() {
                     !appliedQuery &&
                     !hasDraftFilters
                   }
-                  className="rounded-lg border border-white/10 px-4 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-lg border border-white/[0.07] bg-white/[0.015] px-4 py-2.5 text-[10px] font-medium text-slate-400 transition-all hover:border-white/[0.12] hover:bg-white/[0.035] hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-35"
                 >
-                  Clear Filters
+                  Clear
                 </button>
 
                 <button
                   type="button"
                   onClick={handleApplyFilters}
-                  className="rounded-lg border border-violet-400/20 bg-violet-500/[0.08] px-4 py-2 text-xs font-medium text-violet-200 transition-colors hover:bg-violet-500/[0.14]"
+                  className="group rounded-lg border border-violet-400/20 bg-gradient-to-r from-violet-500/[0.12] to-cyan-500/[0.05] px-4 py-2.5 text-[10px] font-semibold text-violet-100 transition-all hover:border-violet-400/30 hover:from-violet-500/[0.17] hover:to-cyan-500/[0.08]"
                 >
-                  Apply Filters
+                  <span className="flex items-center gap-2">
+                    Apply Query
+
+                    <span className="text-cyan-300/60 transition-transform group-hover:translate-x-0.5">
+                      →
+                    </span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -766,10 +894,9 @@ export function EventInspectionPage() {
                       const isExpanded =
                         expandedEventId === event.event_id
 
-                      const metric =
-                        event.source_domain === 'metric'
-                          ? getMetricPayload(event.data)
-                          : null
+                      const metric = getMetricPayload(
+                        event.data,
+                      )
 
                       return (
                         <Fragment key={event.event_id}>
