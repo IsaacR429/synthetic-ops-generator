@@ -34,6 +34,19 @@ def validate_topology(enterprise: Enterprise) -> None:
                 f"Component {component.component_id} references unknown service: {component.service_id}"
             )
 
+    ambiguous_node_ids = (
+        service_ids
+        & component_ids
+    )
+    if ambiguous_node_ids:
+        raise TopologyValidationError(
+            "Service and Component IDs must be globally "
+            "unique for dependency references: "
+            + ", ".join(
+                sorted(ambiguous_node_ids)
+            )
+        )
+
     site_ids = set()
     for site in enterprise.sites:
         if site.site_id in site_ids:
