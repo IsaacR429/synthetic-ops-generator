@@ -7,7 +7,12 @@ from synthetic_ops_generator.config.enterprise_loader import (
 )
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.core.randomness import SimulationRandom
+from synthetic_ops_generator.domain.enums import Environment
 from synthetic_ops_generator.generators.factory import GeneratorFactory
+from synthetic_ops_generator.generators.itsm import ITSMGenerator
+from synthetic_ops_generator.scenarios.context import (
+    ScenarioExecutionTarget,
+)
 from synthetic_ops_generator.generators.log import LogGenerator
 from synthetic_ops_generator.generators.metric import (
     MetricGenerator,
@@ -454,3 +459,133 @@ def test_generator_factory_builds_bank_04_capacity_scenario() -> None:
             generator._capacity_profile.profile_id
             == "critical_payment_capacity"
         )
+
+
+def test_generator_factory_uses_execution_target_service_for_metric_runtime() -> None:
+    scenario = load_scenario(
+        CONFIG_ROOT
+        / "scenarios"
+        / "banking"
+        / "BANK-01.yaml"
+    )
+    enterprise = load_enterprise_configuration(
+        CONFIG_ROOT
+        / "enterprises"
+        / "bank_alpha"
+    )
+    execution_target = ScenarioExecutionTarget(
+        business_stream="core_banking",
+        service="account_service",
+        component="account_database",
+        environment=Environment.PRODUCTION,
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Service account_service does not define "
+            "a Baseline profile"
+        ),
+    ):
+        GeneratorFactory(
+            config_root=CONFIG_ROOT
+        ).build(
+            scenario=scenario,
+            enterprise=enterprise,
+            ids=IdFactory(),
+            random_source=SimulationRandom(42),
+            event_history=[],
+            execution_target=execution_target,
+        )
+
+
+def test_generator_factory_rejects_unknown_execution_target_service() -> None:
+    scenario = load_scenario(
+        CONFIG_ROOT
+        / "scenarios"
+        / "banking"
+        / "BANK-01.yaml"
+    )
+    enterprise = load_enterprise_configuration(
+        CONFIG_ROOT
+        / "enterprises"
+        / "bank_alpha"
+    )
+    execution_target = ScenarioExecutionTarget(
+        business_stream="core_banking",
+        service="missing_service",
+        component=None,
+        environment=Environment.PRODUCTION,
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Execution target Service was not found "
+            "in Enterprise: missing_service"
+        ),
+    ):
+        GeneratorFactory(
+            config_root=CONFIG_ROOT
+        ).build(
+            scenario=scenario,
+            enterprise=enterprise,
+            ids=IdFactory(),
+            random_source=SimulationRandom(42),
+            event_history=[],
+            execution_target=execution_target,
+        )
+
+
+def test_generator_factory_keeps_itsm_on_declared_scenario_scope() -> None:
+    scenario = load_scenario(
+        CONFIG_ROOT
+        / "scenarios"
+        / "banking"
+        / "BANK-01.yaml"
+    )
+    enterprise = load_enterprise_configuration(
+        CONFIG_ROOT
+        / "enterprises"
+        / "bank_alpha"
+    )
+    itsm_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.ITSM
+    )
+    scenario = scenario.model_copy(
+        update={
+            "behaviours": [
+                itsm_behaviour,
+            ],
+        }
+    )
+    execution_target = ScenarioExecutionTarget(
+        business_stream="core_banking",
+        service="account_service",
+        component="account_database",
+        environment=Environment.PRODUCTION,
+    )
+    generators = GeneratorFactory(
+        config_root=CONFIG_ROOT
+    ).build(
+        scenario=scenario,
+        enterprise=enterprise,
+        ids=IdFactory(),
+        random_source=SimulationRandom(42),
+        event_history=[],
+        execution_target=execution_target,
+    )
+    assert len(generators) == 1
+    itsm_generator = generators[0]
+    assert isinstance(
+        itsm_generator,
+        ITSMGenerator,
+    )
+    assert (
+        itsm_generator._service_owner
+        == "payments_operations"
+    )
+    assert (
+        itsm_generator._component_ids
+        == scenario.target.component_ids
+    )

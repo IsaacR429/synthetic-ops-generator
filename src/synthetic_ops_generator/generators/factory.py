@@ -38,6 +38,9 @@ from synthetic_ops_generator.metrics.runtime import (
     MetricRuntimeConfiguration,
     resolve_metric_runtime_configuration,
 )
+from synthetic_ops_generator.scenarios.context import (
+    ScenarioExecutionTarget,
+)
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
     SourceDomain,
@@ -73,13 +76,24 @@ class GeneratorFactory:
         ids: IdFactory,
         random_source: SimulationRandom,
         event_history: Sequence[GeneratedEvent],
+        execution_target: ScenarioExecutionTarget | None = None,
     ) -> list[SourceGenerator]:
         generators: list[SourceGenerator] = []
 
-        service = self._find_service(
-            scenario=scenario,
+        scenario_service = self._find_service(
+            service_id=scenario.target.service_id,
             enterprise=enterprise,
+            target_label="Scenario target",
         )
+
+        runtime_service = scenario_service
+
+        if execution_target is not None:
+            runtime_service = self._find_service(
+                service_id=execution_target.service,
+                enterprise=enterprise,
+                target_label="Execution target",
+            )
 
         metric_runtime: (
             MetricRuntimeConfiguration | None
@@ -108,7 +122,7 @@ class GeneratorFactory:
         if has_metric_behaviour:
             metric_runtime = (
                 resolve_metric_runtime_configuration(
-                    service=service,
+                    service=runtime_service,
                     config_root=self._config_root,
                 )
             )
@@ -116,7 +130,7 @@ class GeneratorFactory:
         if has_capacity_behaviour:
             capacity_runtime = (
                 resolve_capacity_runtime_configuration(
-                    service=service,
+                    service=runtime_service,
                     config_root=self._config_root,
                 )
             )
@@ -127,7 +141,7 @@ class GeneratorFactory:
                     ITSMGenerator(
                         ids=ids,
                         behaviour=behaviour,
-                        service_owner=service.owner,
+                        service_owner=scenario_service.owner,
                         component_ids=scenario.target.component_ids,
                     )
                 )
@@ -262,14 +276,15 @@ class GeneratorFactory:
     @staticmethod
     def _find_service(
         *,
-        scenario: ScenarioDefinition,
+        service_id: str,
         enterprise: Enterprise,
+        target_label: str,
     ) -> Service:
         for service in enterprise.services:
-            if service.service_id == scenario.target.service_id:
+            if service.service_id == service_id:
                 return service
 
         raise ValueError(
-            "Scenario target Service was not found in Enterprise: "
-            f"{scenario.target.service_id}"
+            f"{target_label} Service was not found in Enterprise: "
+            f"{service_id}"
         )
