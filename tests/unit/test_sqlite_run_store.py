@@ -77,6 +77,37 @@ async def test_sqlite_run_store_round_trip(
 
 
 @pytest.mark.asyncio
+async def test_sqlite_run_store_round_trips_run_without_change(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+
+    try:
+        record = replace(
+            make_run_record(),
+            change_id=None,
+        )
+
+        await store.create(record)
+
+        stored = await store.get(
+            record.run_id
+        )
+
+        assert stored == record
+        assert stored is not None
+        assert stored.change_id is None
+
+    finally:
+        await store.stop()
+
+
+
+@pytest.mark.asyncio
 async def test_sqlite_run_store_round_trips_target_snapshot(
     tmp_path: Path,
 ) -> None:
@@ -535,18 +566,25 @@ async def test_sqlite_run_store_migrates_old_schema_without_execution_mode(
 
     try:
         with sqlite3.connect(database_path) as connection:
+            table_info = connection.execute(
+                "PRAGMA table_info(runs)"
+            ).fetchall()
             columns = {
                 str(row[1])
-                for row in connection.execute(
-                    "PRAGMA table_info(runs)"
-                ).fetchall()
+                for row in table_info
             }
+            change_id_column = next(
+                row
+                for row in table_info
+                if str(row[1]) == "change_id"
+            )
         assert "execution_mode" in columns
         assert "enterprise_id" in columns
         assert "business_stream_id" in columns
         assert "service_id" in columns
         assert "target_component_ids" in columns
         assert "target_environment" in columns
+        assert change_id_column[3] == 0
 
         stored = await store.get(
             "RUN0000001"
@@ -565,6 +603,24 @@ async def test_sqlite_run_store_migrates_old_schema_without_execution_mode(
         )
 
         assert stored.event_count == 32
+        assert stored.change_id == "CHG0000001"
+
+        non_change_record = replace(
+            make_run_record(),
+            run_id="RUN0000002",
+            change_id=None,
+        )
+
+        await store.create(
+            non_change_record
+        )
+
+        stored_non_change = await store.get(
+            "RUN0000002"
+        )
+
+        assert stored_non_change is not None
+        assert stored_non_change.change_id is None
 
     finally:
         await store.stop()

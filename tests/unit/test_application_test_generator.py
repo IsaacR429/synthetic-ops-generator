@@ -26,11 +26,12 @@ from synthetic_ops_generator.scenarios.models import (
 def build_context(
     *,
     state: OperationalState = OperationalState.OBSERVING,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="BANK-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -171,6 +172,42 @@ def test_application_events_share_correlation() -> None:
     assert {
         event.service for event in events
     } == {"payment_service"}
+
+
+def test_application_test_generator_supports_run_without_change() -> None:
+    context = build_context(
+        chg_id=None,
+    )
+
+    generator = ApplicationTestGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            context,
+        )
+    )
+
+    assert len(events) == 6
+
+    assert {
+        event.run_id
+        for event in events
+    } == {"RUN0000001"}
+
+    assert {
+        event.chg_id
+        for event in events
+    } == {None}
+
+    assert all(
+        event.data["test"]["chg_id"] is None
+        for event in events
+    )
+
 
 
 def test_passed_events_contain_executed_pass_result() -> None:

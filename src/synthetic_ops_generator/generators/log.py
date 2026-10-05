@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.core.randomness import SimulationRandom
 from synthetic_ops_generator.domain.operational_log import (
     LogSeverity,
     OperationalLog,
@@ -13,6 +14,11 @@ from synthetic_ops_generator.scenarios.context import ScenarioContext
 from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
+)
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    DEGRADATION_ERROR_LOGS,
+    NORMAL_OPERATIONAL_LOGS,
+    RECOVERY_OPERATIONAL_LOGS,
 )
 
 
@@ -136,6 +142,7 @@ class LogGenerator(SourceGenerator):
             ...,
         ]
         | None = None,
+        random_source: SimulationRandom | None = None,
     ) -> None:
         if behaviour.source != SourceDomain.LOG:
             raise ValueError(
@@ -147,9 +154,20 @@ class LogGenerator(SourceGenerator):
                 "LogGenerator requires at least one Log definition."
             )
 
+        if (
+            behaviour.continuous
+            and logs is None
+            and random_source is None
+        ):
+            raise ValueError(
+                "Continuous default Log generation "
+                "requires a SimulationRandom source."
+            )
+
         self._ids = ids
         self._behaviour = behaviour
         self._logs = logs
+        self._random = random_source
 
     def _definitions_for_profile(
         self,
@@ -159,25 +177,47 @@ class LogGenerator(SourceGenerator):
 
         if (
             self._behaviour.profile_id
-            == "normal_operational_logs"
+            == NORMAL_OPERATIONAL_LOGS
         ):
             return DEFAULT_NORMAL_LOGS
 
         if (
             self._behaviour.profile_id
-            == "degradation_error_logs"
+            == DEGRADATION_ERROR_LOGS
         ):
             return DEFAULT_DEGRADATION_LOGS
 
         if (
             self._behaviour.profile_id
-            == "recovery_operational_logs"
+            == RECOVERY_OPERATIONAL_LOGS
         ):
             return DEFAULT_RECOVERY_LOGS
 
         raise ValueError(
             "Unsupported Log behaviour profile: "
             f"{self._behaviour.profile_id}"
+        )
+
+    def _definitions_for_generation(
+        self,
+    ) -> tuple[LogDefinition, ...]:
+        definitions = self._definitions_for_profile()
+
+        if (
+            not self._behaviour.continuous
+            or self._logs is not None
+        ):
+            return definitions
+
+        if self._random is None:
+            raise RuntimeError(
+                "Continuous default Log generation "
+                "requires a SimulationRandom source."
+            )
+
+        return tuple(
+            self._random.choice(definitions)
+            for _ in range(len(definitions))
         )
 
     async def generate(
@@ -187,7 +227,7 @@ class LogGenerator(SourceGenerator):
         if context.scenario_state != self._behaviour.during_state:
             return
 
-        definitions = self._definitions_for_profile()
+        definitions = self._definitions_for_generation()
 
         for definition in definitions:
             component = (

@@ -15,7 +15,11 @@ class LogSeverity(StrEnum):
 
 class OperationalLog(BaseModel):
     log_id: str = Field(min_length=1)
-    chg_id: str = Field(min_length=1)
+    chg_id: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
 
     log_type: str = Field(min_length=1)
     severity: LogSeverity

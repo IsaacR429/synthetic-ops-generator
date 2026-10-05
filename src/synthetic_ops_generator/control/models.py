@@ -40,7 +40,7 @@ class RunTargetSnapshot:
 class RunRecord:
     run_id: str
     scenario_id: str
-    change_id: str
+    change_id: str | None
 
     status: RunStatus
 
@@ -80,7 +80,7 @@ class RunRecord:
 class RunStartResult:
     scenario_id: str
     run_id: str
-    change_id: str
+    change_id: str | None
     status: RunStatus
 
     execution_mode: RunExecutionMode = (
@@ -112,7 +112,7 @@ class StopRunResult:
 class RunExecutionResult:
     scenario_id: str
     run_id: str
-    change_id: str
+    change_id: str | None
 
     visited_states: tuple[str, ...]
 

@@ -1,0 +1,221 @@
+scenario_id: BANK-04
+
+name: Payment Capacity Saturation
+
+description: >
+  Simulates sustained transaction demand against the Bank Alpha
+  Payment Service until its configured capacity envelope is reached.
+  Throughput first enters capacity pressure, then reaches saturation,
+  Service health degrades, an operational Incident is created, and
+  both capacity and Service health subsequently recover without an
+  associated production Change.
+
+family: operational_degradation
+
+industry: banking
+
+target:
+  enterprise_id: bank_alpha
+  business_stream_id: payments
+  service_id: payment_service
+
+  component_ids:
+    - payment_api
+    - payment_database
+    - payment_worker
+
+  environment: production
+
+correlation:
+  change_required: false
+
+risk: high
+
+initial_conditions:
+  - Payment Service is operating normally.
+  - No production Change is associated with the capacity event.
+  - A valid operational baseline is available.
+  - Effective Service benchmark policy is available.
+  - Effective Service capacity profile is available.
+  - Operational monitoring is active.
+
+trigger:
+  source: metric
+
+  trigger_type: payment_capacity_saturation
+
+  description: >
+    Sustained payment transaction demand increases production
+    throughput until the configured Payment Service capacity envelope
+    enters pressure and subsequently reaches saturation.
+
+state_sequence:
+  - initialising
+  - normal
+  - warning
+  - degraded
+  - recovery
+  - completed
+
+behaviours:
+  - source: metric
+    during_state: normal
+    profile_id: healthy_baseline
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Payment Service health metrics initially remain within normal
+      operational behaviour.
+
+  - source: metric
+    during_state: warning
+    profile_id: capacity_pressure
+    selection:
+      metric_ids:
+        - throughput
+    description: >
+      Payment throughput reaches the configured capacity pressure
+      threshold.
+
+  - source: metric
+    during_state: warning
+    profile_id: operational_warning
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Service health metrics begin crossing warning thresholds as
+      sustained transaction demand places pressure on the Payment
+      Service.
+
+  - source: metric
+    during_state: degraded
+    profile_id: capacity_saturation
+    selection:
+      metric_ids:
+        - throughput
+    description: >
+      Payment throughput reaches the configured saturation threshold.
+
+  - source: metric
+    during_state: degraded
+    profile_id: operational_degradation
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Sustained capacity saturation drives blocking Service health
+      conditions.
+
+  - source: log
+    during_state: degraded
+    profile_id: degradation_error_logs
+    description: >
+      Operational logs expose request failures, processing delays,
+      dependency errors and degraded Service health during saturation.
+
+  - source: incident
+    during_state: degraded
+    profile_id: incident_created
+    description: >
+      An operational Incident is created for the capacity-saturated
+      Payment Service without Change correlation.
+
+  - source: metric
+    during_state: recovery
+    profile_id: capacity_recovery
+    selection:
+      metric_ids:
+        - throughput
+    continuous: true
+    description: >
+      Payment throughput returns to normal baseline behaviour below
+      the configured capacity pressure threshold.
+
+  - source: metric
+    during_state: recovery
+    profile_id: operational_recovery
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    continuous: true
+    description: >
+      Service health metrics recover as transaction pressure subsides.
+
+  - source: log
+    during_state: recovery
+    profile_id: recovery_operational_logs
+    continuous: true
+    description: >
+      Operational logs confirm restored request processing and Service
+      recovery after capacity pressure subsides.
+
+  - source: incident
+    during_state: recovery
+    profile_id: incident_resolved
+    description: >
+      The operational Incident is resolved after capacity and Service
+      health return to normal conditions.
+
+expected_result:
+  scenario_id: BANK-04
+
+  expected_outcome: successful
+
+  expected_blocking_conditions:
+    - saturated_payment_capacity
+    - blocking_operational_metrics
+
+  expected_evidence:
+    - healthy_operational_baseline
+    - capacity_pressure_observation
+    - capacity_saturation_observation
+    - degraded_operational_metrics
+    - degradation_logs
+    - incident_record
+    - capacity_recovery_observation
+    - recovery_observation
+    - recovery_logs
+    - incident_resolution
+
+  expected_root_cause: payment_capacity_saturation
+
+  expected_insight: >
+    Sustained transaction demand drove the Payment Service from
+    capacity pressure into saturation. Service health degraded under
+    the saturated load, an operational Incident was created, and both
+    capacity conditions and Service health subsequently recovered
+    without a production Change.
+
+assumptions:
+  - Payment Service benchmark and baseline configuration is valid.
+  - Payment Service capacity configuration is valid.
+  - Required enterprise and topology references exist.
+  - Throughput is evaluated using Service capacity context rather than
+    health benchmark classification.
+  - Capacity pressure and saturation thresholds are synthetic controlled
+    configuration values.
+  - Saturated capacity can produce blocking Service health conditions.
+  - Recovery throughput returns below the configured pressure threshold.
+  - Incident resolution applies to the same Incident created during degradation.
+  - No Change identifier is generated for this Scenario.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - banking
+  - payments
+  - capacity
+  - saturation
+  - operational_degradation
+  - incident
+  - recovery
+  - no_change

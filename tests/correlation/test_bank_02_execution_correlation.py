@@ -204,6 +204,7 @@ def test_bank_02_regression_rollback_recovery() -> None:
                 SourceDomain.LOG,
                 OperationalState.DEGRADED,
             ),
+            random_source=random_source,
         ),
         IncidentGenerator(
             ids=ids,
@@ -240,6 +241,7 @@ def test_bank_02_regression_rollback_recovery() -> None:
                 SourceDomain.LOG,
                 OperationalState.RECOVERY,
             ),
+            random_source=random_source,
         ),
         IncidentGenerator(
             ids=ids,

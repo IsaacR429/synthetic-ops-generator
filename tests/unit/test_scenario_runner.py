@@ -26,6 +26,7 @@ from synthetic_ops_generator.publishers.memory import (
 )
 from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
+    ScenarioCorrelation,
     ScenarioDefinition,
     ScenarioFamily,
     ScenarioTarget,
@@ -157,6 +158,40 @@ def test_runner_creates_scenario_context() -> None:
     assert context.simulation_time == start
     assert context.sequence_number == 0
     assert context.random_seed == 42
+
+
+def test_runner_creates_context_without_change_for_non_change_scenario(
+) -> None:
+    start = datetime(
+        2026,
+        8,
+        11,
+        10,
+        0,
+        tzinfo=UTC,
+    )
+
+    runner = ScenarioRunner(
+        ids=IdFactory(),
+        clock=ManualSimulationClock(start),
+    )
+
+    scenario = build_scenario().model_copy(
+        update={
+            "correlation": ScenarioCorrelation(
+                change_required=False,
+            )
+        }
+    )
+
+    context = runner.create_context(
+        scenario=scenario,
+        enterprise=build_enterprise(),
+        random_seed=42,
+    )
+
+    assert context.run_id == "RUN0000001"
+    assert context.chg_id is None
 
 
 def test_runner_creates_unique_run_and_change_ids() -> None:

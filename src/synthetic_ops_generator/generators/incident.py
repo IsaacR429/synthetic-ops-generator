@@ -14,6 +14,11 @@ from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    INCIDENT_CREATED,
+    INCIDENT_RESOLVED,
+    NO_INCIDENT,
+)
 
 
 @dataclass(frozen=True)
@@ -74,10 +79,10 @@ class IncidentGenerator(SourceGenerator):
         if context.scenario_state != self._behaviour.during_state:
             return
 
-        if self._behaviour.profile_id == "no_incident":
+        if self._behaviour.profile_id == NO_INCIDENT:
             return
 
-        if self._behaviour.profile_id == "incident_created":
+        if self._behaviour.profile_id == INCIDENT_CREATED:
             async for event in self._generate_incident_created(
                 context
             ):
@@ -85,7 +90,7 @@ class IncidentGenerator(SourceGenerator):
 
             return
 
-        if self._behaviour.profile_id == "incident_resolved":
+        if self._behaviour.profile_id == INCIDENT_RESOLVED:
             async for event in self._generate_incident_resolved(
                 context
             ):

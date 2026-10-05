@@ -76,6 +76,11 @@ behaviours:
   - source: metric
     during_state: normal
     profile_id: healthy_baseline
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
     description: >
       Pre-change operational Metrics remain within normal
       Service behaviour.
@@ -101,6 +106,11 @@ behaviours:
   - source: metric
     during_state: observing
     profile_id: healthy_post_change
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
     continuous: true
     description: >
       Post-change latency, error rate and availability remain

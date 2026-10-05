@@ -15,6 +15,10 @@ from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    APPROVED_CHANGE,
+    MISSING_REQUIRED_APPROVAL,
+)
 
 
 class ITSMGenerator(SourceGenerator):
@@ -66,7 +70,14 @@ class ITSMGenerator(SourceGenerator):
         if context.scenario_state != self._behaviour.during_state:
             return
 
-        if self._behaviour.profile_id == "approved_change":
+        if context.chg_id is None:
+            raise ValueError(
+                "ITSM generation requires "
+                "change correlation."
+            )
+
+        if self._behaviour.profile_id == APPROVED_CHANGE:
+
             async for event in self._generate_approved_change(
                 context
             ):
@@ -75,7 +86,7 @@ class ITSMGenerator(SourceGenerator):
 
         if (
             self._behaviour.profile_id
-            == "missing_required_approval"
+            == MISSING_REQUIRED_APPROVAL
         ):
             async for event in self._generate_missing_required_approval(
                 context

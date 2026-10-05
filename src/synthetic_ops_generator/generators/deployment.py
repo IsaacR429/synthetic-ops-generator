@@ -13,6 +13,11 @@ from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    FAILED_DEPLOYMENT,
+    SUCCESSFUL_DEPLOYMENT,
+    SUCCESSFUL_ROLLBACK,
+)
 
 
 class DeploymentGenerator(SourceGenerator):
@@ -60,14 +65,28 @@ class DeploymentGenerator(SourceGenerator):
         if context.scenario_state != self._behaviour.during_state:
             return
 
-        if self._behaviour.profile_id == "successful_deployment":
+        if context.chg_id is None:
+            raise ValueError(
+                "Deployment generation requires "
+                "change correlation."
+            )
+
+        if self._behaviour.profile_id == SUCCESSFUL_DEPLOYMENT:
+
             async for event in self._generate_successful_deployment(
                 context
             ):
                 yield event
             return
 
-        if self._behaviour.profile_id == "successful_rollback":
+        if self._behaviour.profile_id == FAILED_DEPLOYMENT:
+            async for event in self._generate_failed_deployment(
+                context
+            ):
+                yield event
+            return
+
+        if self._behaviour.profile_id == SUCCESSFUL_ROLLBACK:
             async for event in self._generate_successful_rollback(
                 context
             ):
@@ -144,6 +163,73 @@ class DeploymentGenerator(SourceGenerator):
             context=context,
             event_type="cicd.deployment.completed",
             deployment=completed,
+        )
+
+    async def _generate_failed_deployment(
+        self,
+        context: ScenarioContext,
+    ) -> AsyncIterator[GeneratedEvent]:
+        deployment_id = (
+            context.deployment_id
+            or self._ids.deployment_id()
+        )
+
+        context.deployment_id = deployment_id
+
+        created = Deployment(
+            deployment_id=deployment_id,
+            chg_id=context.chg_id,
+            artifact=self._artifact,
+            artifact_version=self._artifact_version,
+            service=context.service,
+            component=context.component,
+            status=DeploymentStatus.CREATED,
+        )
+
+        yield self._event(
+            context=context,
+            event_type="cicd.deployment.created",
+            deployment=created,
+        )
+
+        start_time = context.simulation_time
+
+        started = Deployment(
+            deployment_id=deployment_id,
+            chg_id=context.chg_id,
+            artifact=self._artifact,
+            artifact_version=self._artifact_version,
+            service=context.service,
+            component=context.component,
+            start_time=start_time,
+            status=DeploymentStatus.IN_PROGRESS,
+        )
+
+        yield self._event(
+            context=context,
+            event_type="cicd.deployment.started",
+            deployment=started,
+        )
+
+        completion_time = context.simulation_time
+
+        failed = Deployment(
+            deployment_id=deployment_id,
+            chg_id=context.chg_id,
+            artifact=self._artifact,
+            artifact_version=self._artifact_version,
+            service=context.service,
+            component=context.component,
+            start_time=start_time,
+            completion_time=completion_time,
+            status=DeploymentStatus.FAILED,
+            outcome=DeploymentOutcome.FAILED,
+        )
+
+        yield self._event(
+            context=context,
+            event_type="cicd.deployment.failed",
+            deployment=failed,
         )
 
     async def _generate_successful_rollback(

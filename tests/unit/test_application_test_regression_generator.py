@@ -32,11 +32,12 @@ BASE_TIME = datetime(
 def build_context(
     *,
     state: OperationalState = OperationalState.OBSERVING,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="TEST-APP-REGRESSION",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -175,3 +176,27 @@ def test_regression_requires_at_least_one_mandatory_test() -> None:
         match="Mandatory Test regression requires at least one mandatory Test",
     ):
         asyncio.run(execute())
+
+
+def test_mandatory_test_regression_requires_change_correlation_before_emitting() -> None:
+    context = build_context(
+        chg_id=None,
+    )
+    generator = ApplicationTestGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Mandatory Test regression requires "
+            "change correlation"
+        ),
+    ):
+        asyncio.run(
+            collect_events(
+                generator,
+                context,
+            )
+        )
+    assert context.sequence_number == 0

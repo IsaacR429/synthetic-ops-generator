@@ -3,8 +3,15 @@ import pytest
 from synthetic_ops_generator.config.enterprise_loader import (
     load_enterprise,
 )
+from synthetic_ops_generator.domain.enums import (
+    SourceDomain,
+)
 from synthetic_ops_generator.scenarios.loader import (
     load_scenario,
+)
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    FAILED_DEPLOYMENT,
+    REQUIRED_CHECK_FAILED,
 )
 from synthetic_ops_generator.scenarios.validator import (
     ScenarioValidationError,
@@ -31,6 +38,33 @@ def test_valid_bank_01_scenario() -> None:
         scenario,
         enterprise,
     )
+
+
+def test_valid_bank_03_operational_degradation_scenario() -> None:
+    enterprise = load_enterprise(
+        "config/enterprises/bank_alpha"
+    )
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-03.yaml"
+    )
+    validate_scenario_against_enterprise(
+        scenario,
+        enterprise,
+    )
+
+
+def test_valid_bank_04_capacity_saturation_scenario() -> None:
+    enterprise = load_enterprise(
+        "config/enterprises/bank_alpha"
+    )
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-04.yaml"
+    )
+    validate_scenario_against_enterprise(
+        scenario,
+        enterprise,
+    )
+
 
 
 def test_invalid_enterprise_reference_raises() -> None:
@@ -83,3 +117,106 @@ def test_component_from_wrong_service_raises() -> None:
             scenario,
             enterprise,
         )
+
+
+def test_invalid_behaviour_profile_for_source_raises() -> None:
+    enterprise, scenario = load_valid_objects()
+
+    deployment_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.DEPLOYMENT
+    )
+    deployment_behaviour.profile_id = "healthy_baseline"
+
+    with pytest.raises(
+        ScenarioValidationError,
+        match=(
+            "Unsupported behaviour profile "
+            "'healthy_baseline' for source 'deployment'"
+        ),
+    ):
+        validate_scenario_against_enterprise(
+            scenario,
+            enterprise,
+        )
+
+
+def test_failed_deployment_profile_is_supported() -> None:
+    enterprise, scenario = load_valid_objects()
+
+    deployment_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.DEPLOYMENT
+    )
+    deployment_behaviour.profile_id = FAILED_DEPLOYMENT
+
+    validate_scenario_against_enterprise(
+        scenario,
+        enterprise,
+    )
+
+
+def test_required_check_failed_profile_is_supported() -> None:
+    enterprise, scenario = load_valid_objects()
+
+    infrastructure_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.INFRASTRUCTURE_TEST
+    )
+    infrastructure_behaviour.profile_id = REQUIRED_CHECK_FAILED
+
+    validate_scenario_against_enterprise(
+        scenario,
+        enterprise,
+    )
+
+
+def test_capacity_pressure_metric_profile_is_supported() -> None:
+    enterprise, scenario = load_valid_objects()
+    metric_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.METRIC
+    )
+    metric_behaviour.profile_id = "capacity_pressure"
+    validate_scenario_against_enterprise(
+        scenario,
+        enterprise,
+    )
+
+
+def test_capacity_saturation_metric_profile_is_supported() -> None:
+    enterprise, scenario = load_valid_objects()
+
+    metric_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.METRIC
+    )
+
+    metric_behaviour.profile_id = "capacity_saturation"
+
+    validate_scenario_against_enterprise(
+        scenario,
+        enterprise,
+    )
+
+
+def test_capacity_recovery_metric_profile_is_supported() -> None:
+    enterprise, scenario = load_valid_objects()
+
+    metric_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.METRIC
+    )
+
+    metric_behaviour.profile_id = "capacity_recovery"
+
+    validate_scenario_against_enterprise(
+        scenario,
+        enterprise,
+    )

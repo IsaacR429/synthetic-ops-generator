@@ -42,6 +42,94 @@ class HistoricalScenarioRuntime:
     )
 
 
+def _resolve_historical_metric_ids(
+    *,
+    scenario: ScenarioDefinition,
+    metric_runtime: MetricRuntimeConfiguration,
+) -> tuple[str, ...]:
+    metric_ids: list[str] = []
+    for behaviour in scenario.behaviours:
+        if behaviour.source != SourceDomain.METRIC:
+            continue
+        selection = behaviour.selection
+        if (
+            selection is None
+            or selection.metric_ids is None
+        ):
+            metric_ids = list(
+                metric_runtime
+                .baseline_profile
+                .metrics
+            )
+            break
+        for metric_id in selection.metric_ids:
+            if metric_id not in metric_ids:
+                metric_ids.append(metric_id)
+
+    for metric_id in metric_ids:
+        if (
+            metric_id
+            not in metric_runtime.resolved_benchmarks
+        ):
+            raise ValueError(
+                "Historical execution currently "
+                "supports only benchmark-evaluable "
+                f"Metrics. Unsupported: {metric_id}"
+            )
+
+    return tuple(metric_ids)
+
+
+def _project_metric_runtime(
+    *,
+    metric_runtime: MetricRuntimeConfiguration,
+    metric_ids: tuple[str, ...],
+) -> MetricRuntimeConfiguration:
+    projected_baseline_metrics = {
+        metric_id: metric_runtime.baseline_profile.metrics[
+            metric_id
+        ]
+        for metric_id in metric_ids
+    }
+    projected_baseline = (
+        metric_runtime.baseline_profile.model_copy(
+            update={"metrics": projected_baseline_metrics}
+        )
+    )
+    projected_benchmarks = {
+        metric_id: metric_runtime.resolved_benchmarks[
+            metric_id
+        ]
+        for metric_id in metric_ids
+        if metric_id in metric_runtime.resolved_benchmarks
+    }
+    return MetricRuntimeConfiguration(
+        definitions=metric_runtime.definitions,
+        baseline_profile=projected_baseline,
+        resolved_benchmarks=projected_benchmarks,
+        benchmark_profile_id=(
+            metric_runtime.benchmark_profile_id
+        ),
+    )
+
+
+def _project_historical_profile(
+    *,
+    historical_profile: HistoricalBehaviourProfile,
+    metric_ids: tuple[str, ...],
+) -> HistoricalBehaviourProfile:
+    projected_responses = {
+        metric_id: historical_profile.metric_responses[
+            metric_id
+        ]
+        for metric_id in metric_ids
+        if metric_id in historical_profile.metric_responses
+    }
+    return historical_profile.model_copy(
+        update={"metric_responses": projected_responses}
+    )
+
+
 def build_historical_scenario_runtime(
     *,
     scenario: ScenarioDefinition,
@@ -96,6 +184,13 @@ def build_historical_scenario_runtime(
         )
     )
 
+    historical_metric_ids = (
+        _resolve_historical_metric_ids(
+            scenario=scenario,
+            metric_runtime=metric_runtime,
+        )
+    )
+
     historical_profile = (
         load_historical_behaviour_profile(
             metric_runtime.baseline_profile.profile_id,
@@ -103,6 +198,18 @@ def build_historical_scenario_runtime(
                 root
                 / "historical_profiles"
             ),
+        )
+    )
+
+    metric_runtime = _project_metric_runtime(
+        metric_runtime=metric_runtime,
+        metric_ids=historical_metric_ids,
+    )
+
+    historical_profile = (
+        _project_historical_profile(
+            historical_profile=historical_profile,
+            metric_ids=historical_metric_ids,
         )
     )
 

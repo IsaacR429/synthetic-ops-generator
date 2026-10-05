@@ -12,7 +12,7 @@ from synthetic_ops_generator.domain.enums import (
 class ScenarioContext(BaseModel):
     scenario_id: str
     run_id: str
-    chg_id: str
+    chg_id: str | None = None
 
     business_stream: str
     service: str

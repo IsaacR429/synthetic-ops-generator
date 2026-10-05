@@ -314,6 +314,7 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         LogGenerator(
             ids=ids,
             behaviour=log_behaviour,
+            random_source=random_source,
         ),
         IncidentGenerator(
             ids=ids,
@@ -591,9 +592,9 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         event.data["log"]["log_type"]
         for event in log_events
     ] == [
-        "request_accepted",
-        "request_completed",
         "service_health",
+        "request_accepted",
+        "request_accepted",
     ]
 
     incident_events = [

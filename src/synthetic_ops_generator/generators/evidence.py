@@ -11,6 +11,11 @@ from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    COMPLETE_VALIDATION_EVIDENCE,
+    INCOMPLETE_VALIDATION_EVIDENCE,
+    ROLLBACK_VALIDATION_EVIDENCE,
+)
 
 
 @dataclass(frozen=True)
@@ -170,19 +175,19 @@ class EvidenceGenerator(SourceGenerator):
 
         if (
             self._behaviour.profile_id
-            == "complete_validation_evidence"
+            == COMPLETE_VALIDATION_EVIDENCE
         ):
             return DEFAULT_COMPLETE_VALIDATION_EVIDENCE
 
         if (
             self._behaviour.profile_id
-            == "incomplete_validation_evidence"
+            == INCOMPLETE_VALIDATION_EVIDENCE
         ):
             return DEFAULT_INCOMPLETE_VALIDATION_EVIDENCE
 
         if (
             self._behaviour.profile_id
-            == "rollback_validation_evidence"
+            == ROLLBACK_VALIDATION_EVIDENCE
         ):
             return DEFAULT_ROLLBACK_VALIDATION_EVIDENCE
 
@@ -198,7 +203,14 @@ class EvidenceGenerator(SourceGenerator):
         if context.scenario_state != self._behaviour.during_state:
             return
 
+        if context.chg_id is None:
+            raise ValueError(
+                "Evidence generation requires "
+                "change correlation."
+            )
+
         definitions = self._definitions_for_profile()
+
 
         history = tuple(
             event

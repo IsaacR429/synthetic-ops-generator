@@ -100,6 +100,8 @@ def test_ui_can_discover_enterprises_and_scenarios(
     ] == {
         "BANK-01",
         "BANK-02",
+        "BANK-03",
+        "BANK-04",
         "BANK-07",
     }
 

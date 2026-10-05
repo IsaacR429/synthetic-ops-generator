@@ -26,11 +26,12 @@ from synthetic_ops_generator.scenarios.models import (
 def build_context(
     *,
     state: OperationalState = OperationalState.NORMAL,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="BANK-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -171,6 +172,40 @@ def test_infrastructure_events_share_correlation() -> None:
     assert {
         event.service for event in events
     } == {"payment_service"}
+
+
+def test_infrastructure_generator_supports_run_without_change() -> None:
+    generator = InfrastructureTestGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(
+                chg_id=None,
+            ),
+        )
+    )
+
+    assert len(events) == 6
+
+    assert {
+        event.run_id
+        for event in events
+    } == {"RUN0000001"}
+
+    assert {
+        event.chg_id
+        for event in events
+    } == {None}
+
+    assert {
+        event.data["test"]["chg_id"]
+        for event in events
+    } == {None}
+
 
 
 def test_passed_events_contain_executed_pass_result() -> None:
@@ -335,3 +370,134 @@ def test_generator_rejects_unknown_profile() -> None:
                 build_context(),
             )
         )
+
+
+def test_required_check_failure_generates_failed_result() -> None:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.INFRASTRUCTURE_TEST,
+        during_state=OperationalState.NORMAL,
+        profile_id="required_check_failed",
+    )
+
+    checks = (
+        InfrastructureCheckDefinition(
+            test_type="connectivity",
+            name="Service connectivity validation",
+            mandatory=True,
+        ),
+    )
+
+    generator = InfrastructureTestGenerator(
+        ids=IdFactory(),
+        behaviour=behaviour,
+        checks=checks,
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(),
+        )
+    )
+
+    assert len(events) == 2
+
+    assert events[0].event_type == "infrastructure_test.planned"
+    assert events[1].event_type == "infrastructure_test.failed"
+
+    planned = events[0].data["test"]
+    failed = events[1].data["test"]
+
+    assert planned["test_id"] == failed["test_id"]
+
+    assert failed["mandatory"] is True
+    assert failed["status"] == "executed"
+    assert failed["result"] == "failed"
+    assert failed["executed_at"] is not None
+    assert failed["failure_reason"]
+
+
+def test_required_check_failure_fails_only_first_mandatory_check() -> None:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.INFRASTRUCTURE_TEST,
+        during_state=OperationalState.NORMAL,
+        profile_id="required_check_failed",
+    )
+
+    generator = InfrastructureTestGenerator(
+        ids=IdFactory(),
+        behaviour=behaviour,
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(),
+        )
+    )
+
+    assert [
+        event.event_type for event in events
+    ] == [
+        "infrastructure_test.planned",
+        "infrastructure_test.failed",
+        "infrastructure_test.planned",
+        "infrastructure_test.passed",
+        "infrastructure_test.planned",
+        "infrastructure_test.passed",
+    ]
+
+    executed = events[1::2]
+
+    assert [
+        event.data["test"]["result"]
+        for event in executed
+    ] == [
+        "failed",
+        "passed",
+        "passed",
+    ]
+
+    assert executed[0].data["test"]["failure_reason"]
+    assert executed[1].data["test"]["failure_reason"] is None
+    assert executed[2].data["test"]["failure_reason"] is None
+
+
+def test_required_check_failure_rejects_no_mandatory_checks_before_emitting() -> None:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.INFRASTRUCTURE_TEST,
+        during_state=OperationalState.NORMAL,
+        profile_id="required_check_failed",
+    )
+
+    checks = (
+        InfrastructureCheckDefinition(
+            test_type="optional_probe",
+            name="Optional infrastructure probe",
+            mandatory=False,
+        ),
+    )
+
+    generator = InfrastructureTestGenerator(
+        ids=IdFactory(),
+        behaviour=behaviour,
+        checks=checks,
+    )
+
+    context = build_context()
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "required_check_failed requires at least "
+            "one mandatory infrastructure check"
+        ),
+    ):
+        asyncio.run(
+            collect_events(
+                generator,
+                context,
+            )
+        )
+
+    assert context.sequence_number == 0

@@ -30,6 +30,10 @@ from synthetic_ops_generator.generators.manual_validation import (
     ManualValidationGenerator,
 )
 from synthetic_ops_generator.generators.metric import MetricGenerator
+from synthetic_ops_generator.capacity.runtime import (
+    CapacityRuntimeConfiguration,
+    resolve_capacity_runtime_configuration,
+)
 from synthetic_ops_generator.metrics.runtime import (
     MetricRuntimeConfiguration,
     resolve_metric_runtime_configuration,
@@ -37,6 +41,11 @@ from synthetic_ops_generator.metrics.runtime import (
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
     SourceDomain,
+)
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    CAPACITY_PRESSURE,
+    CAPACITY_RECOVERY,
+    CAPACITY_SATURATION,
 )
 
 
@@ -76,14 +85,37 @@ class GeneratorFactory:
             MetricRuntimeConfiguration | None
         ) = None
 
+        capacity_runtime: (
+            CapacityRuntimeConfiguration | None
+        ) = None
+
         has_metric_behaviour = any(
             behaviour.source == SourceDomain.METRIC
+            for behaviour in scenario.behaviours
+        )
+
+        has_capacity_behaviour = any(
+            behaviour.source == SourceDomain.METRIC
+            and behaviour.profile_id
+            in {
+                CAPACITY_PRESSURE,
+                CAPACITY_SATURATION,
+                CAPACITY_RECOVERY,
+            }
             for behaviour in scenario.behaviours
         )
 
         if has_metric_behaviour:
             metric_runtime = (
                 resolve_metric_runtime_configuration(
+                    service=service,
+                    config_root=self._config_root,
+                )
+            )
+
+        if has_capacity_behaviour:
+            capacity_runtime = (
+                resolve_capacity_runtime_configuration(
                     service=service,
                     config_root=self._config_root,
                 )
@@ -124,6 +156,22 @@ class GeneratorFactory:
                             metric_runtime.benchmark_profile_id
                         ),
                         random_source=random_source,
+                        metric_ids=(
+                            tuple(
+                                behaviour.selection.metric_ids
+                            )
+                            if (
+                                behaviour.selection is not None
+                                and behaviour.selection.metric_ids
+                                is not None
+                            )
+                            else None
+                        ),
+                        capacity_profile=(
+                            capacity_runtime.profile
+                            if capacity_runtime is not None
+                            else None
+                        ),
                     )
                 )
 
@@ -176,6 +224,7 @@ class GeneratorFactory:
                     LogGenerator(
                         ids=ids,
                         behaviour=behaviour,
+                        random_source=random_source,
                     )
                 )
 

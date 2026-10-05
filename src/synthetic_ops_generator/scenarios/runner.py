@@ -57,7 +57,11 @@ class ScenarioRunner:
         return ScenarioContext(
             scenario_id=scenario.scenario_id,
             run_id=self._ids.run_id(),
-            chg_id=self._ids.change_id(),
+            chg_id=(
+                self._ids.change_id()
+                if scenario.correlation.change_required
+                else None
+            ),
             business_stream=scenario.target.business_stream_id,
             service=scenario.target.service_id,
             component=self._default_component(scenario),

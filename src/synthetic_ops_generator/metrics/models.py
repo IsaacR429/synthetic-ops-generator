@@ -16,6 +16,12 @@ class MetricClassification(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
+class MetricEvaluationStatus(StrEnum):
+    EVALUATED = "evaluated"
+    CONTEXT_REQUIRED = "context_required"
+
+
+
 class MetricDefinition(BaseModel):
     metric_definition_id: str = Field(min_length=1)
 

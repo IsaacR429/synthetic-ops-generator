@@ -5,6 +5,8 @@ from pydantic import ValidationError
 
 from synthetic_ops_generator.domain.operational_test import (
     OperationalTest,
+    TestCategory,
+    TestExecutionStatus,
 )
 from synthetic_ops_generator.domain.operational_test import (
     TestCategory as Category,
@@ -15,6 +17,7 @@ from synthetic_ops_generator.domain.operational_test import (
 from synthetic_ops_generator.domain.operational_test import (
     TestResult as Result,
 )
+
 
 
 def test_valid_planned_infrastructure_test() -> None:
@@ -218,3 +221,26 @@ def test_test_rejects_naive_timestamp() -> None:
             status=ExecutionStatus.PLANNED,
             planned_at=naive_timestamp,
         )
+
+
+def test_operational_test_allows_no_change_correlation() -> None:
+    test = OperationalTest(
+        test_id="TST0000001",
+        chg_id=None,
+        category=TestCategory.INFRASTRUCTURE,
+        test_type="service_health",
+        name="Service health validation",
+        service="payment_service",
+        component="payment_api",
+        mandatory=True,
+        status=TestExecutionStatus.PLANNED,
+        planned_at=datetime(
+            2026,
+            10,
+            2,
+            20,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+    assert test.chg_id is None

@@ -23,7 +23,9 @@ from synthetic_ops_generator.domain.enterprise import (
 from synthetic_ops_generator.metrics.models import (
     MetricCatalogue,
     MetricDefinition,
+    MetricDirection,
 )
+
 
 
 @dataclass(frozen=True)
@@ -110,10 +112,16 @@ def resolve_metric_runtime_configuration(
         )
 
         if base_policy is None:
+            if (
+                definition.direction
+                == MetricDirection.CONTEXT_DEPENDENT
+            ):
+                continue
             raise ValueError(
                 "Benchmark profile does not define Metric: "
                 f"{metric_id}"
             )
+
 
         resolved_benchmarks[
             metric_id

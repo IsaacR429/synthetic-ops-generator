@@ -7,7 +7,8 @@ services:
     criticality: critical
     workload_class: interactive_transactional
     benchmark_profile_id: critical_interactive_transaction
-    baseline_profile_id: critical_interactive_nominal
+    baseline_profile_id: payment_processing_nominal
+    capacity_profile_id: critical_payment_capacity
 
   - service_id: identity_service
     name: Identity Service

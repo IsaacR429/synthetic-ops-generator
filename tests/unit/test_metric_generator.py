@@ -12,6 +12,11 @@ from synthetic_ops_generator.benchmarks.models import (
     BenchmarkSourceType,
     ResolvedBenchmark,
 )
+from synthetic_ops_generator.capacity.models import (
+    CapacityDirection,
+    CapacityMetricEnvelope,
+    CapacityProfile,
+)
 from synthetic_ops_generator.core.clock import (
     ManualSimulationClock,
 )
@@ -32,16 +37,22 @@ from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    CAPACITY_PRESSURE,
+    CAPACITY_RECOVERY,
+    CAPACITY_SATURATION,
+)
 
 
 def build_context(
     *,
     state: OperationalState = OperationalState.NORMAL,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="BANK-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -181,6 +192,7 @@ def build_generator(
     behaviour: ScenarioBehaviour | None = None,
     random_seed: int = 42,
     noise: bool = False,
+    metric_ids: tuple[str, ...] | None = None,
 ) -> MetricGenerator:
     return MetricGenerator(
         ids=IdFactory(),
@@ -200,6 +212,7 @@ def build_generator(
         random_source=SimulationRandom(
             random_seed
         ),
+        metric_ids=metric_ids,
     )
 
 
@@ -634,3 +647,856 @@ def test_recovered_values_use_resolved_reference_targets() -> None:
         "error_rate": 0.10,
         "availability": 99.99,
     }
+
+
+def test_metric_generator_advances_random_sequence_between_cycles() -> None:
+    generator = build_generator(
+        random_seed=123,
+        noise=True,
+    )
+
+    context = build_context()
+
+    first = asyncio.run(
+        collect_events(
+            generator,
+            context,
+        )
+    )
+
+    second = asyncio.run(
+        collect_events(
+            generator,
+            context,
+        )
+    )
+
+    first_values = [
+        event.data["metric"]["observed_value"]
+        for event in first
+    ]
+
+    second_values = [
+        event.data["metric"]["observed_value"]
+        for event in second
+    ]
+
+    assert first_values != second_values
+
+
+def test_metric_generation_differs_for_different_seeds() -> None:
+    first = asyncio.run(
+        collect_events(
+            build_generator(
+                random_seed=123,
+                noise=True,
+            ),
+            build_context(),
+        )
+    )
+
+    second = asyncio.run(
+        collect_events(
+            build_generator(
+                random_seed=456,
+                noise=True,
+            ),
+            build_context(),
+        )
+    )
+
+    first_values = [
+        event.data["metric"]["observed_value"]
+        for event in first
+    ]
+
+    second_values = [
+        event.data["metric"]["observed_value"]
+        for event in second
+    ]
+
+    assert first_values != second_values
+
+
+def test_operational_degradation_supports_run_without_change() -> None:
+    context = build_context(
+        state=OperationalState.DEGRADED,
+        chg_id=None,
+    )
+    behaviour = build_behaviour(
+        profile_id="operational_degradation",
+        state=OperationalState.DEGRADED,
+    )
+    events = asyncio.run(
+        collect_events(
+            build_generator(
+                behaviour=behaviour,
+            ),
+            context,
+        )
+    )
+    assert len(events) == 3
+    assert {
+        event.chg_id
+        for event in events
+    } == {None}
+    assert {
+        event.data["metric"]["classification"]
+        for event in events
+    } == {"blocking"}
+    assert {
+        event.data["metric"]["behaviour_profile_id"]
+        for event in events
+    } == {"operational_degradation"}
+
+
+def test_operational_recovery_supports_run_without_change() -> None:
+    context = build_context(
+        state=OperationalState.RECOVERY,
+        chg_id=None,
+    )
+    behaviour = build_behaviour(
+        profile_id="operational_recovery",
+        state=OperationalState.RECOVERY,
+    )
+    events = asyncio.run(
+        collect_events(
+            build_generator(
+                behaviour=behaviour,
+            ),
+            context,
+        )
+    )
+    assert len(events) == 3
+    assert {
+        event.chg_id
+        for event in events
+    } == {None}
+    assert {
+        event.data["metric"]["classification"]
+        for event in events
+    } == {"normal"}
+    assert {
+        event.data["metric"]["behaviour_profile_id"]
+        for event in events
+    } == {"operational_recovery"}
+    values = {
+        event.data["metric"]["metric_definition_id"]:
+        event.data["metric"]["observed_value"]
+        for event in events
+    }
+    assert values == {
+        "request_latency": 300.0,
+        "error_rate": 0.10,
+        "availability": 99.99,
+    }
+
+
+def test_operational_warning_uses_resolved_warning_thresholds() -> None:
+    behaviour = build_behaviour(
+        profile_id="operational_warning",
+        state=OperationalState.WARNING,
+    )
+    context = build_context(
+        state=OperationalState.WARNING,
+        chg_id=None,
+    )
+    events = asyncio.run(
+        collect_events(
+            build_generator(
+                behaviour=behaviour,
+            ),
+            context,
+        )
+    )
+    assert len(events) == 3
+    assert {
+        event.chg_id
+        for event in events
+    } == {None}
+    assert {
+        event.data["metric"]["classification"]
+        for event in events
+    } == {"warning"}
+    values = {
+        event.data["metric"]["metric_definition_id"]:
+        event.data["metric"]["observed_value"]
+        for event in events
+    }
+    assert values == {
+        "request_latency": 500.0,
+        "error_rate": 1.0,
+        "availability": 99.90,
+    }
+
+
+def test_healthy_context_metric_emits_context_required_evidence() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="capacity_nominal",
+        name="Capacity Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=800.0,
+                noise_stddev=0.0,
+                lower_bound=0.0,
+            ),
+        },
+    )
+    generator = MetricGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(
+            profile_id="healthy_baseline",
+            state=OperationalState.NORMAL,
+        ),
+        definitions=definitions,
+        baseline_profile=baseline_profile,
+        benchmarks={},
+        benchmark_profile_id=(
+            "critical_interactive_transaction"
+        ),
+        random_source=SimulationRandom(42),
+        metric_ids=("throughput",),
+    )
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(),
+        )
+    )
+    assert len(events) == 1
+    metric = events[0].data["metric"]
+    assert metric["metric_definition_id"] == "throughput"
+    assert metric["observed_value"] == 800.0
+    assert (
+        metric["evaluation_status"]
+        == "context_required"
+    )
+    assert metric["classification"] is None
+    assert metric["effective_benchmark"] is None
+
+
+def test_context_metric_rejects_threshold_driven_profile() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="capacity_nominal",
+        name="Capacity Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=800.0,
+                noise_stddev=0.0,
+                lower_bound=0.0,
+            ),
+        },
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Context-dependent Metric cannot use "
+            "threshold-driven behaviour"
+        ),
+    ):
+        MetricGenerator(
+            ids=IdFactory(),
+            behaviour=build_behaviour(
+                profile_id="operational_warning",
+                state=OperationalState.WARNING,
+            ),
+            definitions=definitions,
+            baseline_profile=baseline_profile,
+            benchmarks={},
+            benchmark_profile_id=(
+                "critical_interactive_transaction"
+            ),
+            random_source=SimulationRandom(42),
+            metric_ids=("throughput",),
+        )
+
+
+def test_capacity_pressure_generates_pressure_evidence() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    capacity_profile = CapacityProfile(
+        profile_id="critical_payment_capacity",
+        name="Critical Payment Capacity",
+        metrics={
+            "throughput": CapacityMetricEnvelope(
+                metric_definition_id="throughput",
+                direction=(
+                    CapacityDirection.HIGHER_IS_PRESSURE
+                ),
+                pressure_threshold=900.0,
+                saturation_threshold=1000.0,
+            ),
+        },
+    )
+    behaviour = build_behaviour(
+        profile_id=CAPACITY_PRESSURE,
+        state=OperationalState.WARNING,
+    )
+    generator = MetricGenerator(
+        ids=IdFactory(),
+        behaviour=behaviour,
+        definitions=definitions,
+        baseline_profile=baseline_profile,
+        benchmarks={},
+        benchmark_profile_id=(
+            "critical_interactive_transaction"
+        ),
+        random_source=SimulationRandom(42),
+        metric_ids=("throughput",),
+        capacity_profile=capacity_profile,
+    )
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(
+                state=OperationalState.WARNING,
+                chg_id=None,
+            ),
+        )
+    )
+    assert len(events) == 1
+    metric = events[0].data["metric"]
+    assert metric["observed_value"] == 900.0
+    assert metric["classification"] is None
+    assert (
+        metric["evaluation_status"]
+        == "context_required"
+    )
+    assert metric["capacity"]["classification"] == "pressure"
+    assert (
+        metric["capacity"]["capacity_profile_id"]
+        == "critical_payment_capacity"
+    )
+
+
+def test_capacity_pressure_requires_capacity_profile() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Capacity pressure behaviour requires "
+            "a Capacity profile"
+        ),
+    ):
+        MetricGenerator(
+            ids=IdFactory(),
+            behaviour=build_behaviour(
+                profile_id=CAPACITY_PRESSURE,
+                state=OperationalState.WARNING,
+            ),
+            definitions=definitions,
+            baseline_profile=baseline_profile,
+            benchmarks={},
+            benchmark_profile_id=(
+                "critical_interactive_transaction"
+            ),
+            random_source=SimulationRandom(42),
+            metric_ids=("throughput",),
+        )
+
+
+def test_capacity_pressure_requires_selected_metric_in_capacity_profile() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    capacity_profile = CapacityProfile(
+        profile_id="wrong_capacity",
+        name="Wrong Capacity",
+        metrics={
+            "remaining_capacity": CapacityMetricEnvelope(
+                metric_definition_id="remaining_capacity",
+                direction=(
+                    CapacityDirection.LOWER_IS_PRESSURE
+                ),
+                pressure_threshold=20.0,
+                saturation_threshold=10.0,
+            ),
+        },
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Capacity profile does not define Metric: "
+            "throughput"
+        ),
+    ):
+        MetricGenerator(
+            ids=IdFactory(),
+            behaviour=build_behaviour(
+                profile_id=CAPACITY_PRESSURE,
+                state=OperationalState.WARNING,
+            ),
+            definitions=definitions,
+            baseline_profile=baseline_profile,
+            benchmarks={},
+            benchmark_profile_id=(
+                "critical_interactive_transaction"
+            ),
+            random_source=SimulationRandom(42),
+            metric_ids=("throughput",),
+            capacity_profile=capacity_profile,
+        )
+
+
+def test_capacity_saturation_generates_saturated_evidence() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    capacity_profile = CapacityProfile(
+        profile_id="critical_payment_capacity",
+        name="Critical Payment Capacity",
+        metrics={
+            "throughput": CapacityMetricEnvelope(
+                metric_definition_id="throughput",
+                direction=(
+                    CapacityDirection.HIGHER_IS_PRESSURE
+                ),
+                pressure_threshold=900.0,
+                saturation_threshold=1000.0,
+            ),
+        },
+    )
+    behaviour = build_behaviour(
+        profile_id=CAPACITY_SATURATION,
+        state=OperationalState.DEGRADED,
+    )
+    generator = MetricGenerator(
+        ids=IdFactory(),
+        behaviour=behaviour,
+        definitions=definitions,
+        baseline_profile=baseline_profile,
+        benchmarks={},
+        benchmark_profile_id=(
+            "critical_interactive_transaction"
+        ),
+        random_source=SimulationRandom(42),
+        metric_ids=("throughput",),
+        capacity_profile=capacity_profile,
+    )
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(
+                state=OperationalState.DEGRADED,
+                chg_id=None,
+            ),
+        )
+    )
+    assert len(events) == 1
+    metric = events[0].data["metric"]
+    assert metric["observed_value"] == 1000.0
+    assert metric["classification"] is None
+    assert (
+        metric["evaluation_status"]
+        == "context_required"
+    )
+    assert (
+        metric["capacity"]["classification"]
+        == "saturated"
+    )
+    assert (
+        metric["capacity"]["capacity_profile_id"]
+        == "critical_payment_capacity"
+    )
+
+
+def test_capacity_saturation_requires_capacity_profile() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Capacity saturation behaviour requires "
+            "a Capacity profile"
+        ),
+    ):
+        MetricGenerator(
+            ids=IdFactory(),
+            behaviour=build_behaviour(
+                profile_id=CAPACITY_SATURATION,
+                state=OperationalState.DEGRADED,
+            ),
+            definitions=definitions,
+            baseline_profile=baseline_profile,
+            benchmarks={},
+            benchmark_profile_id=(
+                "critical_interactive_transaction"
+            ),
+            random_source=SimulationRandom(42),
+            metric_ids=("throughput",),
+        )
+
+
+def test_capacity_saturation_requires_selected_metric_in_capacity_profile() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    capacity_profile = CapacityProfile(
+        profile_id="wrong_capacity",
+        name="Wrong Capacity",
+        metrics={
+            "remaining_capacity": CapacityMetricEnvelope(
+                metric_definition_id="remaining_capacity",
+                direction=(
+                    CapacityDirection.LOWER_IS_PRESSURE
+                ),
+                pressure_threshold=20.0,
+                saturation_threshold=10.0,
+            ),
+        },
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Capacity profile does not define Metric: "
+            "throughput"
+        ),
+    ):
+        MetricGenerator(
+            ids=IdFactory(),
+            behaviour=build_behaviour(
+                profile_id=CAPACITY_SATURATION,
+                state=OperationalState.DEGRADED,
+            ),
+            definitions=definitions,
+            baseline_profile=baseline_profile,
+            benchmarks={},
+            benchmark_profile_id=(
+                "critical_interactive_transaction"
+            ),
+            random_source=SimulationRandom(42),
+            metric_ids=("throughput",),
+            capacity_profile=capacity_profile,
+        )
+
+
+def test_capacity_recovery_generates_normal_capacity_evidence() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    capacity_profile = CapacityProfile(
+        profile_id="critical_payment_capacity",
+        name="Critical Payment Capacity",
+        metrics={
+            "throughput": CapacityMetricEnvelope(
+                metric_definition_id="throughput",
+                direction=(
+                    CapacityDirection.HIGHER_IS_PRESSURE
+                ),
+                pressure_threshold=900.0,
+                saturation_threshold=1000.0,
+            ),
+        },
+    )
+    behaviour = build_behaviour(
+        profile_id=CAPACITY_RECOVERY,
+        state=OperationalState.RECOVERY,
+    )
+    generator = MetricGenerator(
+        ids=IdFactory(),
+        behaviour=behaviour,
+        definitions=definitions,
+        baseline_profile=baseline_profile,
+        benchmarks={},
+        benchmark_profile_id=(
+            "critical_interactive_transaction"
+        ),
+        random_source=SimulationRandom(42),
+        metric_ids=("throughput",),
+        capacity_profile=capacity_profile,
+    )
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(
+                state=OperationalState.RECOVERY,
+                chg_id=None,
+            ),
+        )
+    )
+    assert len(events) == 1
+    metric = events[0].data["metric"]
+    assert metric["observed_value"] == 700.0
+    assert metric["classification"] is None
+    assert (
+        metric["evaluation_status"]
+        == "context_required"
+    )
+    assert (
+        metric["capacity"]["classification"]
+        == "normal"
+    )
+    assert (
+        metric["capacity"]["capacity_profile_id"]
+        == "critical_payment_capacity"
+    )
+
+
+def test_capacity_recovery_requires_capacity_profile() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Capacity recovery behaviour requires "
+            "a Capacity profile"
+        ),
+    ):
+        MetricGenerator(
+            ids=IdFactory(),
+            behaviour=build_behaviour(
+                profile_id=CAPACITY_RECOVERY,
+                state=OperationalState.RECOVERY,
+            ),
+            definitions=definitions,
+            baseline_profile=baseline_profile,
+            benchmarks={},
+            benchmark_profile_id=(
+                "critical_interactive_transaction"
+            ),
+            random_source=SimulationRandom(42),
+            metric_ids=("throughput",),
+        )
+
+
+def test_capacity_recovery_requires_selected_metric_in_capacity_profile() -> None:
+    definitions = {
+        "throughput": MetricDefinition(
+            metric_definition_id="throughput",
+            name="Throughput",
+            unit="requests_per_second",
+            evaluation_statistic="rate",
+            direction=MetricDirection.CONTEXT_DEPENDENT,
+        ),
+    }
+    baseline_profile = BaselineProfile(
+        profile_id="payment_processing_nominal",
+        name="Payment Processing Nominal Baseline",
+        historical_window_minutes=30,
+        sample_interval_seconds=60,
+        metrics={
+            "throughput": MetricBaseline(
+                metric_definition_id="throughput",
+                center=700.0,
+                noise_stddev=0.0,
+            ),
+        },
+    )
+    capacity_profile = CapacityProfile(
+        profile_id="wrong_capacity",
+        name="Wrong Capacity",
+        metrics={
+            "remaining_capacity": CapacityMetricEnvelope(
+                metric_definition_id="remaining_capacity",
+                direction=(
+                    CapacityDirection.LOWER_IS_PRESSURE
+                ),
+                pressure_threshold=20.0,
+                saturation_threshold=10.0,
+            ),
+        },
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Capacity profile does not define Metric: "
+            "throughput"
+        ),
+    ):
+        MetricGenerator(
+            ids=IdFactory(),
+            behaviour=build_behaviour(
+                profile_id=CAPACITY_RECOVERY,
+                state=OperationalState.RECOVERY,
+            ),
+            definitions=definitions,
+            baseline_profile=baseline_profile,
+            benchmarks={},
+            benchmark_profile_id=(
+                "critical_interactive_transaction"
+            ),
+            random_source=SimulationRandom(42),
+            metric_ids=("throughput",),
+            capacity_profile=capacity_profile,
+        )

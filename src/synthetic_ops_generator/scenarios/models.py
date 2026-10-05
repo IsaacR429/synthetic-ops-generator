@@ -1,6 +1,12 @@
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from synthetic_ops_generator.domain.enums import (
     Environment,
@@ -34,6 +40,10 @@ class ScenarioTarget(BaseModel):
     environment: Environment
 
 
+class ScenarioCorrelation(BaseModel):
+    change_required: bool = True
+
+
 class ScenarioTrigger(BaseModel):
     source: SourceDomain
 
@@ -42,6 +52,36 @@ class ScenarioTrigger(BaseModel):
 
     artifact: str | None = None
     version: str | None = None
+
+
+ScenarioMetricId = Annotated[
+    str,
+    StringConstraints(
+        min_length=1,
+        pattern=r"^\S+$",
+    ),
+]
+
+
+class ScenarioMetricSelection(BaseModel):
+    metric_ids: list[ScenarioMetricId] | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+    @model_validator(mode="after")
+    def validate_unique_metric_ids(
+        self,
+    ) -> "ScenarioMetricSelection":
+        if (
+            self.metric_ids is not None
+            and len(self.metric_ids)
+            != len(set(self.metric_ids))
+        ):
+            raise ValueError(
+                "Metric selection cannot contain duplicate IDs."
+            )
+        return self
 
 
 class ScenarioBehaviour(BaseModel):
@@ -54,6 +94,24 @@ class ScenarioBehaviour(BaseModel):
     description: str | None = None
 
     continuous: bool = False
+
+    selection: ScenarioMetricSelection | None = None
+
+    @model_validator(mode="after")
+    def validate_selection_source(
+        self,
+    ) -> "ScenarioBehaviour":
+        if (
+            self.selection is not None
+            and self.selection.metric_ids is not None
+            and self.source != SourceDomain.METRIC
+        ):
+            raise ValueError(
+                "Metric selection is only valid for Metric behaviour."
+            )
+        return self
+
+
 
 
 class ScenarioIntervalFrequencyOverride(BaseModel):
@@ -101,6 +159,10 @@ class ScenarioDefinition(BaseModel):
     industry: Industry
 
     target: ScenarioTarget
+
+    correlation: ScenarioCorrelation = Field(
+        default_factory=ScenarioCorrelation
+    )
 
     risk: RiskLevel
 

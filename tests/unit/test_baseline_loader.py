@@ -61,3 +61,25 @@ def test_rejects_empty_profile_id() -> None:
             "",
             BASELINE_DIRECTORY,
         )
+
+
+def test_loads_payment_processing_baseline_with_throughput() -> None:
+    profile = load_baseline_profile(
+        "payment_processing_nominal",
+        BASELINE_DIRECTORY,
+    )
+    assert (
+        profile.profile_id
+        == "payment_processing_nominal"
+    )
+    assert set(profile.metrics) == {
+        "request_latency",
+        "error_rate",
+        "availability",
+        "throughput",
+    }
+    assert (
+        profile.metrics["throughput"]
+        .metric_definition_id
+        == "throughput"
+    )

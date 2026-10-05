@@ -11,6 +11,10 @@ from synthetic_ops_generator.history.scenario_runtime import (
 from synthetic_ops_generator.scenarios.loader import (
     load_scenario,
 )
+from synthetic_ops_generator.scenarios.models import (
+    ScenarioMetricSelection,
+    SourceDomain,
+)
 
 CONFIG_ROOT = Path("config")
 
@@ -34,7 +38,7 @@ CONFIG_ROOT = Path("config")
                 "bank_alpha"
             ),
             "payment_service",
-            "critical_interactive_nominal",
+            "payment_processing_nominal",
             "critical_interactive_transaction",
         ),
         (
@@ -112,6 +116,32 @@ def test_builds_real_historical_scenario_runtime(
         "availability",
     }
 
+    assert set(
+        runtime.metric_runtime
+        .baseline_profile.metrics
+    ) == {
+        "request_latency",
+        "error_rate",
+        "availability",
+    }
+
+    assert set(
+        runtime.historical_profile.metric_responses
+    ) == {
+        "request_latency",
+        "error_rate",
+        "availability",
+    }
+
+    assert set(
+        runtime.historical_runtime_profile
+        .metric_responses
+    ) == {
+        "request_latency",
+        "error_rate",
+        "availability",
+    }
+
 
 def test_historical_runtime_rejects_wrong_enterprise(
 ) -> None:
@@ -163,6 +193,59 @@ def test_historical_runtime_rejects_missing_target_service(
     with pytest.raises(
         ValueError,
         match="Scenario target Service was not found",
+    ):
+        build_historical_scenario_runtime(
+            scenario=modified_scenario,
+            enterprise=enterprise,
+            config_root=CONFIG_ROOT,
+        )
+
+
+def test_historical_runtime_rejects_contextual_metric_selection() -> None:
+    scenario = load_scenario(
+        "config/scenarios/banking/"
+        "BANK-02.yaml"
+    )
+    enterprise = (
+        load_enterprise_configuration(
+            "config/enterprises/"
+            "bank_alpha"
+        )
+    )
+    behaviours = list(
+        scenario.behaviours
+    )
+    metric_index = next(
+        index
+        for index, behaviour
+        in enumerate(behaviours)
+        if behaviour.source == SourceDomain.METRIC
+    )
+    behaviours[metric_index] = (
+        behaviours[metric_index].model_copy(
+            update={
+                "selection": (
+                    ScenarioMetricSelection(
+                        metric_ids=[
+                            "throughput"
+                        ]
+                    )
+                )
+            }
+        )
+    )
+    modified_scenario = scenario.model_copy(
+        update={
+            "behaviours": behaviours
+        }
+    )
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Historical execution currently "
+            "supports only benchmark-evaluable "
+            "Metrics.*throughput"
+        ),
     ):
         build_historical_scenario_runtime(
             scenario=modified_scenario,

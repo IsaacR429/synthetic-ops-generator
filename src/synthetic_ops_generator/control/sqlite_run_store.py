@@ -132,56 +132,7 @@ class SQLiteRunStore(RunStore):
         with sqlite3.connect(
             self._database_path
         ) as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS runs (
-                    run_id TEXT PRIMARY KEY,
-                    scenario_id TEXT NOT NULL,
-                    change_id TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    started_at TEXT NOT NULL,
-                    completed_at TEXT,
-                    current_state TEXT NOT NULL,
-                    event_count INTEGER NOT NULL
-                        CHECK(event_count >= 0),
-                    validation_passed INTEGER,
-                    random_seed INTEGER NOT NULL,
-                    event_interval_seconds REAL NOT NULL
-                        CHECK(event_interval_seconds > 0),
-                    error_message TEXT,
-                    execution_mode TEXT NOT NULL
-                        DEFAULT 'standard',
-                    historical_degradation_samples INTEGER
-                        CHECK(
-                            historical_degradation_samples IS NULL
-                            OR historical_degradation_samples > 0
-                        ),
-                    historical_plateau_samples INTEGER
-                        CHECK(
-                            historical_plateau_samples IS NULL
-                            OR historical_plateau_samples >= 0
-                        ),
-                    historical_recovery_samples INTEGER
-                        CHECK(
-                            historical_recovery_samples IS NULL
-                            OR historical_recovery_samples >= 0
-                        ),
-                    generation_lifecycle TEXT NOT NULL
-                        DEFAULT 'bounded',
-                    continuous_stop_mode TEXT,
-                    continuous_duration_seconds INTEGER
-                        CHECK(
-                            continuous_duration_seconds IS NULL
-                            OR continuous_duration_seconds > 0
-                        ),
-                    enterprise_id TEXT,
-                    business_stream_id TEXT,
-                    service_id TEXT,
-                    target_component_ids TEXT,
-                    target_environment TEXT
-                )
-                """
-            )
+            self._create_runs_table(connection)
 
             self._ensure_execution_mode_column(
                 connection
@@ -196,6 +147,10 @@ class SQLiteRunStore(RunStore):
             )
 
             self._ensure_target_snapshot_columns(
+                connection
+            )
+
+            self._ensure_nullable_change_id(
                 connection
             )
 
@@ -214,6 +169,61 @@ class SQLiteRunStore(RunStore):
                 ON runs (status)
                 """
             )
+
+    @staticmethod
+    def _create_runs_table(
+        connection: sqlite3.Connection,
+    ) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS runs (
+                run_id TEXT PRIMARY KEY,
+                scenario_id TEXT NOT NULL,
+                change_id TEXT,
+                status TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                current_state TEXT NOT NULL,
+                event_count INTEGER NOT NULL
+                    CHECK(event_count >= 0),
+                validation_passed INTEGER,
+                random_seed INTEGER NOT NULL,
+                event_interval_seconds REAL NOT NULL
+                    CHECK(event_interval_seconds > 0),
+                error_message TEXT,
+                execution_mode TEXT NOT NULL
+                    DEFAULT 'standard',
+                historical_degradation_samples INTEGER
+                    CHECK(
+                        historical_degradation_samples IS NULL
+                        OR historical_degradation_samples > 0
+                    ),
+                historical_plateau_samples INTEGER
+                    CHECK(
+                        historical_plateau_samples IS NULL
+                        OR historical_plateau_samples >= 0
+                    ),
+                historical_recovery_samples INTEGER
+                    CHECK(
+                        historical_recovery_samples IS NULL
+                        OR historical_recovery_samples >= 0
+                    ),
+                generation_lifecycle TEXT NOT NULL
+                    DEFAULT 'bounded',
+                continuous_stop_mode TEXT,
+                continuous_duration_seconds INTEGER
+                    CHECK(
+                        continuous_duration_seconds IS NULL
+                        OR continuous_duration_seconds > 0
+                    ),
+                enterprise_id TEXT,
+                business_stream_id TEXT,
+                service_id TEXT,
+                target_component_ids TEXT,
+                target_environment TEXT
+            )
+            """
+        )
 
     @staticmethod
     def _ensure_execution_mode_column(
@@ -416,6 +426,105 @@ class SQLiteRunStore(RunStore):
                 ADD COLUMN target_environment TEXT
                 """
             )
+
+    @staticmethod
+    def _ensure_nullable_change_id(
+        connection: sqlite3.Connection,
+    ) -> None:
+        table_info = connection.execute(
+            "PRAGMA table_info(runs)"
+        ).fetchall()
+
+        change_id_column = next(
+            (
+                row
+                for row in table_info
+                if str(row[1]) == "change_id"
+            ),
+            None,
+        )
+
+        if change_id_column is None:
+            raise RuntimeError(
+                "runs table is missing change_id column."
+            )
+
+        if int(change_id_column[3]) == 0:
+            return
+
+        connection.execute(
+            """
+            ALTER TABLE runs
+            RENAME TO runs_legacy_change_id
+            """
+        )
+
+        SQLiteRunStore._create_runs_table(
+            connection
+        )
+
+        connection.execute(
+            """
+            INSERT INTO runs (
+                run_id,
+                scenario_id,
+                change_id,
+                status,
+                started_at,
+                completed_at,
+                current_state,
+                event_count,
+                validation_passed,
+                random_seed,
+                event_interval_seconds,
+                error_message,
+                execution_mode,
+                historical_degradation_samples,
+                historical_plateau_samples,
+                historical_recovery_samples,
+                generation_lifecycle,
+                continuous_stop_mode,
+                continuous_duration_seconds,
+                enterprise_id,
+                business_stream_id,
+                service_id,
+                target_component_ids,
+                target_environment
+            )
+            SELECT
+                run_id,
+                scenario_id,
+                change_id,
+                status,
+                started_at,
+                completed_at,
+                current_state,
+                event_count,
+                validation_passed,
+                random_seed,
+                event_interval_seconds,
+                error_message,
+                execution_mode,
+                historical_degradation_samples,
+                historical_plateau_samples,
+                historical_recovery_samples,
+                generation_lifecycle,
+                continuous_stop_mode,
+                continuous_duration_seconds,
+                enterprise_id,
+                business_stream_id,
+                service_id,
+                target_component_ids,
+                target_environment
+            FROM runs_legacy_change_id
+            """
+        )
+
+        connection.execute(
+            """
+            DROP TABLE runs_legacy_change_id
+            """
+        )
 
     def _create_sync(
         self,
@@ -848,7 +957,11 @@ class SQLiteRunStore(RunStore):
         return RunRecord(
             run_id=str(row[0]),
             scenario_id=str(row[1]),
-            change_id=str(row[2]),
+            change_id=(
+                str(row[2])
+                if row[2] is not None
+                else None
+            ),
             status=RunStatus(str(row[3])),
             started_at=datetime.fromisoformat(
                 str(row[4])
@@ -985,7 +1098,10 @@ class SQLiteRunStore(RunStore):
                 "Scenario ID is required."
             )
 
-        if not record.change_id.strip():
+        if (
+            record.change_id is not None
+            and not record.change_id.strip()
+        ):
             raise ValueError(
                 "Change ID is required."
             )

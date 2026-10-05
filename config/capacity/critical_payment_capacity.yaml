@@ -1,0 +1,14 @@
+profile_id: critical_payment_capacity
+name: Critical Payment Capacity
+
+description: >
+  Synthetic capacity envelope for the mission-critical
+  payment processing service.
+
+metrics:
+
+  throughput:
+    metric_definition_id: throughput
+    direction: higher_is_pressure
+    pressure_threshold: 900
+    saturation_threshold: 1000

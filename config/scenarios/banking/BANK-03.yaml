@@ -1,0 +1,177 @@
+scenario_id: BANK-03
+
+name: Payment Authentication Failure Spike
+
+description: >
+  Simulates an operational degradation affecting the Bank Alpha
+  Payment Service without an associated production Change. Authentication
+  failures and degraded Service telemetry emerge during normal operations,
+  an operational Incident is created, and Service health subsequently
+  recovers.
+
+family: operational_degradation
+
+industry: banking
+
+target:
+  enterprise_id: bank_alpha
+  business_stream_id: payments
+  service_id: payment_service
+
+  component_ids:
+    - payment_api
+    - payment_database
+    - payment_worker
+
+  environment: production
+
+correlation:
+  change_required: false
+
+risk: high
+
+initial_conditions:
+  - Payment Service is operating normally.
+  - No production Change is associated with the degradation.
+  - A valid operational baseline is available.
+  - Effective Service benchmark policy is available.
+  - Operational monitoring is active.
+
+trigger:
+  source: metric
+
+  trigger_type: authentication_failure_spike
+
+  description: >
+    Authentication failures increase during normal production operations,
+    degrading Payment Service health independently of a deployment or
+    production Change.
+
+state_sequence:
+  - initialising
+  - normal
+  - warning
+  - degraded
+  - recovery
+  - completed
+
+behaviours:
+  - source: metric
+    during_state: normal
+    profile_id: healthy_baseline
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Payment Service metrics initially remain within normal operational
+      behaviour.
+
+  - source: metric
+    during_state: warning
+    profile_id: operational_warning
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Payment Service metrics cross warning thresholds as authentication
+      failures begin to affect normal production operations.
+
+  - source: metric
+    during_state: degraded
+    profile_id: operational_degradation
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Operational metrics reach blocking conditions during the
+      authentication failure spike.
+
+  - source: log
+    during_state: degraded
+    profile_id: degradation_error_logs
+    description: >
+      Operational logs expose request failures, dependency errors and
+      degraded Service health.
+
+  - source: incident
+    during_state: degraded
+    profile_id: incident_created
+    description: >
+      An operational Incident is created for the degraded Payment Service
+      without Change correlation.
+
+  - source: metric
+    during_state: recovery
+    profile_id: operational_recovery
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    continuous: true
+    description: >
+      Operational metrics return to normal Service reference targets
+      during recovery.
+
+  - source: log
+    during_state: recovery
+    profile_id: recovery_operational_logs
+    continuous: true
+    description: >
+      Operational logs confirm restored request processing and Service
+      recovery.
+
+  - source: incident
+    during_state: recovery
+    profile_id: incident_resolved
+    description: >
+      The operational Incident is resolved after Service health recovers.
+
+expected_result:
+  scenario_id: BANK-03
+
+  expected_outcome: successful
+
+  expected_blocking_conditions:
+    - blocking_operational_metrics
+
+  expected_evidence:
+    - healthy_operational_baseline
+    - degraded_operational_metrics
+    - degradation_logs
+    - incident_record
+    - recovery_observation
+    - recovery_logs
+    - incident_resolution
+
+  expected_root_cause: null
+
+  expected_insight: >
+    The Payment Service experienced an operational authentication-related
+    degradation independent of a production Change. Blocking operational
+    conditions and error evidence were observed, an Incident was created,
+    and Service health subsequently recovered.
+
+assumptions:
+  - Payment Service benchmark and baseline configuration is valid.
+  - Required enterprise and topology references exist.
+  - Blocking operational metrics represent degraded Service conditions.
+  - Recovery observations use effective reference targets.
+  - Incident resolution applies to the same Incident created during degradation.
+  - No Change identifier is generated for this Scenario.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - banking
+  - payments
+  - operational_degradation
+  - authentication
+  - incident
+  - recovery
+  - no_change

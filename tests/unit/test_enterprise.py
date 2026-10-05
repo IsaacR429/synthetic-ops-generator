@@ -27,3 +27,18 @@ def test_enterprise_collections_are_independent() -> None:
 
     assert len(first.services) == 1
     assert len(second.services) == 0
+
+
+def test_service_can_reference_capacity_profile() -> None:
+    service = Service(
+        service_id="SVC001",
+        name="Payment Service",
+        business_stream_id="payments",
+        owner="Payments Team",
+        criticality=Criticality.CRITICAL,
+        capacity_profile_id="critical_payment_capacity",
+    )
+    assert (
+        service.capacity_profile_id
+        == "critical_payment_capacity"
+    )

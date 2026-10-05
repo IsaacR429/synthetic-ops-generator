@@ -21,7 +21,11 @@ class TestResult(StrEnum):
 
 class OperationalTest(BaseModel):
     test_id: str = Field(min_length=1)
-    chg_id: str = Field(min_length=1)
+    chg_id: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
 
     category: TestCategory
 

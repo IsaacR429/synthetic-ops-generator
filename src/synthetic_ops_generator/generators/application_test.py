@@ -15,6 +15,10 @@ from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    ALL_MANDATORY_TESTS_PASS,
+    MANDATORY_TEST_REGRESSION,
+)
 
 
 @dataclass(frozen=True)
@@ -85,7 +89,7 @@ class ApplicationTestGenerator(SourceGenerator):
 
         if (
             self._behaviour.profile_id
-            == "all_mandatory_tests_pass"
+            == ALL_MANDATORY_TESTS_PASS
         ):
             async for event in self._generate_all_tests_pass(
                 context
@@ -96,7 +100,7 @@ class ApplicationTestGenerator(SourceGenerator):
 
         if (
             self._behaviour.profile_id
-            == "mandatory_test_regression"
+            == MANDATORY_TEST_REGRESSION
         ):
             async for event in (
                 self._generate_mandatory_test_regression(
@@ -163,6 +167,12 @@ class ApplicationTestGenerator(SourceGenerator):
         self,
         context: ScenarioContext,
     ) -> AsyncIterator[GeneratedEvent]:
+        if context.chg_id is None:
+            raise ValueError(
+                "Mandatory Test regression requires "
+                "change correlation."
+            )
+
         mandatory_tests = [
             definition
             for definition in self._tests

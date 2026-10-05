@@ -519,7 +519,7 @@ class StartRunRequest(BaseModel):
 class StartRunResponse(BaseModel):
     scenario_id: str
     run_id: str
-    change_id: str
+    change_id: str | None = None
     status: RunStatus
     execution_mode: RunExecutionMode
     generation_lifecycle: GenerationLifecycle
@@ -607,7 +607,7 @@ class RunTargetResponse(BaseModel):
 class RunResponse(BaseModel):
     run_id: str
     scenario_id: str
-    change_id: str
+    change_id: str | None = None
 
     status: RunStatus
     execution_mode: RunExecutionMode

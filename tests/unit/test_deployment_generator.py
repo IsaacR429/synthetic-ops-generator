@@ -20,11 +20,12 @@ from synthetic_ops_generator.scenarios.models import (
 def build_context(
     *,
     state: OperationalState = OperationalState.IMPLEMENTING,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="BANK-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -132,6 +133,37 @@ def test_deployment_events_share_run_and_change_correlation() -> None:
     assert {
         event.environment for event in events
     } == {Environment.PRODUCTION}
+
+
+def test_deployment_generator_rejects_run_without_change_before_emitting() -> None:
+    context = build_context(
+        chg_id=None,
+    )
+
+    generator = DeploymentGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+        artifact="payment-api",
+        artifact_version="2.5.0",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Deployment generation requires "
+            "change correlation"
+        ),
+    ):
+        asyncio.run(
+            collect_events(
+                generator,
+                context,
+            )
+        )
+
+    assert context.sequence_number == 0
+    assert context.deployment_id is None
+
 
 
 def test_deployment_events_use_canonical_identifiers_and_sequence() -> None:
@@ -299,3 +331,38 @@ def test_deployment_generator_rejects_unknown_profile() -> None:
                 build_context(),
             )
         )
+
+
+def test_failed_deployment_generates_failed_terminal_event() -> None:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.DEPLOYMENT,
+        during_state=OperationalState.IMPLEMENTING,
+        profile_id="failed_deployment",
+    )
+
+    generator = DeploymentGenerator(
+        ids=IdFactory(),
+        behaviour=behaviour,
+        artifact="payment-api",
+        artifact_version="2.5.0",
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(),
+        )
+    )
+
+    assert len(events) == 3
+
+    assert events[0].event_type == "cicd.deployment.created"
+    assert events[1].event_type == "cicd.deployment.started"
+    assert events[2].event_type == "cicd.deployment.failed"
+
+    failed = events[2].data["deployment"]
+
+    assert failed["status"] == "failed"
+    assert failed["outcome"] == "failed"
+    assert failed["start_time"] is not None
+    assert failed["completion_time"] is not None

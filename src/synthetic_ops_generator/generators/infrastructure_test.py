@@ -15,6 +15,10 @@ from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    ALL_REQUIRED_CHECKS_PASS,
+    REQUIRED_CHECK_FAILED,
+)
 
 
 @dataclass(frozen=True)
@@ -85,9 +89,19 @@ class InfrastructureTestGenerator(SourceGenerator):
 
         if (
             self._behaviour.profile_id
-            == "all_required_checks_pass"
+            == ALL_REQUIRED_CHECKS_PASS
         ):
             async for event in self._generate_all_checks_pass(
+                context
+            ):
+                yield event
+            return
+
+        if (
+            self._behaviour.profile_id
+            == REQUIRED_CHECK_FAILED
+        ):
+            async for event in self._generate_required_check_failed(
                 context
             ):
                 yield event
@@ -142,6 +156,90 @@ class InfrastructureTestGenerator(SourceGenerator):
             yield self._event(
                 context=context,
                 event_type="infrastructure_test.passed",
+                operational_test=executed,
+            )
+
+    async def _generate_required_check_failed(
+        self,
+        context: ScenarioContext,
+    ) -> AsyncIterator[GeneratedEvent]:
+        if not any(check.mandatory for check in self._checks):
+            raise ValueError(
+                "required_check_failed requires at least "
+                "one mandatory infrastructure check."
+            )
+
+        failure_emitted = False
+
+        for check in self._checks:
+            test_id = self._ids.test_id()
+
+            planned = OperationalTest(
+                test_id=test_id,
+                chg_id=context.chg_id,
+                category=TestCategory.INFRASTRUCTURE,
+                test_type=check.test_type,
+                name=check.name,
+                service=context.service,
+                component=context.component,
+                mandatory=check.mandatory,
+                status=TestExecutionStatus.PLANNED,
+                planned_at=context.simulation_time,
+            )
+
+            yield self._event(
+                context=context,
+                event_type="infrastructure_test.planned",
+                operational_test=planned,
+            )
+
+            should_fail = (
+                check.mandatory
+                and not failure_emitted
+            )
+
+            if should_fail:
+                executed = OperationalTest(
+                    test_id=test_id,
+                    chg_id=context.chg_id,
+                    category=TestCategory.INFRASTRUCTURE,
+                    test_type=check.test_type,
+                    name=check.name,
+                    service=context.service,
+                    component=context.component,
+                    mandatory=check.mandatory,
+                    status=TestExecutionStatus.EXECUTED,
+                    result=TestResult.FAILED,
+                    planned_at=planned.planned_at,
+                    executed_at=context.simulation_time,
+                    failure_reason=(
+                        "Required infrastructure check failed."
+                    ),
+                )
+
+                failure_emitted = True
+                event_type = "infrastructure_test.failed"
+            else:
+                executed = OperationalTest(
+                    test_id=test_id,
+                    chg_id=context.chg_id,
+                    category=TestCategory.INFRASTRUCTURE,
+                    test_type=check.test_type,
+                    name=check.name,
+                    service=context.service,
+                    component=context.component,
+                    mandatory=check.mandatory,
+                    status=TestExecutionStatus.EXECUTED,
+                    result=TestResult.PASSED,
+                    planned_at=planned.planned_at,
+                    executed_at=context.simulation_time,
+                )
+
+                event_type = "infrastructure_test.passed"
+
+            yield self._event(
+                context=context,
+                event_type=event_type,
                 operational_test=executed,
             )
 

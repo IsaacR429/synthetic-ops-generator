@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from synthetic_ops_generator.benchmarks.models import (
     ResolvedBenchmark,
 )
@@ -5,11 +7,18 @@ from synthetic_ops_generator.metrics.models import (
     MetricClassification,
     MetricDefinition,
     MetricDirection,
+    MetricEvaluationStatus,
 )
 
 
 class MetricEvaluationError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class MetricEvaluationResult:
+    status: MetricEvaluationStatus
+    classification: MetricClassification | None
 
 
 def classify_metric(
@@ -38,4 +47,37 @@ def classify_metric(
     raise MetricEvaluationError(
         f"Metric {definition.metric_definition_id} "
         "requires context-specific evaluation."
+    )
+
+
+def evaluate_metric(
+    *,
+    definition: MetricDefinition,
+    benchmark: ResolvedBenchmark | None,
+    observed_value: float,
+) -> MetricEvaluationResult:
+    if (
+        definition.direction
+        == MetricDirection.CONTEXT_DEPENDENT
+    ):
+        return MetricEvaluationResult(
+            status=(
+                MetricEvaluationStatus.CONTEXT_REQUIRED
+            ),
+            classification=None,
+        )
+
+    if benchmark is None:
+        raise MetricEvaluationError(
+            f"Metric {definition.metric_definition_id} "
+            "requires a resolved Benchmark for evaluation."
+        )
+
+    return MetricEvaluationResult(
+        status=MetricEvaluationStatus.EVALUATED,
+        classification=classify_metric(
+            definition,
+            benchmark,
+            observed_value,
+        ),
     )

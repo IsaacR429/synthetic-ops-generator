@@ -20,3 +20,25 @@ def test_invalid_state_transition() -> None:
 
     with pytest.raises(InvalidStateTransition):
         machine.transition(OperationalState.FAILURE)
+
+
+def test_normal_can_transition_directly_to_degraded() -> None:
+    machine = ScenarioStateMachine()
+    machine.transition(
+        OperationalState.NORMAL
+    )
+    machine.transition(
+        OperationalState.DEGRADED
+    )
+    assert machine.state == OperationalState.DEGRADED
+
+
+def test_normal_can_transition_to_warning() -> None:
+    machine = ScenarioStateMachine()
+    machine.transition(
+        OperationalState.NORMAL
+    )
+    machine.transition(
+        OperationalState.WARNING
+    )
+    assert machine.state == OperationalState.WARNING

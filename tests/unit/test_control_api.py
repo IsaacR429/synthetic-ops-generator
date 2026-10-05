@@ -8,10 +8,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from synthetic_ops_generator.api.app import create_app
+from synthetic_ops_generator.api.models import (
+    RunResponse,
+    StartRunResponse,
+)
 from synthetic_ops_generator.api.routes import (
     events as events_routes,
 )
 from synthetic_ops_generator.control.models import (
+    RunRecord,
+    RunStartResult,
     RunStatus,
     StopRunResult,
 )
@@ -20,6 +26,10 @@ from synthetic_ops_generator.control.service import (
     RunNotReplayableError,
     RunNotStoppableError,
 )
+from synthetic_ops_generator.domain.enums import (
+    OperationalState,
+)
+
 
 
 @pytest.fixture
@@ -98,6 +108,8 @@ def test_list_scenarios_returns_catalogue(
     ] == [
         "BANK-01",
         "BANK-02",
+        "BANK-03",
+        "BANK-04",
         "BANK-07",
         "INS-01",
         "INS-02",
@@ -221,6 +233,65 @@ def test_start_run_executes_scenario(
         "historical_configuration": None,
         "continuous_configuration": None,
     }
+
+
+def test_start_run_response_allows_run_without_change() -> None:
+    result = RunStartResult(
+        scenario_id="OPS-01",
+        run_id="RUN0000001",
+        change_id=None,
+        status=RunStatus.RUNNING,
+    )
+
+    response = StartRunResponse.from_result(
+        result
+    )
+
+    assert response.change_id is None
+    assert (
+        response.model_dump(
+            mode="json"
+        )["change_id"]
+        is None
+    )
+
+
+def test_run_response_allows_run_without_change() -> None:
+    record = RunRecord(
+        run_id="RUN0000001",
+        scenario_id="OPS-01",
+        change_id=None,
+        status=RunStatus.RUNNING,
+        started_at=datetime(
+            2026,
+            10,
+            2,
+            20,
+            0,
+            tzinfo=UTC,
+        ),
+        completed_at=None,
+        current_state=(
+            OperationalState.INITIALISING
+        ),
+        event_count=0,
+        validation_passed=None,
+        random_seed=42,
+        event_interval_seconds=5.0,
+    )
+
+    response = RunResponse.from_record(
+        record
+    )
+
+    assert response.change_id is None
+    assert (
+        response.model_dump(
+            mode="json"
+        )["change_id"]
+        is None
+    )
+
 
 
 def test_start_continuous_run_executes_scenario(

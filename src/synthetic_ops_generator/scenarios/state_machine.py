@@ -15,6 +15,8 @@ _ALLOWED_TRANSITIONS: dict[
 
     OperationalState.NORMAL: {
         OperationalState.IMPLEMENTING,
+        OperationalState.WARNING,
+        OperationalState.DEGRADED,
         OperationalState.COMPLETED,
     },
 

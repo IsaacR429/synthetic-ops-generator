@@ -31,6 +31,7 @@ class Service(BaseModel):
 
     benchmark_profile_id: str | None = None
     baseline_profile_id: str | None = None
+    capacity_profile_id: str | None = None
 
 
 class Component(BaseModel):

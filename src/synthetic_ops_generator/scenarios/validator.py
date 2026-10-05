@@ -4,6 +4,9 @@ from synthetic_ops_generator.domain.enterprise import (
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    SUPPORTED_PROFILES_BY_SOURCE,
+)
 
 
 class ScenarioValidationError(ValueError):
@@ -90,4 +93,15 @@ def validate_scenario_against_enterprise(
                 f"'{component.environment}' does not match "
                 f"Scenario environment "
                 f"'{target.environment}'."
+            )
+
+    for behaviour in scenario.behaviours:
+        supported = SUPPORTED_PROFILES_BY_SOURCE.get(
+            behaviour.source,
+            frozenset(),
+        )
+        if behaviour.profile_id not in supported:
+            raise ScenarioValidationError(
+                f"Unsupported behaviour profile '{behaviour.profile_id}' "
+                f"for source '{behaviour.source}'"
             )

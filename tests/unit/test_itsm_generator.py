@@ -20,11 +20,12 @@ from synthetic_ops_generator.scenarios.models import (
 def build_context(
     *,
     state: OperationalState = OperationalState.NORMAL,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="BANK-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -160,6 +161,36 @@ def test_itsm_events_share_run_and_change_correlation() -> None:
     assert {
         event.environment for event in events
     } == {Environment.PRODUCTION}
+
+
+def test_itsm_generator_rejects_run_without_change_before_emitting() -> None:
+    context = build_context(
+        chg_id=None,
+    )
+
+    generator = ITSMGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+        service_owner="Payments Operations",
+        component_ids=["payment_api"],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "ITSM generation requires "
+            "change correlation"
+        ),
+    ):
+        asyncio.run(
+            collect_events(
+                generator,
+                context,
+            )
+        )
+
+    assert context.sequence_number == 0
+
 
 
 def test_itsm_events_use_canonical_identifiers_and_sequence() -> None:

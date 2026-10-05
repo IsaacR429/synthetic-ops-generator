@@ -14,6 +14,9 @@ from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
 )
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    ALL_REQUIRED_VALIDATIONS_PASS,
+)
 
 
 @dataclass(frozen=True)
@@ -85,9 +88,16 @@ class ManualValidationGenerator(SourceGenerator):
         if context.scenario_state != self._behaviour.during_state:
             return
 
+        if context.chg_id is None:
+            raise ValueError(
+                "Manual validation generation requires "
+                "change correlation."
+            )
+
         if (
+
             self._behaviour.profile_id
-            != "all_required_validations_pass"
+            != ALL_REQUIRED_VALIDATIONS_PASS
         ):
             raise ValueError(
                 "Unsupported Manual Validation behaviour profile: "

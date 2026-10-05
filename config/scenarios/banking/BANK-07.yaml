@@ -64,6 +64,11 @@ behaviours:
   - source: metric
     during_state: normal
     profile_id: healthy_baseline
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
     description: >
       Pre-change Payment Service telemetry remains within normal
       baseline behaviour.
@@ -89,6 +94,11 @@ behaviours:
   - source: metric
     during_state: observing
     profile_id: healthy_post_change
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
     description: >
       Post-change operational Metrics remain healthy relative to
       the effective benchmark policy.

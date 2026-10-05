@@ -70,6 +70,11 @@ behaviours:
   - source: metric
     during_state: normal
     profile_id: healthy_baseline
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
     description: >
       Pre-change operational Metrics remain within normal Service
       behaviour.
@@ -97,6 +102,11 @@ behaviours:
   - source: metric
     during_state: degraded
     profile_id: degraded_post_change
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
     description: >
       Operational Metrics reach blocking conditions relative to
       the effective Service benchmark policy.
@@ -124,6 +134,11 @@ behaviours:
   - source: metric
     during_state: recovery
     profile_id: recovered_post_rollback
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
     continuous: true
     description: >
       Operational Metrics return to normal Service targets after

@@ -155,11 +155,12 @@ def build_context(
     *,
     sequence_number: int = 14,
     state: OperationalState = OperationalState.OBSERVING,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="TEST-EVD-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -193,7 +194,38 @@ async def collect_events(
     ]
 
 
+def test_evidence_generator_rejects_run_without_change_before_history_lookup() -> None:
+    ids = IdFactory()
+    history = build_history(ids)
+    context = build_context(
+        chg_id=None,
+    )
+
+    generator = EvidenceGenerator(
+        ids=ids,
+        behaviour=build_behaviour(),
+        event_history=history,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Evidence generation requires "
+            "change correlation"
+        ),
+    ):
+        asyncio.run(
+            collect_events(
+                generator,
+                context,
+            )
+        )
+
+    assert context.sequence_number == 14
+
+
 def test_complete_validation_evidence_generates_six_events() -> None:
+
     ids = IdFactory()
     history = build_history(ids)
 

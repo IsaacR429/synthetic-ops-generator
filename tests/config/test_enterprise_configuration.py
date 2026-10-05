@@ -28,3 +28,18 @@ def test_insurer_alpha_configuration_loads() -> None:
     assert len(enterprise.sites) == 2
     assert len(enterprise.service_instances) == 4
     assert len(enterprise.dependencies) == 3
+
+
+def test_bank_alpha_payment_service_loads_capacity_profile_reference() -> None:
+    enterprise = load_enterprise_configuration(
+        "config/enterprises/bank_alpha"
+    )
+    payment_service = next(
+        service
+        for service in enterprise.services
+        if service.service_id == "payment_service"
+    )
+    assert (
+        payment_service.capacity_profile_id
+        == "critical_payment_capacity"
+    )

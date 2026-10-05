@@ -248,6 +248,7 @@ def test_bank_07_missing_approval_and_incomplete_evidence() -> None:
             benchmark_profile.metrics[metric_id],
         )
         for metric_id in baseline_profile.metrics
+        if metric_id in benchmark_profile.metrics
     }
 
     ids = IdFactory()
@@ -297,6 +298,12 @@ def test_bank_07_missing_approval_and_incomplete_evidence() -> None:
                 benchmark_profile.profile_id
             ),
             random_source=random_source,
+            metric_ids=(
+                tuple(baseline_metric_behaviour.selection.metric_ids)
+                if baseline_metric_behaviour.selection
+                and baseline_metric_behaviour.selection.metric_ids
+                else None
+            ),
         ),
         InfrastructureTestGenerator(
             ids=ids,
@@ -322,6 +329,12 @@ def test_bank_07_missing_approval_and_incomplete_evidence() -> None:
                 benchmark_profile.profile_id
             ),
             random_source=random_source,
+            metric_ids=(
+                tuple(post_change_metric_behaviour.selection.metric_ids)
+                if post_change_metric_behaviour.selection
+                and post_change_metric_behaviour.selection.metric_ids
+                else None
+            ),
         ),
         LogGenerator(
             ids=ids,

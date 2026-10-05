@@ -1,15 +1,21 @@
 from collections.abc import AsyncIterator, Mapping
-from typing import ClassVar
 
 from synthetic_ops_generator.baselines.models import (
     BaselineProfile,
     MetricBaseline,
 )
 from synthetic_ops_generator.benchmarks.evaluator import (
-    classify_metric,
+    evaluate_metric,
 )
+
 from synthetic_ops_generator.benchmarks.models import (
     ResolvedBenchmark,
+)
+from synthetic_ops_generator.capacity.evaluator import (
+    classify_capacity,
+)
+from synthetic_ops_generator.capacity.models import (
+    CapacityProfile,
 )
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.core.randomness import SimulationRandom
@@ -18,13 +24,29 @@ from synthetic_ops_generator.generators.base import SourceGenerator
 from synthetic_ops_generator.metrics.event_payload import (
     METRIC_EVENT_TYPE,
     METRIC_SOURCE_SYSTEM,
+    MetricCapacityContext,
     build_metric_event_data,
 )
-from synthetic_ops_generator.metrics.models import MetricDefinition
+from synthetic_ops_generator.metrics.models import (
+    MetricDefinition,
+    MetricDirection,
+)
+
 from synthetic_ops_generator.scenarios.context import ScenarioContext
 from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
+)
+from synthetic_ops_generator.scenarios.profile_contracts import (
+    CAPACITY_PRESSURE,
+    CAPACITY_RECOVERY,
+    CAPACITY_SATURATION,
+    DEGRADED_POST_CHANGE,
+    OPERATIONAL_DEGRADATION,
+    OPERATIONAL_RECOVERY,
+    OPERATIONAL_WARNING,
+    RECOVERED_POST_ROLLBACK,
+    SUPPORTED_PROFILES_BY_SOURCE,
 )
 
 
@@ -39,15 +61,6 @@ class MetricGenerator(SourceGenerator):
 
     source_system = METRIC_SOURCE_SYSTEM
 
-    _SUPPORTED_PROFILES: ClassVar[frozenset[str]] = frozenset(
-        {
-            "healthy_baseline",
-            "healthy_post_change",
-            "degraded_post_change",
-            "recovered_post_rollback",
-        }
-    )
-
     def __init__(
         self,
         *,
@@ -59,6 +72,7 @@ class MetricGenerator(SourceGenerator):
         benchmark_profile_id: str,
         random_source: SimulationRandom,
         metric_ids: tuple[str, ...] | None = None,
+        capacity_profile: CapacityProfile | None = None,
     ) -> None:
         if behaviour.source != SourceDomain.METRIC:
             raise ValueError(
@@ -77,6 +91,7 @@ class MetricGenerator(SourceGenerator):
         self._benchmarks = dict(benchmarks)
         self._benchmark_profile_id = benchmark_profile_id
         self._random = random_source
+        self._capacity_profile = capacity_profile
 
         self._metric_ids = (
             metric_ids
@@ -100,7 +115,9 @@ class MetricGenerator(SourceGenerator):
 
         if (
             self._behaviour.profile_id
-            not in self._SUPPORTED_PROFILES
+            not in SUPPORTED_PROFILES_BY_SOURCE[
+                SourceDomain.METRIC
+            ]
         ):
             raise ValueError(
                 "Unsupported Metric behaviour profile: "
@@ -110,22 +127,74 @@ class MetricGenerator(SourceGenerator):
         for metric_id in self._metric_ids:
             definition = self._definitions[metric_id]
             baseline = self._baseline_profile.metrics[metric_id]
-            benchmark = self._benchmarks[metric_id]
+            benchmark = self._benchmarks.get(metric_id)
+
 
             observed_value = self._generate_observation(
                 baseline=baseline,
                 benchmark=benchmark,
             )
 
-            classification = classify_metric(
-                definition,
-                benchmark,
-                observed_value,
+            evaluation = evaluate_metric(
+                definition=definition,
+                benchmark=benchmark,
+                observed_value=observed_value,
             )
+
+            classification = evaluation.classification
+
+            capacity_context: MetricCapacityContext | None = None
+            if self._behaviour.profile_id in {
+                CAPACITY_PRESSURE,
+                CAPACITY_SATURATION,
+                CAPACITY_RECOVERY,
+            }:
+                if self._capacity_profile is None:
+                    raise ValueError(
+                        "Capacity pressure behaviour requires "
+                        "a Capacity profile."
+                    )
+                envelope = self._capacity_profile.metrics.get(
+                    metric_id
+                )
+                if envelope is None:
+                    raise ValueError(
+                        "Capacity profile does not define Metric: "
+                        f"{metric_id}"
+                    )
+                capacity_context = MetricCapacityContext(
+                    capacity_profile_id=(
+                        self._capacity_profile.profile_id
+                    ),
+                    classification=classify_capacity(
+                        envelope,
+                        observed_value=observed_value,
+                    ),
+                    direction=envelope.direction,
+                    pressure_threshold=(
+                        envelope.pressure_threshold
+                    ),
+                    saturation_threshold=(
+                        envelope.saturation_threshold
+                    ),
+                )
 
             if (
                 self._behaviour.profile_id
-                == "degraded_post_change"
+                == OPERATIONAL_WARNING
+                and classification.value != "warning"
+            ):
+                raise ValueError(
+                    "Operational warning Metric behaviour "
+                    f"must produce a warning observation for {metric_id}."
+                )
+
+            if (
+                self._behaviour.profile_id
+                in {
+                    DEGRADED_POST_CHANGE,
+                    OPERATIONAL_DEGRADATION,
+                }
                 and classification.value != "blocking"
             ):
                 raise ValueError(
@@ -135,7 +204,10 @@ class MetricGenerator(SourceGenerator):
 
             if (
                 self._behaviour.profile_id
-                == "recovered_post_rollback"
+                in {
+                    RECOVERED_POST_ROLLBACK,
+                    OPERATIONAL_RECOVERY,
+                }
                 and classification.value != "normal"
             ):
                 raise ValueError(
@@ -175,6 +247,8 @@ class MetricGenerator(SourceGenerator):
                     ),
                     observed_value=observed_value,
                     classification=classification,
+                    evaluation_status=evaluation.status,
+                    capacity_context=capacity_context,
                 ),
             )
 
@@ -182,11 +256,58 @@ class MetricGenerator(SourceGenerator):
         self,
         *,
         baseline: MetricBaseline,
-        benchmark: ResolvedBenchmark,
+        benchmark: ResolvedBenchmark | None,
     ) -> float:
+        if self._behaviour.profile_id in {
+            CAPACITY_PRESSURE,
+            CAPACITY_SATURATION,
+        }:
+            if self._capacity_profile is None:
+                if (
+                    self._behaviour.profile_id
+                    == CAPACITY_PRESSURE
+                ):
+                    raise ValueError(
+                        "Capacity pressure behaviour requires "
+                        "a Capacity profile."
+                    )
+                raise ValueError(
+                    "Capacity saturation behaviour requires "
+                    "a Capacity profile."
+                )
+            envelope = self._capacity_profile.metrics.get(
+                baseline.metric_definition_id
+            )
+            if envelope is None:
+                raise ValueError(
+                    "Capacity profile does not define Metric: "
+                    f"{baseline.metric_definition_id}"
+                )
+            if (
+                self._behaviour.profile_id
+                == CAPACITY_PRESSURE
+            ):
+                return float(
+                    envelope.pressure_threshold
+                )
+            return float(
+                envelope.saturation_threshold
+            )
+
         if (
             self._behaviour.profile_id
-            == "degraded_post_change"
+            == OPERATIONAL_WARNING
+        ):
+            return float(
+                benchmark.warning_threshold
+            )
+
+        if (
+            self._behaviour.profile_id
+            in {
+                DEGRADED_POST_CHANGE,
+                OPERATIONAL_DEGRADATION,
+            }
         ):
             return float(
                 benchmark.blocking_threshold
@@ -194,7 +315,10 @@ class MetricGenerator(SourceGenerator):
 
         if (
             self._behaviour.profile_id
-            == "recovered_post_rollback"
+            in {
+                RECOVERED_POST_ROLLBACK,
+                OPERATIONAL_RECOVERY,
+            }
         ):
             return float(
                 benchmark.reference_target
@@ -228,6 +352,36 @@ class MetricGenerator(SourceGenerator):
         return float(value)
 
     def _validate_configuration(self) -> None:
+        if (
+            self._behaviour.profile_id
+            == CAPACITY_PRESSURE
+            and self._capacity_profile is None
+        ):
+            raise ValueError(
+                "Capacity pressure behaviour requires "
+                "a Capacity profile."
+            )
+
+        if (
+            self._behaviour.profile_id
+            == CAPACITY_SATURATION
+            and self._capacity_profile is None
+        ):
+            raise ValueError(
+                "Capacity saturation behaviour requires "
+                "a Capacity profile."
+            )
+
+        if (
+            self._behaviour.profile_id
+            == CAPACITY_RECOVERY
+            and self._capacity_profile is None
+        ):
+            raise ValueError(
+                "Capacity recovery behaviour requires "
+                "a Capacity profile."
+            )
+
         for metric_id in self._metric_ids:
             definition = self._definitions.get(
                 metric_id
@@ -258,15 +412,55 @@ class MetricGenerator(SourceGenerator):
                     f"its configuration key: {metric_id}"
                 )
 
+            if (
+                self._behaviour.profile_id
+                in {
+                    CAPACITY_PRESSURE,
+                    CAPACITY_SATURATION,
+                    CAPACITY_RECOVERY,
+                }
+                and self._capacity_profile is not None
+                and metric_id
+                not in self._capacity_profile.metrics
+            ):
+                raise ValueError(
+                    "Capacity profile does not define Metric: "
+                    f"{metric_id}"
+                )
+
+            if (
+                definition.direction
+                == MetricDirection.CONTEXT_DEPENDENT
+                and self._behaviour.profile_id
+                in {
+                    OPERATIONAL_WARNING,
+                    OPERATIONAL_DEGRADATION,
+                    DEGRADED_POST_CHANGE,
+                    OPERATIONAL_RECOVERY,
+                    RECOVERED_POST_ROLLBACK,
+                }
+            ):
+                raise ValueError(
+                    "Context-dependent Metric cannot use "
+                    "threshold-driven behaviour."
+                )
+
             benchmark = self._benchmarks.get(
                 metric_id
             )
 
+
             if benchmark is None:
+                if (
+                    definition.direction
+                    == MetricDirection.CONTEXT_DEPENDENT
+                ):
+                    continue
                 raise ValueError(
                     "Missing resolved Benchmark: "
                     f"{metric_id}"
                 )
+
 
             if (
                 benchmark.metric_definition_id

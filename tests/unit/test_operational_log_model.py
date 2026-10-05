@@ -121,3 +121,24 @@ def test_operational_log_allows_service_level_log() -> None:
     )
 
     assert log.component is None
+
+
+def test_operational_log_allows_no_change_correlation() -> None:
+    log = OperationalLog(
+        log_id="LOG0000001",
+        chg_id=None,
+        log_type="service_health",
+        severity=LogSeverity.INFO,
+        message="Service operating normally.",
+        service="payment_service",
+        component="payment_api",
+        timestamp=datetime(
+            2026,
+            10,
+            2,
+            20,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+    assert log.chg_id is None

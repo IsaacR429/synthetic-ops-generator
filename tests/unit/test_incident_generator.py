@@ -26,11 +26,12 @@ from synthetic_ops_generator.scenarios.models import (
 def build_context(
     *,
     state: OperationalState = OperationalState.OBSERVING,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="TEST-INC-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -200,6 +201,34 @@ def test_incident_preserves_change_and_run_correlation() -> None:
     assert event.business_stream == "payments"
     assert event.service == "payment_service"
     assert event.component == "payment_api"
+
+
+def test_incident_generator_supports_run_without_change() -> None:
+    generator = IncidentGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(
+                chg_id=None,
+            ),
+        )
+    )
+
+    assert len(events) == 1
+
+    event = events[0]
+
+    assert event.run_id == "RUN0000001"
+    assert event.chg_id is None
+    assert (
+        event.data["incident"]["chg_id"]
+        is None
+    )
+
 
 
 def test_incident_timestamp_matches_event_time() -> None:

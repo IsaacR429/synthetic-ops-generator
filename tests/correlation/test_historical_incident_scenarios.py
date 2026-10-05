@@ -46,7 +46,7 @@ CASES = (
         ),
         "BANK-02",
         "payment_service",
-        "critical_interactive_nominal",
+        "payment_processing_nominal",
         "critical_interactive_transaction",
     ),
     (

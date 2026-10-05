@@ -29,11 +29,12 @@ from synthetic_ops_generator.scenarios.models import (
 def build_context(
     *,
     state: OperationalState = OperationalState.OBSERVING,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="BANK-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -167,6 +168,40 @@ def test_log_events_preserve_run_correlation() -> None:
         event.source_domain
         for event in events
     } == {SourceDomain.LOG}
+
+
+def test_log_generator_supports_run_without_change() -> None:
+    generator = LogGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(
+                chg_id=None,
+            ),
+        )
+    )
+
+    assert len(events) == 3
+
+    assert {
+        event.chg_id
+        for event in events
+    } == {None}
+
+    assert {
+        event.data["log"]["chg_id"]
+        for event in events
+    } == {None}
+
+    assert {
+        event.run_id
+        for event in events
+    } == {"RUN0000001"}
+
 
 
 def test_normal_operational_logs_are_info_severity() -> None:

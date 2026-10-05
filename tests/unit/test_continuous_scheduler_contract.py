@@ -3,6 +3,15 @@ from datetime import UTC, datetime
 
 import pytest
 
+from synthetic_ops_generator.baselines.models import (
+    BaselineProfile,
+    MetricBaseline,
+)
+from synthetic_ops_generator.benchmarks.models import (
+    BenchmarkSource,
+    BenchmarkSourceType,
+    ResolvedBenchmark,
+)
 from synthetic_ops_generator.config.runtime import (
     IntervalFrequencyConfiguration,
     LogFrequencyConfiguration,
@@ -12,6 +21,7 @@ from synthetic_ops_generator.config.runtime import (
 )
 from synthetic_ops_generator.core.clock import ManualSimulationClock
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.core.randomness import SimulationRandom
 from synthetic_ops_generator.domain.enums import (
     Environment,
     OperationalState,
@@ -22,6 +32,11 @@ from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.log import (
     LogDefinition,
     LogGenerator,
+)
+from synthetic_ops_generator.generators.metric import MetricGenerator
+from synthetic_ops_generator.metrics.models import (
+    MetricDefinition,
+    MetricDirection,
 )
 from synthetic_ops_generator.publishers.base import EventPublisher
 from synthetic_ops_generator.scenarios.context import ScenarioContext
@@ -344,6 +359,113 @@ async def test_metric_interval_applies_between_cycles_not_events(
 
 
 @pytest.mark.asyncio
+async def test_real_metric_generator_advances_values_between_continuous_cycles(
+) -> None:
+    clock = ManualSimulationClock(
+        START_TIME
+    )
+
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.METRIC,
+        during_state=OperationalState.OBSERVING,
+        profile_id="healthy_post_change",
+        continuous=True,
+    )
+
+    provenance = BenchmarkSource(
+        source_id="synthetic_metric_policy_v1",
+        source_type=BenchmarkSourceType.SYNTHETIC_REFERENCE,
+        source_name="Synthetic Ops Generator Metric Policy",
+        source_reference="internal:metric-policy-v1",
+        version="1.0",
+        rationale="Controlled synthetic test policy.",
+    )
+
+    generator = MetricGenerator(
+        ids=IdFactory(),
+        behaviour=behaviour,
+        definitions={
+            "request_latency": MetricDefinition(
+                metric_definition_id="request_latency",
+                name="Request Latency",
+                unit="ms",
+                evaluation_statistic="p95",
+                direction=MetricDirection.LOWER_IS_BETTER,
+            ),
+        },
+        baseline_profile=BaselineProfile(
+            profile_id="nominal",
+            name="Nominal",
+            historical_window_minutes=30,
+            sample_interval_seconds=300,
+            metrics={
+                "request_latency": MetricBaseline(
+                    metric_definition_id="request_latency",
+                    center=180,
+                    noise_stddev=15.0,
+                    lower_bound=100,
+                    upper_bound=260,
+                ),
+            },
+        ),
+        benchmarks={
+            "request_latency": ResolvedBenchmark(
+                metric_definition_id="request_latency",
+                reference_target=300,
+                warning_threshold=500,
+                blocking_threshold=1000,
+                provenance=provenance,
+            ),
+        },
+        benchmark_profile_id="test_policy",
+        random_source=SimulationRandom(123),
+    )
+
+    publisher = StopAfterPublisher(
+        stop_after=2
+    )
+
+    await ContinuousSourceScheduler(
+        clock=clock,
+        runtime=RuntimeTimingConfiguration(
+            mode=RuntimeMode.REAL_TIME,
+            speed_multiplier=1.0,
+        ),
+        frequency=make_frequency(),
+        sleep_fn=SleepRecorder(),
+    ).run(
+        context=make_context(clock),
+        bindings=[
+            ContinuousSourceBinding(
+                behaviour=behaviour,
+                generator=generator,
+            )
+        ],
+        publisher=publisher,
+    )
+
+    assert len(publisher.events) == 2
+
+    first_value = (
+        publisher.events[0]
+        .data["metric"]["observed_value"]
+    )
+    second_value = (
+        publisher.events[1]
+        .data["metric"]["observed_value"]
+    )
+
+    assert first_value != second_value
+
+    assert (
+        publisher.events[1].event_time
+        - publisher.events[0].event_time
+    ).total_seconds() == pytest.approx(
+        5.0
+    )
+
+
+@pytest.mark.asyncio
 async def test_scheduler_only_runs_continuous_behaviour_for_active_state(
 ) -> None:
     clock = ManualSimulationClock(
@@ -549,3 +671,149 @@ async def test_finite_log_profile_is_restarted_after_exhaustion(
             0.04,
         ]
     )
+
+
+@pytest.mark.asyncio
+async def test_continuous_log_cycles_do_not_repeat_identical_semantic_block(
+) -> None:
+    clock = ManualSimulationClock(
+        START_TIME
+    )
+
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.LOG,
+        during_state=OperationalState.OBSERVING,
+        profile_id="normal_operational_logs",
+        continuous=True,
+    )
+
+    generator = CountingLogGenerator(
+        LogGenerator(
+            ids=IdFactory(),
+            behaviour=behaviour,
+            random_source=SimulationRandom(42),
+        )
+    )
+
+    publisher = StopAfterPublisher(
+        stop_after=6
+    )
+
+    await ContinuousSourceScheduler(
+        clock=clock,
+        runtime=RuntimeTimingConfiguration(
+            mode=RuntimeMode.REAL_TIME,
+            speed_multiplier=1.0,
+        ),
+        frequency=make_frequency(),
+        sleep_fn=SleepRecorder(),
+    ).run(
+        context=make_context(clock),
+        bindings=[
+            ContinuousSourceBinding(
+                behaviour=behaviour,
+                generator=generator,
+            )
+        ],
+        publisher=publisher,
+    )
+
+    def semantic_signature(
+        event: GeneratedEvent,
+    ) -> tuple:
+        log = event.data["log"]
+
+        return (
+            log["log_type"],
+            log["severity"],
+            log["message"],
+            log["service"],
+            log["component"],
+            log["error_code"],
+            tuple(
+                sorted(
+                    log["attributes"].items()
+                )
+            ),
+        )
+
+    first_cycle = [
+        semantic_signature(event)
+        for event in publisher.events[:3]
+    ]
+
+    second_cycle = [
+        semantic_signature(event)
+        for event in publisher.events[3:6]
+    ]
+
+    assert generator.invocation_count == 2
+    assert first_cycle != second_cycle
+
+
+@pytest.mark.asyncio
+async def test_continuous_log_generation_is_reproducible_for_same_seed(
+) -> None:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.LOG,
+        during_state=OperationalState.OBSERVING,
+        profile_id="normal_operational_logs",
+        continuous=True,
+    )
+
+    async def generate_sequence(
+        seed: int,
+    ) -> list[tuple]:
+        clock = ManualSimulationClock(
+            START_TIME
+        )
+
+        generator = LogGenerator(
+            ids=IdFactory(),
+            behaviour=behaviour,
+            random_source=SimulationRandom(seed),
+        )
+
+        publisher = StopAfterPublisher(
+            stop_after=6
+        )
+
+        await ContinuousSourceScheduler(
+            clock=clock,
+            runtime=RuntimeTimingConfiguration(
+                mode=RuntimeMode.REAL_TIME,
+                speed_multiplier=1.0,
+            ),
+            frequency=make_frequency(),
+            sleep_fn=SleepRecorder(),
+        ).run(
+            context=make_context(clock),
+            bindings=[
+                ContinuousSourceBinding(
+                    behaviour=behaviour,
+                    generator=generator,
+                )
+            ],
+            publisher=publisher,
+        )
+
+        return [
+            (
+                event.data["log"]["log_type"],
+                event.data["log"]["severity"],
+                event.data["log"]["message"],
+                event.data["log"]["component"],
+                event.data["log"]["error_code"],
+                tuple(
+                    sorted(
+                        event.data["log"]["attributes"].items()
+                    )
+                ),
+            )
+            for event in publisher.events
+        ]
+
+    first = await generate_sequence(42)
+    second = await generate_sequence(42)
+
+    assert first == second

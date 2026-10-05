@@ -26,11 +26,12 @@ from synthetic_ops_generator.scenarios.models import (
 def build_context(
     *,
     state: OperationalState = OperationalState.OBSERVING,
+    chg_id: str | None = "CHG0000001",
 ) -> ScenarioContext:
     return ScenarioContext(
         scenario_id="TEST-MANUAL-01",
         run_id="RUN0000001",
-        chg_id="CHG0000001",
+        chg_id=chg_id,
         business_stream="payments",
         service="payment_service",
         component="payment_api",
@@ -168,6 +169,34 @@ def test_manual_validation_events_preserve_correlation() -> None:
         event.service
         for event in events
     } == {"payment_service"}
+
+
+def test_manual_validation_generator_rejects_run_without_change_before_emitting() -> None:
+    context = build_context(
+        chg_id=None,
+    )
+
+    generator = ManualValidationGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Manual validation generation requires "
+            "change correlation"
+        ),
+    ):
+        asyncio.run(
+            collect_events(
+                generator,
+                context,
+            )
+        )
+
+    assert context.sequence_number == 0
+
 
 
 def test_requested_events_are_pending_without_result() -> None:
