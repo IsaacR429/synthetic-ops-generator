@@ -112,3 +112,35 @@ def test_metric_selection_rejects_duplicate_metric_ids() -> None:
                 "request_latency",
             ],
         )
+
+
+def test_behaviour_can_declare_execution_node_id() -> None:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.LOG,
+        during_state=OperationalState.DEGRADED,
+        profile_id="degradation_error_logs",
+        execution_node_id="account_database",
+    )
+    assert (
+        behaviour.execution_node_id
+        == "account_database"
+    )
+
+
+def test_behaviour_rejects_blank_execution_node_id() -> None:
+    with pytest.raises(ValidationError):
+        ScenarioBehaviour(
+            source=SourceDomain.LOG,
+            during_state=OperationalState.DEGRADED,
+            profile_id="degradation_error_logs",
+            execution_node_id="   ",
+        )
+
+
+def test_behaviour_execution_node_defaults_to_none() -> None:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.LOG,
+        during_state=OperationalState.DEGRADED,
+        profile_id="degradation_error_logs",
+    )
+    assert behaviour.execution_node_id is None

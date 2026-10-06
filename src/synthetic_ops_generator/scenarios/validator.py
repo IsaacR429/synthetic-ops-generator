@@ -1,6 +1,10 @@
 from synthetic_ops_generator.domain.enterprise import (
     Enterprise,
 )
+from synthetic_ops_generator.scenarios.execution_plan import (
+    ScenarioExecutionPlanningError,
+    build_scenario_execution_plan,
+)
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
 )
@@ -105,3 +109,13 @@ def validate_scenario_against_enterprise(
                 f"Unsupported behaviour profile '{behaviour.profile_id}' "
                 f"for source '{behaviour.source}'"
             )
+
+    try:
+        build_scenario_execution_plan(
+            scenario=scenario,
+            enterprise=enterprise,
+        )
+    except ScenarioExecutionPlanningError as exc:
+        raise ScenarioValidationError(
+            str(exc)
+        ) from exc

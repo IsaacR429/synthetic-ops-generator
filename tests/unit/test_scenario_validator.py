@@ -220,3 +220,39 @@ def test_capacity_recovery_metric_profile_is_supported() -> None:
         scenario,
         enterprise,
     )
+
+
+def test_invalid_behaviour_execution_node_raises() -> None:
+    enterprise, scenario = load_valid_objects()
+    metric_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.METRIC
+    )
+    metric_behaviour.execution_node_id = (
+        "missing_topology_node"
+    )
+    with pytest.raises(
+        ScenarioValidationError,
+        match="missing_topology_node",
+    ):
+        validate_scenario_against_enterprise(
+            scenario,
+            enterprise,
+        )
+
+
+def test_cross_service_behaviour_execution_node_is_valid() -> None:
+    enterprise, scenario = load_valid_objects()
+    metric_behaviour = next(
+        behaviour
+        for behaviour in scenario.behaviours
+        if behaviour.source == SourceDomain.METRIC
+    )
+    metric_behaviour.execution_node_id = (
+        "account_database"
+    )
+    validate_scenario_against_enterprise(
+        scenario,
+        enterprise,
+    )

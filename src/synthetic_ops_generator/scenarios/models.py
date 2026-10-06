@@ -62,6 +62,14 @@ ScenarioMetricId = Annotated[
     ),
 ]
 
+ScenarioExecutionNodeId = Annotated[
+    str,
+    StringConstraints(
+        min_length=1,
+        pattern=r"^\S+$",
+    ),
+]
+
 
 class ScenarioMetricSelection(BaseModel):
     metric_ids: list[ScenarioMetricId] | None = Field(
@@ -96,6 +104,8 @@ class ScenarioBehaviour(BaseModel):
     continuous: bool = False
 
     selection: ScenarioMetricSelection | None = None
+
+    execution_node_id: ScenarioExecutionNodeId | None = None
 
     @model_validator(mode="after")
     def validate_selection_source(
