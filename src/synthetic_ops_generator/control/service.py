@@ -77,6 +77,9 @@ from synthetic_ops_generator.scenarios.continuous import (
     ContinuousSourceBinding,
     ContinuousSourceScheduler,
 )
+from synthetic_ops_generator.scenarios.execution_plan import (
+    build_scenario_execution_plan,
+)
 from synthetic_ops_generator.scenarios.runner import (
     ScenarioRunner,
 )
@@ -527,13 +530,19 @@ class ControlService:
                 random_source = SimulationRandom(
                     context.random_seed
                 )
-
-                generators = self._generator_factory.build(
+                execution_plan = build_scenario_execution_plan(
                     scenario=scenario,
                     enterprise=enterprise,
-                    ids=self._ids,
-                    random_source=random_source,
-                    event_history=runner.event_history,
+                )
+                execution_bindings = (
+                    self._generator_factory.build_execution_bindings(
+                        scenario=scenario,
+                        enterprise=enterprise,
+                        plan=execution_plan,
+                        ids=self._ids,
+                        random_source=random_source,
+                        event_history=runner.event_history,
+                    )
                 )
 
                 if (
@@ -544,33 +553,24 @@ class ControlService:
                         scenario.state_sequence[-2]
                     )
 
-                    behaviour_generators = list(
-                        zip(
-                            scenario.behaviours,
-                            generators,
-                            strict=True,
-                        )
-                    )
-
-                    prefix_generators = [
-                        generator
-                        for behaviour, generator
-                        in behaviour_generators
+                    prefix_bindings = [
+                        binding
+                        for binding in execution_bindings
                         if not (
-                            behaviour.during_state
+                            binding.behaviour.during_state
                             == continuous_active_state
                             and (
-                                behaviour.continuous
-                                or behaviour.source
+                                binding.behaviour.continuous
+                                or binding.behaviour.source
                                 == SourceDomain.EVIDENCE
                             )
                         )
                     ]
 
-                    await runner.execute(
+                    await runner.execute_bindings(
                         scenario=scenario,
                         context=context,
-                        generators=prefix_generators,
+                        bindings=prefix_bindings,
                         publisher=publisher,
                         progress_observer=persist_progress,
                         event_interval_seconds=(
@@ -600,14 +600,16 @@ class ControlService:
 
                     continuous_bindings = [
                         ContinuousSourceBinding(
-                            behaviour=behaviour,
-                            generator=generator,
+                            behaviour=binding.behaviour,
+                            generator=binding.generator,
+                            execution_target=(
+                                binding.execution_target
+                            ),
                         )
-                        for behaviour, generator
-                        in behaviour_generators
+                        for binding in execution_bindings
                         if (
-                            behaviour.continuous
-                            and behaviour.during_state
+                            binding.behaviour.continuous
+                            and binding.behaviour.during_state
                             == continuous_active_state
                         )
                     ]
@@ -645,10 +647,10 @@ class ControlService:
                         "unexpectedly."
                     )
 
-                await runner.execute(
+                await runner.execute_bindings(
                     scenario=scenario,
                     context=context,
-                    generators=generators,
+                    bindings=execution_bindings,
                     publisher=publisher,
                     progress_observer=persist_progress,
                     event_interval_seconds=(

@@ -27,6 +27,7 @@ from synthetic_ops_generator.core.sqlite_identifiers import (
 )
 from synthetic_ops_generator.domain.enums import (
     OperationalState,
+    SourceDomain,
 )
 from synthetic_ops_generator.generators.factory import (
     GeneratorFactory,
@@ -352,6 +353,115 @@ async def test_scenario_without_continuous_active_behaviour_is_rejected(
                     GenerationLifecycle.CONTINUOUS
                 ),
             )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_continuous_control_service_propagates_execution_target(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+
+    base_catalogue = ScenarioCatalogue(
+        CONFIG_ROOT / "scenarios"
+    )
+    original_scenario = base_catalogue.get_scenario("BANK-01")
+    assert original_scenario is not None
+
+    updated_behaviours = []
+    for b in original_scenario.behaviours:
+        if b.continuous and b.source == SourceDomain.LOG:
+            updated_behaviours.append(
+                b.model_copy(
+                    update={"execution_node_id": "payment_database"}
+                )
+            )
+        else:
+            updated_behaviours.append(b)
+
+    targeted_scenario = original_scenario.model_copy(
+        update={"behaviours": updated_behaviours}
+    )
+
+    class MockCatalogue(ScenarioCatalogue):
+        def __init__(self) -> None:
+            pass
+
+        def get_scenario(self, scenario_id: str):
+            if scenario_id == "BANK-01":
+                return targeted_scenario
+            return None
+
+    try:
+        service = ControlService(
+            catalogue=MockCatalogue(),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        started = await service.start_run(
+            scenario_id="BANK-01",
+            random_seed=42,
+            generation_lifecycle=(
+                GenerationLifecycle.CONTINUOUS
+            ),
+        )
+
+        assert started.status == RunStatus.RUNNING
+
+        await asyncio.sleep(0.5)
+
+        stopped = await service.stop_run(
+            started.run_id
+        )
+        assert stopped.status == RunStatus.STOPPED
+
+        events = await store.get_run_events(
+            started.run_id
+        )
+        log_events = [
+            e
+            for e in events
+            if e.source_domain == SourceDomain.LOG
+        ]
+        assert len(log_events) > 0
+
+        targeted_logs = [
+            e
+            for e in log_events
+            if e.component == "payment_database"
+        ]
+        assert len(targeted_logs) > 0
+        for log_event in targeted_logs:
+            assert log_event.service == "payment_service"
+            assert log_event.component == "payment_database"
 
     finally:
         await active_run_manager.shutdown()
