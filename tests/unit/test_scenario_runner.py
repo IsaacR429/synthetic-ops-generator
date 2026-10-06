@@ -1,9 +1,19 @@
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 
 from synthetic_ops_generator.core.clock import ManualSimulationClock
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.events.envelope import GeneratedEvent
+from synthetic_ops_generator.generators.base import SourceGenerator
+from synthetic_ops_generator.generators.bindings import (
+    SourceExecutionBinding,
+)
+from synthetic_ops_generator.scenarios.context import (
+    ScenarioContext,
+    ScenarioExecutionTarget,
+)
 from synthetic_ops_generator.domain.enterprise import (
     BusinessStream,
     Component,
@@ -452,4 +462,121 @@ async def test_runner_can_stop_at_active_state_before_completed() -> None:
     assert (
         OperationalState.COMPLETED.value
         not in visited_states
-    )
+    )
+
+
+class ContextRecordingGenerator(SourceGenerator):
+    source_system = "test"
+
+    async def generate(
+        self,
+        context: ScenarioContext,
+    ) -> AsyncIterator[GeneratedEvent]:
+        sequence_number = context.next_sequence()
+        yield GeneratedEvent(
+            event_id=f"EVT-{sequence_number}",
+            event_type="test.context",
+            event_time=context.simulation_time,
+            source_system=self.source_system,
+            scenario_id=context.scenario_id,
+            run_id=context.run_id,
+            chg_id=context.chg_id,
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=context.environment,
+            sequence_number=sequence_number,
+        )
+
+
+@pytest.mark.asyncio
+async def test_execute_bindings_projects_target_context() -> None:
+    scenario = build_scenario()
+    enterprise = build_enterprise()
+    clock = ManualSimulationClock(
+        datetime(2026, 8, 15, 10, 0, tzinfo=UTC)
+    )
+    runner = ScenarioRunner(
+        ids=IdFactory(),
+        clock=clock,
+    )
+    context = runner.create_context(
+        scenario=scenario,
+        enterprise=enterprise,
+        random_seed=42,
+    )
+    target = ScenarioExecutionTarget(
+        business_stream="core_banking",
+        service="account_service",
+        component="account_database",
+        environment=Environment.PRODUCTION,
+    )
+    binding = SourceExecutionBinding(
+        behaviour=scenario.behaviours[0],
+        generator=ContextRecordingGenerator(),
+        execution_target=target,
+    )
+    publisher = InMemoryPublisher()
+    await runner.execute_bindings(
+        scenario=scenario,
+        context=context,
+        bindings=[binding],
+        publisher=publisher,
+        stop_at_state=OperationalState.NORMAL,
+    )
+    assert len(publisher.events) > 0
+    event = publisher.events[0]
+    assert event.business_stream == "core_banking"
+    assert event.service == "account_service"
+    assert event.component == "account_database"
+    assert context.service == "payment_service"
+
+
+@pytest.mark.asyncio
+async def test_execute_bindings_shares_run_state_and_sequence() -> None:
+    scenario = build_scenario()
+    enterprise = build_enterprise()
+    clock = ManualSimulationClock(
+        datetime(2026, 8, 15, 10, 0, tzinfo=UTC)
+    )
+    runner = ScenarioRunner(
+        ids=IdFactory(),
+        clock=clock,
+    )
+    context = runner.create_context(
+        scenario=scenario,
+        enterprise=enterprise,
+        random_seed=42,
+    )
+    target_b = ScenarioExecutionTarget(
+        business_stream="core_banking",
+        service="account_service",
+        component="account_database",
+        environment=Environment.PRODUCTION,
+    )
+    binding_a = SourceExecutionBinding(
+        behaviour=scenario.behaviours[0],
+        generator=ContextRecordingGenerator(),
+        execution_target=None,
+    )
+    binding_b = SourceExecutionBinding(
+        behaviour=scenario.behaviours[0],
+        generator=ContextRecordingGenerator(),
+        execution_target=target_b,
+    )
+    publisher = InMemoryPublisher()
+    await runner.execute_bindings(
+        scenario=scenario,
+        context=context,
+        bindings=[binding_a, binding_b],
+        publisher=publisher,
+        stop_at_state=OperationalState.NORMAL,
+    )
+    events = publisher.events
+    assert len(events) == 2
+    event_a, event_b = events[0], events[1]
+    assert event_a.run_id == event_b.run_id
+    assert event_a.scenario_id == event_b.scenario_id
+    assert event_a.chg_id == event_b.chg_id
+    assert event_a.sequence_number == 1
+    assert event_b.sequence_number == 2

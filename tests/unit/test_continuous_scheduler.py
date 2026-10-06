@@ -22,7 +22,10 @@ from synthetic_ops_generator.domain.operational_log import (
 )
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.publishers.base import EventPublisher
-from synthetic_ops_generator.scenarios.context import ScenarioContext
+from synthetic_ops_generator.scenarios.context import (
+    ScenarioContext,
+    ScenarioExecutionTarget,
+)
 from synthetic_ops_generator.scenarios.continuous import (
     ContinuousSourceBinding,
     ContinuousSourceScheduler,
@@ -475,5 +478,106 @@ async def test_scheduler_rejects_unsupported_continuous_source() -> None:
                     generator=SingleEventGenerator("deployment.triggered"),
                 )
             ],
+            publisher=RecordingPublisher(stop_after=1),
+        )
+
+
+@pytest.mark.asyncio
+async def test_continuous_scheduler_projects_target_context() -> None:
+    start = datetime(2026, 8, 15, 10, 0, tzinfo=UTC)
+    clock = ManualSimulationClock(start)
+    context = make_context(clock)
+
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.METRIC,
+        during_state=OperationalState.OBSERVING,
+        profile_id="operational_metrics",
+        continuous=True,
+    )
+
+    scheduler = ContinuousSourceScheduler(
+        clock=clock,
+        runtime=RuntimeTimingConfiguration(
+            mode=RuntimeMode.ACCELERATED,
+            speed_multiplier=12.0,
+        ),
+        frequency=make_frequency(),
+        sleep_fn=SleepRecorder(),
+    )
+
+    target = ScenarioExecutionTarget(
+        business_stream="core_banking",
+        service="account_service",
+        component="account_database",
+        environment=Environment.PRODUCTION,
+    )
+
+    binding = ContinuousSourceBinding(
+        behaviour=behaviour,
+        generator=MetricEventGenerator(),
+        execution_target=target,
+    )
+
+    publisher = RecordingPublisher(stop_after=1)
+
+    await scheduler.run(
+        context=context,
+        bindings=[binding],
+        publisher=publisher,
+    )
+
+    assert len(publisher.events) == 1
+    event = publisher.events[0]
+    assert event.business_stream == "core_banking"
+    assert event.service == "account_service"
+    assert event.component == "account_database"
+    assert context.service == "payment-gateway"
+
+
+@pytest.mark.asyncio
+async def test_continuous_scheduler_rejects_targeted_raw_async_generator() -> None:
+    start = datetime(2026, 8, 15, 10, 0, tzinfo=UTC)
+    clock = ManualSimulationClock(start)
+    context = make_context(clock)
+
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.METRIC,
+        during_state=OperationalState.OBSERVING,
+        profile_id="operational_metrics",
+        continuous=True,
+    )
+
+    scheduler = ContinuousSourceScheduler(
+        clock=clock,
+        runtime=RuntimeTimingConfiguration(
+            mode=RuntimeMode.ACCELERATED,
+            speed_multiplier=12.0,
+        ),
+        frequency=make_frequency(),
+        sleep_fn=SleepRecorder(),
+    )
+
+    target = ScenarioExecutionTarget(
+        business_stream="core_banking",
+        service="account_service",
+        component="account_database",
+        environment=Environment.PRODUCTION,
+    )
+
+    raw_generator = MetricEventGenerator().generate(context)
+
+    binding = ContinuousSourceBinding(
+        behaviour=behaviour,
+        generator=raw_generator,
+        execution_target=target,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="cannot be assigned an execution target",
+    ):
+        await scheduler.run(
+            context=context,
+            bindings=[binding],
             publisher=RecordingPublisher(stop_after=1),
         )

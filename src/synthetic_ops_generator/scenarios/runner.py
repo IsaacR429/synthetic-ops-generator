@@ -11,8 +11,14 @@ from synthetic_ops_generator.domain.enterprise import Enterprise
 from synthetic_ops_generator.domain.enums import OperationalState
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.base import SourceGenerator
+from synthetic_ops_generator.generators.bindings import (
+    SourceExecutionBinding,
+)
 from synthetic_ops_generator.publishers.base import EventPublisher
-from synthetic_ops_generator.scenarios.context import ScenarioContext
+from synthetic_ops_generator.scenarios.context import (
+    ScenarioContext,
+    ScenarioExecutionTarget,
+)
 from synthetic_ops_generator.scenarios.models import ScenarioDefinition
 from synthetic_ops_generator.scenarios.state_machine import ScenarioStateMachine
 
@@ -118,6 +124,70 @@ class ScenarioRunner:
         produced by registered source generators.
         """
 
+        return await self._execute_sources(
+            scenario=scenario,
+            context=context,
+            sources=[
+                (generator, None)
+                for generator in generators
+            ],
+            publisher=publisher,
+            progress_observer=progress_observer,
+            event_interval_seconds=event_interval_seconds,
+            stop_at_state=stop_at_state,
+        )
+
+    async def execute_bindings(
+        self,
+        *,
+        scenario: ScenarioDefinition,
+        context: ScenarioContext,
+        bindings: Sequence[SourceExecutionBinding],
+        publisher: EventPublisher,
+        progress_observer: (
+            ScenarioProgressObserver | None
+        ) = None,
+        event_interval_seconds: float = 5.0,
+        stop_at_state: OperationalState | None = None,
+    ) -> list[str]:
+        """
+        Execute a Scenario state sequence with execution bindings.
+        """
+
+        return await self._execute_sources(
+            scenario=scenario,
+            context=context,
+            sources=[
+                (
+                    binding.generator,
+                    binding.execution_target,
+                )
+                for binding in bindings
+            ],
+            publisher=publisher,
+            progress_observer=progress_observer,
+            event_interval_seconds=event_interval_seconds,
+            stop_at_state=stop_at_state,
+        )
+
+    async def _execute_sources(
+        self,
+        *,
+        scenario: ScenarioDefinition,
+        context: ScenarioContext,
+        sources: Sequence[
+            tuple[
+                SourceGenerator,
+                ScenarioExecutionTarget | None,
+            ]
+        ],
+        publisher: EventPublisher,
+        progress_observer: (
+            ScenarioProgressObserver | None
+        ) = None,
+        event_interval_seconds: float = 5.0,
+        stop_at_state: OperationalState | None = None,
+    ) -> list[str]:
         if event_interval_seconds <= 0:
             raise ValueError(
                 "Event interval must be greater than zero."
@@ -188,9 +258,17 @@ class ScenarioRunner:
                     len(self._event_history),
                 )
 
-            for generator in generators:
-                async for event in generator.generate(
+            for generator, execution_target in sources:
+                generator_context = (
                     context
+                    if execution_target is None
+                    else context.for_target(
+                        execution_target
+                    )
+                )
+
+                async for event in generator.generate(
+                    generator_context
                 ):
                     await publisher.publish(event)
 

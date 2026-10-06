@@ -13,7 +13,10 @@ from synthetic_ops_generator.domain.operational_log import OperationalLog
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.base import SourceGenerator
 from synthetic_ops_generator.publishers.base import EventPublisher
-from synthetic_ops_generator.scenarios.context import ScenarioContext
+from synthetic_ops_generator.scenarios.context import (
+    ScenarioContext,
+    ScenarioExecutionTarget,
+)
 from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     SourceDomain,
@@ -24,6 +27,7 @@ from synthetic_ops_generator.scenarios.models import (
 class ContinuousSourceBinding:
     behaviour: ScenarioBehaviour
     generator: SourceGenerator | AsyncGenerator[GeneratedEvent, None]
+    execution_target: ScenarioExecutionTarget | None = None
 
 
 class ContinuousSourceScheduler:
@@ -65,12 +69,30 @@ class ContinuousSourceScheduler:
         binding: ContinuousSourceBinding,
         context: ScenarioContext,
     ) -> Any:
+        generator_context = context
+
+        if binding.execution_target is not None:
+            if not hasattr(binding.generator, "generate"):
+                raise ValueError(
+                    "Pre-created continuous async generators "
+                    "cannot be assigned an execution target."
+                )
+            generator_context = context.for_target(
+                binding.execution_target
+            )
+
         if hasattr(binding.generator, "generate"):
-            gen = binding.generator.generate(context)
+            gen = binding.generator.generate(
+                generator_context
+            )
         else:
             gen = binding.generator
 
-        return gen.__aiter__() if hasattr(gen, "__aiter__") else gen
+        return (
+            gen.__aiter__()
+            if hasattr(gen, "__aiter__")
+            else gen
+        )
 
     def _simulated_interval(
         self,
