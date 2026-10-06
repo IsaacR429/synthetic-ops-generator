@@ -4,6 +4,9 @@ from synthetic_ops_generator.control.models import (
     RunRecord,
     RunStatus,
 )
+from synthetic_ops_generator.domain.enums import (
+    OperationalState,
+)
 
 
 class RunStore(ABC):
@@ -50,6 +53,21 @@ class RunStore(ABC):
         self,
         record: RunRecord,
     ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_progress(
+        self,
+        *,
+        run_id: str,
+        current_state: OperationalState,
+        event_count: int,
+    ) -> bool:
+        """
+        Persist execution progress only while the Run is RUNNING.
+        Returns True when progress was updated and False when
+        the Run exists but is already terminal.
+        """
         raise NotImplementedError
 
     @abstractmethod

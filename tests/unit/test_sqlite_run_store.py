@@ -719,3 +719,94 @@ def test_continuous_duration_configuration_requires_positive_duration(
             stop_mode=ContinuousStopMode.DURATION,
             duration_seconds=duration_seconds,
         )
+
+
+@pytest.mark.asyncio
+async def test_sqlite_run_store_updates_running_progress(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+    await store.start()
+    try:
+        record = make_run_record()
+        await store.create(record)
+        updated = await store.update_progress(
+            run_id=record.run_id,
+            current_state=OperationalState.NORMAL,
+            event_count=7,
+        )
+        stored = await store.get(
+            record.run_id
+        )
+        assert updated is True
+        assert stored == replace(
+            record,
+            current_state=OperationalState.NORMAL,
+            event_count=7,
+        )
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_sqlite_run_store_does_not_update_progress_after_stop(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+    await store.start()
+    try:
+        record = make_run_record()
+        await store.create(record)
+        stopped = replace(
+            record,
+            status=RunStatus.STOPPED,
+            completed_at=datetime(
+                2026,
+                8,
+                14,
+                0,
+                5,
+                tzinfo=UTC,
+            ),
+            current_state=OperationalState.OBSERVING,
+            event_count=28,
+        )
+        await store.update(stopped)
+        updated = await store.update_progress(
+            run_id=record.run_id,
+            current_state=OperationalState.COMPLETED,
+            event_count=29,
+        )
+        stored = await store.get(
+            record.run_id
+        )
+        assert updated is False
+        assert stored == stopped
+    finally:
+        await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_sqlite_run_store_rejects_progress_for_unknown_run(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+    await store.start()
+    try:
+        with pytest.raises(
+            ValueError,
+            match="Run does not exist",
+        ):
+            await store.update_progress(
+                run_id="RUN9999999",
+                current_state=OperationalState.NORMAL,
+                event_count=1,
+            )
+    finally:
+        await store.stop()

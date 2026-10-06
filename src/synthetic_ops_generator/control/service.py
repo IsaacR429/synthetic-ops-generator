@@ -975,26 +975,17 @@ class ControlService:
         state: OperationalState,
         event_count: int,
     ) -> None:
-        record = await self._run_store.get(
-            run_id
-        )
-
-        if record is None:
-            raise RuntimeError(
-                f"Run '{run_id}' disappeared "
-                "during execution."
-            )
-
-        if record.status != RunStatus.RUNNING:
-            return
-
-        await self._run_store.update(
-            replace(
-                record,
+        try:
+            await self._run_store.update_progress(
+                run_id=run_id,
                 current_state=state,
                 event_count=event_count,
             )
-        )
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Run '{run_id}' disappeared "
+                "during execution."
+            ) from exc
 
     async def reconcile_orphaned_runs(
         self,

@@ -120,6 +120,32 @@ class SQLiteRunStore(RunStore):
                 f"Run does not exist: {record.run_id}"
             )
 
+    async def update_progress(
+        self,
+        *,
+        run_id: str,
+        current_state: OperationalState,
+        event_count: int,
+    ) -> bool:
+        self._require_started()
+
+        if not run_id.strip():
+            raise ValueError(
+                "Run ID is required."
+            )
+
+        if event_count < 0:
+            raise ValueError(
+                "Event count cannot be negative."
+            )
+
+        return await asyncio.to_thread(
+            self._update_progress_sync,
+            run_id,
+            current_state,
+            event_count,
+        )
+
     async def stop(self) -> None:
         self._started = False
 
@@ -803,6 +829,52 @@ class SQLiteRunStore(RunStore):
             )
 
             return cursor.rowcount > 0
+
+    def _update_progress_sync(
+        self,
+        run_id: str,
+        current_state: OperationalState,
+        event_count: int,
+    ) -> bool:
+        with sqlite3.connect(
+            self._database_path
+        ) as connection:
+            cursor = connection.execute(
+                """
+                UPDATE runs
+                SET
+                    current_state = ?,
+                    event_count = ?
+                WHERE
+                    run_id = ?
+                    AND status = ?
+                """,
+                (
+                    current_state.value,
+                    event_count,
+                    run_id,
+                    RunStatus.RUNNING.value,
+                ),
+            )
+
+            if cursor.rowcount > 0:
+                return True
+
+            exists = connection.execute(
+                """
+                SELECT 1
+                FROM runs
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            ).fetchone()
+
+            if exists is None:
+                raise ValueError(
+                    f"Run does not exist: {run_id}"
+                )
+
+            return False
 
     def _record_values(
         self,
