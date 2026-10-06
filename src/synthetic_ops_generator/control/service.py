@@ -663,6 +663,8 @@ class ControlService:
                         events=runner.event_history,
                         context=context,
                         enterprise=enterprise,
+                        scenario=scenario,
+                        execution_plan=execution_plan,
                     )
                 )
 

@@ -3,7 +3,16 @@ from collections.abc import Sequence
 
 from synthetic_ops_generator.domain.enterprise import Enterprise
 from synthetic_ops_generator.events.envelope import GeneratedEvent
-from synthetic_ops_generator.scenarios.context import ScenarioContext
+from synthetic_ops_generator.scenarios.context import (
+    ScenarioContext,
+    ScenarioExecutionTarget,
+)
+from synthetic_ops_generator.scenarios.execution_plan import (
+    ScenarioExecutionPlan,
+)
+from synthetic_ops_generator.scenarios.models import (
+    ScenarioDefinition,
+)
 from synthetic_ops_generator.validation.models import (
     CrossSourceValidationReport,
 )
@@ -24,6 +33,8 @@ class CrossSourceValidator:
         events: Sequence[GeneratedEvent],
         context: ScenarioContext,
         enterprise: Enterprise | None = None,
+        scenario: ScenarioDefinition | None = None,
+        execution_plan: ScenarioExecutionPlan | None = None,
     ) -> CrossSourceValidationReport:
         report = CrossSourceValidationReport()
 
@@ -40,6 +51,14 @@ class CrossSourceValidator:
         self._validate_context_correlation(
             events=events,
             context=context,
+            report=report,
+        )
+
+        self._validate_execution_target_scope(
+            events=events,
+            context=context,
+            scenario=scenario,
+            execution_plan=execution_plan,
             report=report,
         )
 
@@ -181,10 +200,37 @@ class CrossSourceValidator:
                     event_ids=[event.event_id],
                 )
 
+    @classmethod
+    def _validate_execution_target_scope(
+        cls,
+        *,
+        events: Sequence[GeneratedEvent],
+        context: ScenarioContext,
+        scenario: ScenarioDefinition | None,
+        execution_plan: ScenarioExecutionPlan | None,
+        report: CrossSourceValidationReport,
+    ) -> None:
+        allowed_targets = cls._resolve_allowed_execution_targets(
+            context=context,
+            scenario=scenario,
+            execution_plan=execution_plan,
+        )
+        allowed_business_streams = {
+            target.business_stream
+            for target in allowed_targets
+        }
+        allowed_services = {
+            target.service
+            for target in allowed_targets
+        }
+
+        for event in events:
+            invalid_dimension = False
+
             if (
                 event.business_stream is not None
                 and event.business_stream
-                != context.business_stream
+                not in allowed_business_streams
             ):
                 report.add_finding(
                     requirement_id="REQ-COR-004",
@@ -192,26 +238,140 @@ class CrossSourceValidator:
                     message=(
                         f"Event {event.event_id} references "
                         f"Business Stream "
-                        f"{event.business_stream}; expected "
-                        f"{context.business_stream}."
+                        f"{event.business_stream}; it is outside "
+                        "the Scenario execution scope."
                     ),
                     event_ids=[event.event_id],
                 )
+                invalid_dimension = True
 
             if (
                 event.service is not None
-                and event.service != context.service
+                and event.service not in allowed_services
             ):
                 report.add_finding(
                     requirement_id="REQ-COR-005",
                     rule="service_correlation",
                     message=(
                         f"Event {event.event_id} references "
-                        f"Service {event.service}; "
-                        f"expected {context.service}."
+                        f"Service {event.service}; it is outside "
+                        "the Scenario execution scope."
                     ),
                     event_ids=[event.event_id],
                 )
+                invalid_dimension = True
+
+            if invalid_dimension:
+                continue
+
+            if any(
+                cls._event_matches_execution_target(
+                    event=event,
+                    target=target,
+                )
+                for target in allowed_targets
+            ):
+                continue
+
+            report.add_finding(
+                requirement_id="REQ-COR-006",
+                rule="execution_target_scope",
+                message=(
+                    f"Event {event.event_id} target "
+                    f"(business_stream={event.business_stream}, "
+                    f"service={event.service}, "
+                    f"component={event.component}, "
+                    f"environment={event.environment}) "
+                    "is outside the Scenario execution scope."
+                ),
+                event_ids=[event.event_id],
+            )
+
+    @staticmethod
+    def _resolve_allowed_execution_targets(
+        *,
+        context: ScenarioContext,
+        scenario: ScenarioDefinition | None,
+        execution_plan: ScenarioExecutionPlan | None,
+    ) -> list[ScenarioExecutionTarget]:
+        targets: list[ScenarioExecutionTarget] = []
+
+        if scenario is not None:
+            if scenario.target.component_ids:
+                for component_id in scenario.target.component_ids:
+                    target = ScenarioExecutionTarget(
+                        business_stream=(
+                            scenario.target.business_stream_id
+                        ),
+                        service=scenario.target.service_id,
+                        component=component_id,
+                        environment=scenario.target.environment,
+                    )
+                    if target not in targets:
+                        targets.append(target)
+            else:
+                targets.append(
+                    ScenarioExecutionTarget(
+                        business_stream=(
+                            scenario.target.business_stream_id
+                        ),
+                        service=scenario.target.service_id,
+                        component=None,
+                        environment=scenario.target.environment,
+                    )
+                )
+        else:
+            targets.append(
+                ScenarioExecutionTarget(
+                    business_stream=context.business_stream,
+                    service=context.service,
+                    component=None,
+                    environment=context.environment,
+                )
+            )
+
+        if execution_plan is not None:
+            for entry in execution_plan.entries:
+                if (
+                    entry.execution_target is not None
+                    and entry.execution_target not in targets
+                ):
+                    targets.append(entry.execution_target)
+
+        return targets
+
+    @staticmethod
+    def _event_matches_execution_target(
+        *,
+        event: GeneratedEvent,
+        target: ScenarioExecutionTarget,
+    ) -> bool:
+        if (
+            event.business_stream is not None
+            and event.business_stream != target.business_stream
+        ):
+            return False
+
+        if (
+            event.service is not None
+            and event.service != target.service
+        ):
+            return False
+
+        if (
+            event.environment is not None
+            and event.environment != target.environment
+        ):
+            return False
+
+        if (
+            event.component is not None
+            and target.component is not None
+            and event.component != target.component
+        ):
+            return False
+
+        return True
 
     @staticmethod
     def _validate_chronology(

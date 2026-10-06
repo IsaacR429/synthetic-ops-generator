@@ -11,10 +11,29 @@ from synthetic_ops_generator.domain.enums import (
     Environment,
     Industry,
     OperationalState,
+    Outcome,
     RiskLevel,
+    SourceDomain,
 )
 from synthetic_ops_generator.events.envelope import GeneratedEvent
-from synthetic_ops_generator.scenarios.context import ScenarioContext
+from synthetic_ops_generator.oracle.models import (
+    ExpectedScenarioResult,
+)
+from synthetic_ops_generator.scenarios.context import (
+    ScenarioContext,
+    ScenarioExecutionTarget,
+)
+from synthetic_ops_generator.scenarios.execution_plan import (
+    ScenarioExecutionPlan,
+    ScenarioExecutionPlanEntry,
+)
+from synthetic_ops_generator.scenarios.models import (
+    ScenarioBehaviour,
+    ScenarioDefinition,
+    ScenarioFamily,
+    ScenarioTarget,
+    ScenarioTrigger,
+)
 from synthetic_ops_generator.validation.cross_source import (
     CrossSourceValidator,
 )
@@ -523,3 +542,203 @@ def test_incident_lifecycle_field_mismatch_is_reported() -> None:
         == "incident_lifecycle_consistency"
         for finding in report.findings
     )
+
+
+def build_multi_target_enterprise() -> Enterprise:
+    enterprise = build_enterprise()
+    enterprise.business_streams.append(
+        BusinessStream(
+            stream_id="core_banking",
+            name="Core Banking",
+        )
+    )
+    enterprise.services.append(
+        Service(
+            service_id="account_service",
+            name="Account Service",
+            business_stream_id="core_banking",
+            owner="Core Banking Team",
+            criticality=Criticality.CRITICAL,
+        )
+    )
+    enterprise.components.append(
+        Component(
+            component_id="account_database",
+            name="Account Database",
+            component_type="database",
+            service_id="account_service",
+            environment=Environment.PRODUCTION,
+        )
+    )
+    return enterprise
+
+
+def build_target_execution_plan(
+    target: ScenarioExecutionTarget | None,
+) -> ScenarioExecutionPlan:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.LOG,
+        during_state=OperationalState.OBSERVING,
+        profile_id="execution_target_test",
+    )
+    return ScenarioExecutionPlan(
+        entries=(
+            ScenarioExecutionPlanEntry(
+                behaviour=behaviour,
+                execution_target=target,
+            ),
+        )
+    )
+
+
+def test_execution_plan_target_is_valid_run_scope() -> None:
+    execution_target = ScenarioExecutionTarget(
+        business_stream="core_banking",
+        service="account_service",
+        component="account_database",
+        environment=Environment.PRODUCTION,
+    )
+    event = build_event(
+        sequence_number=1,
+    ).model_copy(
+        update={
+            "business_stream": "core_banking",
+            "service": "account_service",
+            "component": "account_database",
+        }
+    )
+    report = CrossSourceValidator().validate(
+        events=[event],
+        context=build_context(),
+        enterprise=build_multi_target_enterprise(),
+        execution_plan=build_target_execution_plan(
+            execution_target
+        ),
+    )
+    assert report.is_valid is True
+    assert report.findings == []
+
+
+def test_enterprise_known_target_outside_execution_plan_is_rejected() -> None:
+    event = build_event(
+        sequence_number=1,
+    ).model_copy(
+        update={
+            "business_stream": "core_banking",
+            "service": "account_service",
+            "component": "account_database",
+        }
+    )
+    report = CrossSourceValidator().validate(
+        events=[event],
+        context=build_context(),
+        enterprise=build_multi_target_enterprise(),
+        execution_plan=build_target_execution_plan(None),
+    )
+    assert report.is_valid is False
+    assert any(
+        finding.rule == "business_stream_correlation"
+        or finding.rule == "service_correlation"
+        for finding in report.findings
+    )
+
+
+def build_scope_scenario(
+    component_ids: list[str],
+) -> ScenarioDefinition:
+    return ScenarioDefinition(
+        scenario_id="TEST-01",
+        name="Execution Scope Test",
+        description="Tests declared execution scope.",
+        family=ScenarioFamily.CHANGE_VALIDATION,
+        industry=Industry.BANKING,
+        target=ScenarioTarget(
+            enterprise_id="bank_alpha",
+            business_stream_id="payments",
+            service_id="payment_service",
+            component_ids=component_ids,
+            environment=Environment.PRODUCTION,
+        ),
+        risk=RiskLevel.MEDIUM,
+        initial_conditions=[
+            "Payment Service is available.",
+        ],
+        trigger=ScenarioTrigger(
+            source=SourceDomain.LOG,
+            trigger_type="scope_test",
+            description="Generate scope-test evidence.",
+        ),
+        state_sequence=[
+            OperationalState.INITIALISING,
+            OperationalState.OBSERVING,
+            OperationalState.COMPLETED,
+        ],
+        behaviours=[
+            ScenarioBehaviour(
+                source=SourceDomain.LOG,
+                during_state=OperationalState.OBSERVING,
+                profile_id="scope_test",
+            )
+        ],
+        expected_result=ExpectedScenarioResult(
+            scenario_id="TEST-01",
+            expected_outcome=Outcome.SUCCESSFUL,
+        ),
+    )
+
+
+def test_declared_secondary_component_is_valid_run_scope() -> None:
+    enterprise = build_enterprise()
+    enterprise.components.append(
+        Component(
+            component_id="payment_worker",
+            name="Payment Worker",
+            component_type="worker",
+            service_id="payment_service",
+            environment=Environment.PRODUCTION,
+        )
+    )
+    event = build_event(
+        sequence_number=1,
+        component="payment_worker",
+    )
+    report = CrossSourceValidator().validate(
+        events=[event],
+        context=build_context(),
+        enterprise=enterprise,
+        scenario=build_scope_scenario(
+            ["payment_api", "payment_worker"]
+        ),
+    )
+    assert report.is_valid is True
+    assert report.findings == []
+
+
+def test_enterprise_known_component_outside_declared_scope_is_rejected() -> None:
+    enterprise = build_enterprise()
+    enterprise.components.append(
+        Component(
+            component_id="payment_worker",
+            name="Payment Worker",
+            component_type="worker",
+            service_id="payment_service",
+            environment=Environment.PRODUCTION,
+        )
+    )
+    event = build_event(
+        sequence_number=1,
+        component="payment_worker",
+    )
+    report = CrossSourceValidator().validate(
+        events=[event],
+        context=build_context(),
+        enterprise=enterprise,
+        scenario=build_scope_scenario(
+            ["payment_api"]
+        ),
+    )
+    assert report.is_valid is False
+    assert "execution_target_scope" in {
+        finding.rule
+        for finding in report.findings
+    }
