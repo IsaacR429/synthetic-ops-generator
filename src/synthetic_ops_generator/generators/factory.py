@@ -12,6 +12,9 @@ from synthetic_ops_generator.generators.application_test import (
     ApplicationTestGenerator,
 )
 from synthetic_ops_generator.generators.base import SourceGenerator
+from synthetic_ops_generator.generators.bindings import (
+    SourceExecutionBinding,
+)
 from synthetic_ops_generator.generators.deployment import (
     DeploymentGenerator,
 )
@@ -40,6 +43,9 @@ from synthetic_ops_generator.metrics.runtime import (
 )
 from synthetic_ops_generator.scenarios.context import (
     ScenarioExecutionTarget,
+)
+from synthetic_ops_generator.scenarios.execution_plan import (
+    ScenarioExecutionPlan,
 )
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
@@ -272,6 +278,68 @@ class GeneratorFactory:
                 )
 
         return generators
+
+    def build_execution_bindings(
+        self,
+        *,
+        scenario: ScenarioDefinition,
+        enterprise: Enterprise,
+        plan: ScenarioExecutionPlan,
+        ids: IdFactory,
+        random_source: SimulationRandom,
+        event_history: Sequence[GeneratedEvent],
+    ) -> list[SourceExecutionBinding]:
+        if len(plan.entries) != len(scenario.behaviours):
+            raise ValueError(
+                "Scenario execution plan does not match "
+                "Scenario behaviour count."
+            )
+
+        bindings: list[SourceExecutionBinding] = []
+
+        for behaviour, entry in zip(
+            scenario.behaviours,
+            plan.entries,
+            strict=True,
+        ):
+            if entry.behaviour != behaviour:
+                raise ValueError(
+                    "Scenario execution plan behaviour order "
+                    "does not match Scenario definition."
+                )
+
+            behaviour_scenario = scenario.model_copy(
+                update={
+                    "behaviours": [
+                        entry.behaviour,
+                    ],
+                }
+            )
+
+            generators = self.build(
+                scenario=behaviour_scenario,
+                enterprise=enterprise,
+                ids=ids,
+                random_source=random_source,
+                event_history=event_history,
+                execution_target=entry.execution_target,
+            )
+
+            if len(generators) != 1:
+                raise RuntimeError(
+                    "Scenario execution plan entry did not "
+                    "produce exactly one generator."
+                )
+
+            bindings.append(
+                SourceExecutionBinding(
+                    behaviour=entry.behaviour,
+                    generator=generators[0],
+                    execution_target=entry.execution_target,
+                )
+            )
+
+        return bindings
 
     @staticmethod
     def _find_service(
