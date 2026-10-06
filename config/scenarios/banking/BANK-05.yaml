@@ -1,0 +1,206 @@
+﻿scenario_id: BANK-05
+
+name: Core Banking Database Connectivity Failure
+
+description: >
+  Simulates a production connectivity failure affecting the Bank Alpha
+  Account Database. The Account API observes downstream dependency
+  failures while the Payment Service develops degraded operational
+  symptoms because of its dependency on the Account Database.
+  Connectivity and Service health subsequently recover without an
+  associated production Change.
+
+family: root_cause_analysis
+
+industry: banking
+
+target:
+  enterprise_id: bank_alpha
+  business_stream_id: payments
+  service_id: payment_service
+
+  component_ids:
+    - payment_api
+    - payment_database
+    - payment_worker
+
+  environment: production
+
+correlation:
+  change_required: false
+
+risk: high
+
+initial_conditions:
+  - Payment Service is operating normally.
+  - Account Service dependencies are operating normally.
+  - Account Database connectivity is healthy.
+  - No production Change is associated with the degradation.
+  - Payment Service baseline and benchmark configuration is valid.
+  - Operational monitoring and infrastructure validation are active.
+
+trigger:
+  source: infrastructure_test
+  trigger_type: account_database_connectivity_loss
+  description: >
+    Production connectivity to the Account Database becomes unavailable,
+    affecting services that depend on the database.
+
+state_sequence:
+  - initialising
+  - normal
+  - warning
+  - degraded
+  - recovery
+  - completed
+
+behaviours:
+  - source: metric
+    during_state: normal
+    profile_id: healthy_baseline
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Payment Service metrics initially remain within normal operational
+      behaviour.
+
+  - source: metric
+    during_state: warning
+    profile_id: operational_warning
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Payment Service health begins to deteriorate as requests encounter
+      problems reaching the dependent Account Database.
+
+  - source: infrastructure_test
+    during_state: degraded
+    profile_id: required_check_failed
+    execution_node_id: account_database
+    description: >
+      Required infrastructure validation detects a connectivity failure
+      on the Account Database.
+
+  - source: log
+    during_state: degraded
+    profile_id: degradation_error_logs
+    execution_node_id: account_api
+    description: >
+      Account API logs expose request timeouts and downstream dependency
+      failures while Account Database connectivity is unavailable.
+
+  - source: metric
+    during_state: degraded
+    profile_id: operational_degradation
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Payment Service metrics reach blocking operational conditions while
+      the dependent database remains unavailable.
+
+  - source: log
+    during_state: degraded
+    profile_id: degradation_error_logs
+    description: >
+      Payment Service logs expose request failures and downstream
+      dependency errors during the database connectivity outage.
+
+  - source: infrastructure_test
+    during_state: recovery
+    profile_id: all_required_checks_pass
+    execution_node_id: account_database
+    description: >
+      Account Database infrastructure validations confirm restored
+      connectivity and service health.
+
+  - source: log
+    during_state: recovery
+    profile_id: recovery_operational_logs
+    execution_node_id: account_api
+    continuous: true
+    description: >
+      Account API logs confirm restored downstream dependency access.
+
+  - source: metric
+    during_state: recovery
+    profile_id: operational_recovery
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    continuous: true
+    description: >
+      Payment Service operational metrics return to normal reference
+      targets after database connectivity is restored.
+
+  - source: log
+    during_state: recovery
+    profile_id: recovery_operational_logs
+    continuous: true
+    description: >
+      Payment Service logs confirm normal request processing after
+      dependency recovery.
+
+expected_result:
+  scenario_id: BANK-05
+
+  expected_outcome: successful
+
+  expected_blocking_conditions:
+    - account_database_connectivity_failure
+    - blocking_operational_metrics
+
+  expected_evidence:
+    - healthy_payment_service_baseline
+    - payment_service_warning_metrics
+    - account_database_connectivity_failure
+    - account_api_dependency_errors
+    - degraded_payment_service_metrics
+    - payment_service_dependency_errors
+    - account_database_connectivity_recovery
+    - account_api_recovery_logs
+    - payment_service_recovery_observation
+    - payment_service_recovery_logs
+
+  expected_incident_attribution: false
+
+  expected_root_cause: account_database
+
+  expected_insight: >
+    Account Database connectivity failed during normal production
+    operation. The Account API produced downstream dependency failures
+    while the Payment Service developed blocking operational symptoms.
+    Connectivity restoration was followed by recovery of both Account API
+    dependency access and Payment Service health. No production Change was
+    associated with the event.
+
+assumptions:
+  - Required enterprise and topology references exist.
+  - Payment Service baseline and benchmark configuration is valid.
+  - Account Database infrastructure checks represent observed connectivity evidence.
+  - Account API dependency-error logs represent symptoms rather than root-cause conclusions.
+  - Payment Service degradation represents downstream impact rather than direct proof of cause.
+  - Recovery evidence follows restoration of Account Database connectivity.
+  - No Change identifier is generated for this Scenario.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - banking
+  - payments
+  - core_banking
+  - database
+  - connectivity
+  - dependency
+  - root_cause_analysis
+  - recovery
+  - no_change

@@ -2671,3 +2671,232 @@ async def test_control_service_validates_bounded_multi_service_run(
         await active_run_manager.shutdown()
         await run_store.stop()
         await store.stop()
+
+
+@pytest.mark.asyncio
+async def test_control_service_executes_bank_05_database_rca_evidence_chain(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+
+    try:
+        service = ControlService(
+            catalogue=ScenarioCatalogue(
+                CONFIG_ROOT / "scenarios"
+            ),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        started = await service.start_run(
+            scenario_id="BANK-05",
+            random_seed=42,
+        )
+
+        assert started.scenario_id == "BANK-05"
+        assert started.change_id is None
+        assert started.status == RunStatus.RUNNING
+
+        record = await wait_for_terminal_run(
+            service,
+            started.run_id,
+        )
+
+        events = await store.get_run_events(
+            started.run_id
+        )
+
+        database_failures = [
+            event
+            for event in events
+            if (
+                event.event_type
+                == "infrastructure_test.failed"
+                and event.service == "account_service"
+                and event.component == "account_database"
+                and event.data["test"]["test_type"]
+                == "connectivity"
+                and event.data["test"]["result"]
+                == "failed"
+            )
+        ]
+
+        account_api_degradation = [
+            event
+            for event in events
+            if (
+                event.source_domain == SourceDomain.LOG
+                and event.service == "account_service"
+                and event.component == "account_api"
+                and event.data.get(
+                    "behaviour_profile_id"
+                )
+                == "degradation_error_logs"
+                and event.data["log"]["log_type"]
+                in {
+                    "request_timeout",
+                    "dependency_error",
+                }
+            )
+        ]
+
+        payment_degradation = [
+            event
+            for event in events
+            if (
+                event.source_domain == SourceDomain.METRIC
+                and event.service == "payment_service"
+                and event.data.get(
+                    "metric",
+                    {},
+                ).get(
+                    "behaviour_profile_id"
+                )
+                == "operational_degradation"
+                and event.data["metric"]["classification"]
+                == "blocking"
+            )
+        ]
+
+        database_recovery = [
+            event
+            for event in events
+            if (
+                event.event_type
+                == "infrastructure_test.passed"
+                and event.service == "account_service"
+                and event.component == "account_database"
+                and event.data["test"]["test_type"]
+                == "connectivity"
+            )
+        ]
+
+        account_api_recovery = [
+            event
+            for event in events
+            if (
+                event.source_domain == SourceDomain.LOG
+                and event.service == "account_service"
+                and event.data.get(
+                    "behaviour_profile_id"
+                )
+                == "recovery_operational_logs"
+            )
+        ]
+
+        payment_recovery = [
+            event
+            for event in events
+            if (
+                event.source_domain == SourceDomain.METRIC
+                and event.service == "payment_service"
+                and event.data.get(
+                    "metric",
+                    {},
+                ).get(
+                    "behaviour_profile_id"
+                )
+                == "operational_recovery"
+                and event.data["metric"]["classification"]
+                == "normal"
+            )
+        ]
+
+        assert record.status == RunStatus.COMPLETED
+        assert (
+            record.current_state
+            == OperationalState.COMPLETED
+        )
+        assert record.validation_passed is True
+
+        assert database_failures
+        assert account_api_degradation
+        assert payment_degradation
+        assert database_recovery
+        assert account_api_recovery
+        assert payment_recovery
+
+        assert all(
+            event.scenario_id == "BANK-05"
+            for event in events
+        )
+
+        assert all(
+            event.run_id == started.run_id
+            for event in events
+        )
+
+        assert all(
+            event.chg_id is None
+            for event in events
+        )
+
+        assert (
+            database_failures[0].sequence_number
+            < account_api_degradation[0].sequence_number
+            < payment_degradation[0].sequence_number
+        )
+
+        assert (
+            database_recovery[0].sequence_number
+            < account_api_recovery[0].sequence_number
+            < payment_recovery[0].sequence_number
+        )
+
+        serialized_events = [
+            event.model_dump_json()
+            for event in events
+        ]
+
+        assert all(
+            "expected_root_cause" not in event_json
+            for event_json in serialized_events
+        )
+
+        assert all(
+            "expected_result" not in event_json
+            for event_json in serialized_events
+        )
+
+        assert all(
+            "expected_insight" not in event_json
+            for event_json in serialized_events
+        )
+
+        assert all(
+            '"root_cause"' not in event_json
+            for event_json in serialized_events
+        )
+
+        assert all(
+            '"probable_root_cause"' not in event_json
+            for event_json in serialized_events
+        )
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
