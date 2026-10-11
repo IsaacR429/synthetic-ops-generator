@@ -81,3 +81,23 @@ def test_history_ids_survive_factory_restart(
         second_ids.history_id()
         == "HST0000002"
     )
+
+
+
+def test_sqlite_factory_supports_resilience_observation_ids(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "identifiers.sqlite3"
+
+    ids = SQLiteIdFactory(
+        database_path=database_path
+    )
+
+    assert (
+        ids.resilience_observation_id()
+        == "RSO0000001"
+    )
+    assert (
+        ids.resilience_observation_id()
+        == "RSO0000002"
+    )

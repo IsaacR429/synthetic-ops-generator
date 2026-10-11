@@ -39,6 +39,12 @@ NO_INCIDENT = "no_incident"
 INCIDENT_CREATED = "incident_created"
 INCIDENT_RESOLVED = "incident_resolved"
 
+FAILOVER_INITIATED = "failover_initiated"
+TRAFFIC_SWITCH_STARTED = "traffic_switch_started"
+TRAFFIC_SWITCH_COMPLETED = "traffic_switch_completed"
+INSTANCE_ACTIVATED = "instance_activated"
+INSTANCE_SERVING = "instance_serving"
+
 COMPLETE_VALIDATION_EVIDENCE = (
     "complete_validation_evidence"
 )
@@ -110,6 +116,15 @@ SUPPORTED_PROFILES_BY_SOURCE: dict[
             NO_INCIDENT,
             INCIDENT_CREATED,
             INCIDENT_RESOLVED,
+        }
+    ),
+    SourceDomain.RESILIENCE: frozenset(
+        {
+            FAILOVER_INITIATED,
+            TRAFFIC_SWITCH_STARTED,
+            TRAFFIC_SWITCH_COMPLETED,
+            INSTANCE_ACTIVATED,
+            INSTANCE_SERVING,
         }
     ),
     SourceDomain.EVIDENCE: frozenset(

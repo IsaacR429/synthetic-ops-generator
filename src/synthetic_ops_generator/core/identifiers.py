@@ -44,6 +44,9 @@ class IdFactory:
     def incident_id(self) -> str:
         return self.next("INC")
 
+    def resilience_observation_id(self) -> str:
+        return self.next("RSO")
+
     def evidence_id(self) -> str:
         return self.next("EVD")
 
