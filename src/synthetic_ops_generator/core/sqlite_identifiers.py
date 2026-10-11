@@ -1,4 +1,6 @@
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
 
@@ -30,6 +32,21 @@ class SQLiteIdFactory(IdFactory):
 
         self._initialize_database()
 
+    @contextmanager
+    def _connection(
+        self,
+    ) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(
+            self._database_path,
+            timeout=30.0,
+        )
+
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def next(
         self,
         prefix: str,
@@ -51,10 +68,7 @@ class SQLiteIdFactory(IdFactory):
         return f"{prefix}{value:0{width}d}"
 
     def _initialize_database(self) -> None:
-        with sqlite3.connect(
-            self._database_path,
-            timeout=30.0,
-        ) as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS id_counters (
@@ -69,10 +83,7 @@ class SQLiteIdFactory(IdFactory):
         self,
         prefix: str,
     ) -> int:
-        with sqlite3.connect(
-            self._database_path,
-            timeout=30.0,
-        ) as connection:
+        with self._connection() as connection:
             connection.execute(
                 "BEGIN IMMEDIATE"
             )
