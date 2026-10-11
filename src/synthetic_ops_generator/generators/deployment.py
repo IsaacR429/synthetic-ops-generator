@@ -302,6 +302,8 @@ class DeploymentGenerator(SourceGenerator):
             service=context.service,
             component=context.component,
             environment=context.environment,
+            site_id=context.site_id,
+            service_instance_id=context.service_instance_id,
             sequence_number=context.next_sequence(),
             data={
                 "deployment": deployment.model_dump(mode="json"),

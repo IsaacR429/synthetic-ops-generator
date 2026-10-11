@@ -1600,3 +1600,39 @@ async def test_store_creates_query_indexes(
         "event_type",
         "sequence_number",
     ]
+
+
+@pytest.mark.asyncio
+async def test_store_preserves_service_instance_execution_lineage(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    event = make_event().model_copy(
+        update={
+            "site_id": "bank_secondary",
+            "service_instance_id": (
+                "payment_api_secondary"
+            ),
+        }
+    )
+
+    await store.start()
+
+    try:
+        await store.append(event)
+
+        restored = await store.get_run_events(
+            event.run_id
+        )
+    finally:
+        await store.stop()
+
+    assert restored == (event,)
+    assert restored[0].site_id == "bank_secondary"
+    assert (
+        restored[0].service_instance_id
+        == "payment_api_secondary"
+    )

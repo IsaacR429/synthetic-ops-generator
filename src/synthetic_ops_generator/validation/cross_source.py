@@ -281,7 +281,10 @@ class CrossSourceValidator:
                     f"(business_stream={event.business_stream}, "
                     f"service={event.service}, "
                     f"component={event.component}, "
-                    f"environment={event.environment}) "
+                    f"environment={event.environment}, "
+                    f"site_id={event.site_id}, "
+                    f"service_instance_id="
+                    f"{event.service_instance_id}) "
                     "is outside the Scenario execution scope."
                 ),
                 event_ids=[event.event_id],
@@ -327,6 +330,8 @@ class CrossSourceValidator:
                     service=context.service,
                     component=None,
                     environment=context.environment,
+                    site_id=context.site_id,
+                    service_instance_id=context.service_instance_id,
                 )
             )
 
@@ -368,6 +373,18 @@ class CrossSourceValidator:
             event.component is not None
             and target.component is not None
             and event.component != target.component
+        ):
+            return False
+
+        # Site and Service Instance are exact placement identity
+        # dimensions. Unlike component scope, an instance-specific
+        # event must not fall back to a broader service target.
+        if event.site_id != target.site_id:
+            return False
+
+        if (
+            event.service_instance_id
+            != target.service_instance_id
         ):
             return False
 
@@ -440,6 +457,16 @@ class CrossSourceValidator:
             for component in enterprise.components
         }
 
+        sites = {
+            site.site_id: site
+            for site in enterprise.sites
+        }
+
+        service_instances = {
+            instance.instance_id: instance
+            for instance in enterprise.service_instances
+        }
+
         for event in events:
             if (
                 event.business_stream is not None
@@ -488,6 +515,122 @@ class CrossSourceValidator:
                     ),
                     event_ids=[event.event_id],
                 )
+
+            if (
+                event.site_id is not None
+                and event.site_id not in sites
+            ):
+                report.add_finding(
+                    requirement_id="REQ-COR-006",
+                    rule="site_reference",
+                    message=(
+                        f"Event {event.event_id} references "
+                        f"unknown Site {event.site_id}."
+                    ),
+                    event_ids=[event.event_id],
+                )
+
+            service_instance = None
+
+            if event.service_instance_id is not None:
+                service_instance = service_instances.get(
+                    event.service_instance_id
+                )
+
+                if service_instance is None:
+                    report.add_finding(
+                        requirement_id="REQ-COR-006",
+                        rule="service_instance_reference",
+                        message=(
+                            f"Event {event.event_id} references "
+                            f"unknown Service Instance "
+                            f"{event.service_instance_id}."
+                        ),
+                        event_ids=[event.event_id],
+                    )
+
+            if service_instance is not None:
+                if event.site_id != service_instance.site_id:
+                    report.add_finding(
+                        requirement_id="REQ-COR-006",
+                        rule=(
+                            "service_instance_site_relationship"
+                        ),
+                        message=(
+                            f"Service Instance "
+                            f"{service_instance.instance_id} "
+                            f"belongs to Site "
+                            f"{service_instance.site_id}; event "
+                            f"uses {event.site_id}."
+                        ),
+                        event_ids=[event.event_id],
+                    )
+
+                expected_service = (
+                    event.service
+                    if event.service is not None
+                    else context.service
+                )
+
+                if (
+                    service_instance.service_id
+                    != expected_service
+                ):
+                    report.add_finding(
+                        requirement_id="REQ-COR-006",
+                        rule=(
+                            "service_instance_service_relationship"
+                        ),
+                        message=(
+                            f"Service Instance "
+                            f"{service_instance.instance_id} "
+                            f"belongs to Service "
+                            f"{service_instance.service_id}; "
+                            f"expected {expected_service}."
+                        ),
+                        event_ids=[event.event_id],
+                    )
+
+                if (
+                    event.component is not None
+                    and service_instance.component_id
+                    != event.component
+                ):
+                    report.add_finding(
+                        requirement_id="REQ-COR-006",
+                        rule=(
+                            "service_instance_component_relationship"
+                        ),
+                        message=(
+                            f"Service Instance "
+                            f"{service_instance.instance_id} "
+                            f"belongs to Component "
+                            f"{service_instance.component_id}; "
+                            f"event uses {event.component}."
+                        ),
+                        event_ids=[event.event_id],
+                    )
+
+                if (
+                    event.environment is not None
+                    and service_instance.environment
+                    != event.environment
+                ):
+                    report.add_finding(
+                        requirement_id="REQ-VAL-010",
+                        rule=(
+                            "service_instance_environment_relationship"
+                        ),
+                        message=(
+                            f"Service Instance "
+                            f"{service_instance.instance_id} "
+                            f"uses Environment "
+                            f"{service_instance.environment.value}; "
+                            f"event uses "
+                            f"{event.environment.value}."
+                        ),
+                        event_ids=[event.event_id],
+                    )
 
             if event.component is None:
                 continue

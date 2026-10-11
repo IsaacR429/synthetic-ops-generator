@@ -34,6 +34,11 @@ def validate_topology(enterprise: Enterprise) -> None:
                 f"Component {component.component_id} references unknown service: {component.service_id}"
             )
 
+    components_by_id = {
+        component.component_id: component
+        for component in enterprise.components
+    }
+
     ambiguous_node_ids = (
         service_ids
         & component_ids
@@ -55,6 +60,8 @@ def validate_topology(enterprise: Enterprise) -> None:
             )
         site_ids.add(site.site_id)
 
+    execution_node_ids = service_ids | component_ids
+
     instance_ids = set()
     for instance in enterprise.service_instances:
         if instance.instance_id in instance_ids:
@@ -62,6 +69,13 @@ def validate_topology(enterprise: Enterprise) -> None:
                 f"Duplicate service instance ID: {instance.instance_id}"
             )
         instance_ids.add(instance.instance_id)
+
+        if instance.instance_id in execution_node_ids:
+            raise TopologyValidationError(
+                "Service instance ID collides with "
+                "existing execution node ID: "
+                + instance.instance_id
+            )
         if instance.service_id not in service_ids:
             raise TopologyValidationError(
                 f"Service instance {instance.instance_id} references unknown service: {instance.service_id}"
@@ -70,6 +84,31 @@ def validate_topology(enterprise: Enterprise) -> None:
             raise TopologyValidationError(
                 f"Service instance {instance.instance_id} references unknown component: {instance.component_id}"
             )
+        if instance.component_id is not None:
+            component = components_by_id[
+                instance.component_id
+            ]
+
+            if component.service_id != instance.service_id:
+                raise TopologyValidationError(
+                    "Service instance "
+                    f"{instance.instance_id} component "
+                    f"{instance.component_id} belongs to "
+                    "service "
+                    f"{component.service_id}, not "
+                    f"{instance.service_id}."
+                )
+
+            if component.environment != instance.environment:
+                raise TopologyValidationError(
+                    "Service instance "
+                    f"{instance.instance_id} environment "
+                    f"{instance.environment.value} does not "
+                    "match component "
+                    f"{instance.component_id} environment "
+                    f"{component.environment.value}."
+                )
+
         if instance.site_id not in site_ids:
             raise TopologyValidationError(
                 f"Service instance {instance.instance_id} references unknown site: {instance.site_id}"

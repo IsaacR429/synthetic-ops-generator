@@ -29,7 +29,7 @@ def resolve_scenario_execution_target(
     execution environment.
     """
 
-    node = topology.resolve_node(node_id)
+    node = topology.resolve_execution_node(node_id)
 
     return scenario_execution_target_from_node(
         node=node,
@@ -68,6 +68,42 @@ def scenario_execution_target_from_node(
             service=node.service_id,
             component=node.component_id,
             environment=node.environment,
+        )
+
+    if node.node_type == "service_instance":
+        if node.service_instance_id is None:
+            raise ScenarioExecutionTargetResolutionError(
+                "Resolved Service Instance is missing "
+                f"instance identity: {node.node_id}"
+            )
+
+        if node.site_id is None:
+            raise ScenarioExecutionTargetResolutionError(
+                "Resolved Service Instance is missing "
+                f"site identity: {node.node_id}"
+            )
+
+        if node.environment is None:
+            raise ScenarioExecutionTargetResolutionError(
+                "Resolved Service Instance is missing "
+                f"environment: {node.node_id}"
+            )
+
+        if node.environment != environment:
+            raise ScenarioExecutionTargetResolutionError(
+                "Service Instance environment does not match "
+                "Scenario execution environment: "
+                f"{node.node_id} is {node.environment.value}; "
+                f"requested {environment.value}."
+            )
+
+        return ScenarioExecutionTarget(
+            business_stream=node.business_stream_id,
+            service=node.service_id,
+            component=node.component_id,
+            environment=node.environment,
+            site_id=node.site_id,
+            service_instance_id=node.service_instance_id,
         )
 
     if node.node_type == "service":

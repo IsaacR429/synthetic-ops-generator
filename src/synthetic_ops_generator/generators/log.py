@@ -264,6 +264,8 @@ class LogGenerator(SourceGenerator):
                 service=context.service,
                 component=operational_log.component,
                 environment=context.environment,
+                site_id=context.site_id,
+                service_instance_id=context.service_instance_id,
                 sequence_number=context.next_sequence(),
                 data={
                     "log": operational_log.model_dump(

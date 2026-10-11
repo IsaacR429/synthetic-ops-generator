@@ -29,6 +29,9 @@ class GeneratedEvent(BaseModel):
     component: str | None = None
     environment: Environment | None = None
 
+    site_id: str | None = None
+    service_instance_id: str | None = None
+
     sequence_number: int = Field(ge=1)
 
     synthetic: bool = True

@@ -43,7 +43,7 @@ from synthetic_ops_generator.scenarios.runner import (
 CONFIG_ROOT = Path("config")
 
 
-def build_bank_01_events():
+def build_bank_01_events(*, instance_target: bool = False):
     scenario = load_scenario(
         "config/scenarios/banking/"
         "BANK-01.yaml"
@@ -101,6 +101,22 @@ def build_bank_01_events():
         random_seed=42,
     )
 
+    if instance_target:
+        from synthetic_ops_generator.scenarios.context import (
+            ScenarioExecutionTarget,
+        )
+
+        context = context.for_target(
+            ScenarioExecutionTarget(
+                business_stream=context.business_stream,
+                service=context.service,
+                component=context.component,
+                environment=context.environment,
+                site_id="bank_secondary",
+                service_instance_id="historical_secondary",
+            )
+        )
+
     original_time = (
         context.simulation_time
     )
@@ -122,7 +138,7 @@ def build_bank_01_events():
     )
 
 
-def build_bank_02_events():
+def build_bank_02_events(*, instance_target: bool = False):
     scenario = load_scenario(
         "config/scenarios/banking/"
         "BANK-02.yaml"
@@ -185,6 +201,22 @@ def build_bank_02_events():
         enterprise=enterprise,
         random_seed=42,
     )
+
+    if instance_target:
+        from synthetic_ops_generator.scenarios.context import (
+            ScenarioExecutionTarget,
+        )
+
+        context = context.for_target(
+            ScenarioExecutionTarget(
+                business_stream=context.business_stream,
+                service=context.service,
+                component=context.component,
+                environment=context.environment,
+                site_id="bank_secondary",
+                service_instance_id="historical_secondary",
+            )
+        )
 
     original_time = (
         context.simulation_time
@@ -600,3 +632,41 @@ def test_healthy_events_do_not_emit_change_boundary_timestamp() -> None:
         event.event_time != dataset.change_boundary_time
         for event in events
     )
+
+
+def test_historical_healthy_metric_events_preserve_service_instance_execution_lineage(
+) -> None:
+    _, _, _, events = build_bank_01_events(
+        instance_target=True,
+    )
+
+    assert events
+
+    assert {
+        event.site_id
+        for event in events
+    } == {"bank_secondary"}
+
+    assert {
+        event.service_instance_id
+        for event in events
+    } == {"historical_secondary"}
+
+
+def test_historical_metric_events_preserve_service_instance_execution_lineage(
+) -> None:
+    _, _, _, events = build_bank_02_events(
+        instance_target=True,
+    )
+
+    assert events
+
+    assert {
+        event.site_id
+        for event in events
+    } == {"bank_secondary"}
+
+    assert {
+        event.service_instance_id
+        for event in events
+    } == {"historical_secondary"}

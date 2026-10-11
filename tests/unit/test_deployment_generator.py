@@ -366,3 +366,47 @@ def test_failed_deployment_generates_failed_terminal_event() -> None:
     assert failed["outcome"] == "failed"
     assert failed["start_time"] is not None
     assert failed["completion_time"] is not None
+
+
+def test_deployment_events_preserve_service_instance_execution_lineage(
+) -> None:
+    from synthetic_ops_generator.scenarios.context import (
+        ScenarioExecutionTarget,
+    )
+
+    context = build_context()
+
+    targeted = context.for_target(
+        ScenarioExecutionTarget(
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=context.environment,
+            site_id="bank_secondary",
+            service_instance_id="payment_api_secondary",
+        )
+    )
+
+    generator = DeploymentGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+        artifact="payment-api",
+        artifact_version="2.5.0",
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            targeted,
+        )
+    )
+
+    assert events
+    assert {
+        event.site_id
+        for event in events
+    } == {"bank_secondary"}
+    assert {
+        event.service_instance_id
+        for event in events
+    } == {"payment_api_secondary"}

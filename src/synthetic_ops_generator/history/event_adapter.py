@@ -108,6 +108,8 @@ def iter_historical_metric_events(
                 service=context.service,
                 component=None,
                 environment=context.environment,
+                site_id=context.site_id,
+                service_instance_id=context.service_instance_id,
                 sequence_number=context.next_sequence(),
                 data=event_data,
             )
@@ -298,6 +300,8 @@ def iter_historical_healthy_metric_events(
                 service=context.service,
                 component=None,
                 environment=context.environment,
+                site_id=context.site_id,
+                service_instance_id=context.service_instance_id,
                 sequence_number=context.next_sequence(),
                 data=event_data,
             )

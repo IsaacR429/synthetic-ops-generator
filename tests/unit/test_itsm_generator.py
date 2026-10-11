@@ -346,3 +346,47 @@ def test_itsm_generator_rejects_unknown_profile() -> None:
                 build_context(),
             )
         )
+
+
+def test_itsm_events_preserve_service_instance_execution_lineage(
+) -> None:
+    from synthetic_ops_generator.scenarios.context import (
+        ScenarioExecutionTarget,
+    )
+
+    context = build_context()
+
+    targeted = context.for_target(
+        ScenarioExecutionTarget(
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=context.environment,
+            site_id="bank_secondary",
+            service_instance_id="payment_api_secondary",
+        )
+    )
+
+    generator = ITSMGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+        service_owner="Payments Operations",
+        component_ids=["payment_api"],
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            targeted,
+        )
+    )
+
+    assert events
+    assert {
+        event.site_id
+        for event in events
+    } == {"bank_secondary"}
+    assert {
+        event.service_instance_id
+        for event in events
+    } == {"payment_api_secondary"}

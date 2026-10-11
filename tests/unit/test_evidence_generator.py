@@ -622,3 +622,47 @@ def test_custom_evidence_definition_is_supported() -> None:
         events[0].data["evidence"]["evidence_type"]
         == "deployment_only"
     )
+
+
+def test_evidence_events_preserve_service_instance_execution_lineage(
+) -> None:
+    from synthetic_ops_generator.scenarios.context import (
+        ScenarioExecutionTarget,
+    )
+
+    ids = IdFactory()
+    context = build_context()
+
+    targeted = context.for_target(
+        ScenarioExecutionTarget(
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=context.environment,
+            site_id="bank_secondary",
+            service_instance_id="payment_api_secondary",
+        )
+    )
+
+    generator = EvidenceGenerator(
+        ids=ids,
+        behaviour=build_behaviour(),
+        event_history=build_history(ids),
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            targeted,
+        )
+    )
+
+    assert events
+    assert {
+        event.site_id
+        for event in events
+    } == {"bank_secondary"}
+    assert {
+        event.service_instance_id
+        for event in events
+    } == {"payment_api_secondary"}

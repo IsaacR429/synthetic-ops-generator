@@ -1500,3 +1500,40 @@ def test_capacity_recovery_requires_selected_metric_in_capacity_profile() -> Non
             metric_ids=("throughput",),
             capacity_profile=capacity_profile,
         )
+
+
+def test_metric_events_preserve_service_instance_execution_lineage(
+) -> None:
+    from synthetic_ops_generator.scenarios.context import (
+        ScenarioExecutionTarget,
+    )
+
+    context = build_context()
+
+    targeted = context.for_target(
+        ScenarioExecutionTarget(
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=context.environment,
+            site_id="bank_secondary",
+            service_instance_id="payment_api_secondary",
+        )
+    )
+
+    events = asyncio.run(
+        collect_events(
+            build_generator(),
+            targeted,
+        )
+    )
+
+    assert events
+    assert {
+        event.site_id
+        for event in events
+    } == {"bank_secondary"}
+    assert {
+        event.service_instance_id
+        for event in events
+    } == {"payment_api_secondary"}

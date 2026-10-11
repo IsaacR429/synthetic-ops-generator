@@ -148,6 +148,8 @@ class IncidentGenerator(SourceGenerator):
             service=context.service,
             component=incident.component,
             environment=context.environment,
+            site_id=context.site_id,
+            service_instance_id=context.service_instance_id,
             sequence_number=context.next_sequence(),
             data={
                 "incident": incident.model_dump(
@@ -236,6 +238,8 @@ class IncidentGenerator(SourceGenerator):
             service=resolved.service,
             component=resolved.component,
             environment=context.environment,
+            site_id=context.site_id,
+            service_instance_id=context.service_instance_id,
             sequence_number=context.next_sequence(),
             data={
                 "incident": resolved.model_dump(

@@ -63,6 +63,8 @@ class ScenarioExecutionTarget(BaseModel):
     service: str
     component: str | None = None
     environment: Environment
+    site_id: str | None = None
+    service_instance_id: str | None = None
 
 
 class ScenarioContext(BaseModel):
@@ -118,6 +120,8 @@ class ScenarioContext(BaseModel):
             "service",
             "component",
             "environment",
+            "site_id",
+            "service_instance_id",
         )
 
         return {
@@ -167,6 +171,16 @@ class ScenarioContext(BaseModel):
     @property
     def environment(self) -> Environment:
         return self.target.environment
+
+    @computed_field
+    @property
+    def site_id(self) -> str | None:
+        return self.target.site_id
+
+    @computed_field
+    @property
+    def service_instance_id(self) -> str | None:
+        return self.target.service_instance_id
 
     @computed_field
     @property

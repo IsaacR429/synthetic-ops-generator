@@ -263,6 +263,8 @@ class InfrastructureTestGenerator(SourceGenerator):
             service=context.service,
             component=operational_test.component,
             environment=context.environment,
+            site_id=context.site_id,
+            service_instance_id=context.service_instance_id,
             sequence_number=context.next_sequence(),
             data={
                 "test": operational_test.model_dump(

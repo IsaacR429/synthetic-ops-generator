@@ -501,3 +501,45 @@ def test_required_check_failure_rejects_no_mandatory_checks_before_emitting() ->
         )
 
     assert context.sequence_number == 0
+
+
+def test_infrastructure_events_preserve_service_instance_execution_lineage(
+) -> None:
+    from synthetic_ops_generator.scenarios.context import (
+        ScenarioExecutionTarget,
+    )
+
+    context = build_context()
+
+    targeted = context.for_target(
+        ScenarioExecutionTarget(
+            business_stream=context.business_stream,
+            service=context.service,
+            component=context.component,
+            environment=context.environment,
+            site_id="bank_secondary",
+            service_instance_id="payment_api_secondary",
+        )
+    )
+
+    generator = InfrastructureTestGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(),
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            targeted,
+        )
+    )
+
+    assert events
+    assert {
+        event.site_id
+        for event in events
+    } == {"bank_secondary"}
+    assert {
+        event.service_instance_id
+        for event in events
+    } == {"payment_api_secondary"}

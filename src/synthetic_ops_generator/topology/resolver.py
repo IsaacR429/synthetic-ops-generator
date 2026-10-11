@@ -23,11 +23,17 @@ class TopologyResolutionError(ValueError):
 @dataclass(frozen=True)
 class ResolvedTopologyNode:
     node_id: str
-    node_type: Literal["service", "component"]
+    node_type: Literal[
+        "service",
+        "component",
+        "service_instance",
+    ]
     service_id: str
     business_stream_id: str
     component_id: str | None = None
     environment: Environment | None = None
+    site_id: str | None = None
+    service_instance_id: str | None = None
 
 
 class TopologyResolver:
@@ -64,6 +70,26 @@ class TopologyResolver:
                 environment=component.environment,
             )
 
+        self._service_instance_nodes: dict[
+            str,
+            ResolvedTopologyNode,
+        ] = {}
+
+        for instance in enterprise.service_instances:
+            service = services[instance.service_id]
+            self._service_instance_nodes[
+                instance.instance_id
+            ] = ResolvedTopologyNode(
+                node_id=instance.instance_id,
+                node_type="service_instance",
+                service_id=instance.service_id,
+                business_stream_id=service.business_stream_id,
+                component_id=instance.component_id,
+                environment=instance.environment,
+                site_id=instance.site_id,
+                service_instance_id=instance.instance_id,
+            )
+
         self._outgoing: dict[str, list[Dependency]] = defaultdict(list)
         self._incoming: dict[str, list[Dependency]] = defaultdict(list)
 
@@ -78,6 +104,32 @@ class TopologyResolver:
                 f"Unknown topology node: {node_id}"
             )
         return node
+
+    def resolve_execution_node(
+        self,
+        node_id: str,
+    ) -> ResolvedTopologyNode:
+        """
+        Resolve a Scenario execution address.
+
+        Services and Components retain dependency-graph semantics.
+        Service Instances are execution identities only and do not
+        become dependency-graph vertices.
+        """
+
+        node = self._nodes.get(node_id)
+        if node is not None:
+            return node
+
+        instance_node = self._service_instance_nodes.get(
+            node_id
+        )
+        if instance_node is not None:
+            return instance_node
+
+        raise TopologyResolutionError(
+            f"Unknown topology node: {node_id}"
+        )
 
     def outgoing_dependencies(
         self, node_id: str
