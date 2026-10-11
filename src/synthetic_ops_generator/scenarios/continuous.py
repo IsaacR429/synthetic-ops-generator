@@ -13,6 +13,9 @@ from synthetic_ops_generator.domain.operational_log import OperationalLog
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.base import SourceGenerator
 from synthetic_ops_generator.publishers.base import EventPublisher
+from synthetic_ops_generator.scenarios.continuous_contract import (
+    supports_continuous_execution,
+)
 from synthetic_ops_generator.scenarios.context import (
     ScenarioContext,
     ScenarioExecutionTarget,
@@ -164,10 +167,8 @@ class ContinuousSourceScheduler:
                 continue
 
             source = binding.behaviour.source
-            if source not in (
-                SourceDomain.METRIC,
-                SourceDomain.INFRASTRUCTURE_TEST,
-                SourceDomain.LOG,
+            if not supports_continuous_execution(
+                source
             ):
                 raise ValueError(
                     "Continuous scheduling is not "

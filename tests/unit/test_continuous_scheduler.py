@@ -446,7 +446,7 @@ async def test_scheduler_rejects_unsupported_continuous_source() -> None:
     start = datetime(2026, 8, 15, 10, 0, tzinfo=UTC)
     clock = ManualSimulationClock(start)
 
-    behaviour = ScenarioBehaviour(
+    behaviour = ScenarioBehaviour.model_construct(
         source=SourceDomain.DEPLOYMENT,
         during_state=OperationalState.OBSERVING,
         profile_id="deployment",

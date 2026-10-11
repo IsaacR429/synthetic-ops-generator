@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from synthetic_ops_generator.scenarios.continuous_contract import (
+    supports_continuous_execution,
+)
 from synthetic_ops_generator.scenarios.models import (
     ScenarioDefinition,
     SourceDomain,
@@ -77,6 +80,9 @@ def resolve_scenario_execution_capabilities(
 
     continuous_supported = any(
         behaviour.continuous
+        and supports_continuous_execution(
+            behaviour.source
+        )
         and behaviour.during_state
         == continuous_active_state
         for behaviour in scenario.behaviours

@@ -144,3 +144,31 @@ def test_behaviour_execution_node_defaults_to_none() -> None:
         profile_id="degradation_error_logs",
     )
     assert behaviour.execution_node_id is None
+
+
+def test_behaviour_rejects_unsupported_continuous_source() -> None:
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "Continuous execution is not supported "
+            "for source: deployment"
+        ),
+    ):
+        ScenarioBehaviour(
+            source=SourceDomain.DEPLOYMENT,
+            during_state=OperationalState.OBSERVING,
+            profile_id="successful_deployment",
+            continuous=True,
+        )
+
+
+def test_non_continuous_behaviour_allows_source_without_continuous_scheduler(
+) -> None:
+    behaviour = ScenarioBehaviour(
+        source=SourceDomain.DEPLOYMENT,
+        during_state=OperationalState.OBSERVING,
+        profile_id="successful_deployment",
+        continuous=False,
+    )
+
+    assert behaviour.continuous is False

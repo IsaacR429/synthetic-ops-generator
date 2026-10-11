@@ -16,6 +16,9 @@ from synthetic_ops_generator.domain.enums import (
     SourceDomain,
 )
 from synthetic_ops_generator.oracle.models import ExpectedScenarioResult
+from synthetic_ops_generator.scenarios.continuous_contract import (
+    supports_continuous_execution,
+)
 
 
 class ScenarioFamily(StrEnum):
@@ -119,6 +122,16 @@ class ScenarioBehaviour(BaseModel):
             raise ValueError(
                 "Metric selection is only valid for Metric behaviour."
             )
+
+        if (
+            self.continuous
+            and not supports_continuous_execution(self.source)
+        ):
+            raise ValueError(
+                "Continuous execution is not supported "
+                f"for source: {self.source.value}"
+            )
+
         return self
 
 
