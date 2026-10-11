@@ -33,6 +33,9 @@ from synthetic_ops_generator.generators.manual_validation import (
     ManualValidationGenerator,
 )
 from synthetic_ops_generator.generators.metric import MetricGenerator
+from synthetic_ops_generator.generators.resilience import (
+    ResilienceGenerator,
+)
 from synthetic_ops_generator.capacity.runtime import (
     CapacityRuntimeConfiguration,
     resolve_capacity_runtime_configuration,
@@ -83,6 +86,9 @@ class GeneratorFactory:
         random_source: SimulationRandom,
         event_history: Sequence[GeneratedEvent],
         execution_target: ScenarioExecutionTarget | None = None,
+        resilience_transition_target: (
+            ScenarioExecutionTarget | None
+        ) = None,
     ) -> list[SourceGenerator]:
         generators: list[SourceGenerator] = []
 
@@ -277,6 +283,17 @@ class GeneratorFactory:
                     )
                 )
 
+            elif behaviour.source == SourceDomain.RESILIENCE:
+                generators.append(
+                    ResilienceGenerator(
+                        ids=ids,
+                        behaviour=behaviour,
+                        transition_target=(
+                            resilience_transition_target
+                        ),
+                    )
+                )
+
         return generators
 
     def build_execution_bindings(
@@ -323,6 +340,9 @@ class GeneratorFactory:
                 random_source=random_source,
                 event_history=event_history,
                 execution_target=entry.execution_target,
+                resilience_transition_target=(
+                    entry.resilience_transition_target
+                ),
             )
 
             if len(generators) != 1:
@@ -336,6 +356,9 @@ class GeneratorFactory:
                     behaviour=entry.behaviour,
                     generator=generators[0],
                     execution_target=entry.execution_target,
+                    resilience_transition_target=(
+                        entry.resilience_transition_target
+                    ),
                 )
             )
 

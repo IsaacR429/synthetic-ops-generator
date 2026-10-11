@@ -16,3 +16,6 @@ class SourceExecutionBinding:
     behaviour: ScenarioBehaviour
     generator: SourceGenerator
     execution_target: ScenarioExecutionTarget | None
+    resilience_transition_target: (
+        ScenarioExecutionTarget | None
+    ) = None
