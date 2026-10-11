@@ -32,6 +32,9 @@ class ScenarioExecutionPlanningError(ValueError):
 class ScenarioExecutionPlanEntry:
     behaviour: ScenarioBehaviour
     execution_target: ScenarioExecutionTarget | None
+    resilience_transition_target: (
+        ScenarioExecutionTarget | None
+    ) = None
 
 
 @dataclass(frozen=True)
@@ -77,6 +80,23 @@ def build_scenario_execution_plan(
                 node_id=behaviour.execution_node_id,
                 environment=scenario.target.environment,
             )
+
+            resilience_transition_target = None
+
+            if behaviour.resilience_transition is not None:
+                resilience_transition_target = (
+                    resolve_scenario_execution_target(
+                        topology=topology,
+                        node_id=(
+                            behaviour.resilience_transition
+                            .to_execution_node_id
+                        ),
+                        environment=(
+                            scenario.target.environment
+                        ),
+                    )
+                )
+
         except (
             TopologyResolutionError,
             ScenarioExecutionTargetResolutionError,
@@ -89,6 +109,9 @@ def build_scenario_execution_plan(
             ScenarioExecutionPlanEntry(
                 behaviour=behaviour,
                 execution_target=target,
+                resilience_transition_target=(
+                    resilience_transition_target
+                ),
             )
         )
 

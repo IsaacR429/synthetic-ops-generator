@@ -74,6 +74,10 @@ ScenarioExecutionNodeId = Annotated[
 ]
 
 
+class ScenarioResilienceTransition(BaseModel):
+    to_execution_node_id: ScenarioExecutionNodeId
+
+
 class ScenarioMetricSelection(BaseModel):
     metric_ids: list[ScenarioMetricId] | None = Field(
         default=None,
@@ -110,6 +114,10 @@ class ScenarioBehaviour(BaseModel):
 
     execution_node_id: ScenarioExecutionNodeId | None = None
 
+    resilience_transition: (
+        ScenarioResilienceTransition | None
+    ) = None
+
     @model_validator(mode="after")
     def validate_selection_source(
         self,
@@ -122,6 +130,19 @@ class ScenarioBehaviour(BaseModel):
             raise ValueError(
                 "Metric selection is only valid for Metric behaviour."
             )
+
+        if self.resilience_transition is not None:
+            if self.source != SourceDomain.RESILIENCE:
+                raise ValueError(
+                    "Resilience transition is only valid "
+                    "for Resilience behaviour."
+                )
+
+            if self.execution_node_id is None:
+                raise ValueError(
+                    "Resilience transition requires "
+                    "execution_node_id."
+                )
 
         if (
             self.continuous
