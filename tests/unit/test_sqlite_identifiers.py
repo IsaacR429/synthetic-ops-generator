@@ -80,4 +80,4 @@ def test_history_ids_survive_factory_restart(
     assert (
         second_ids.history_id()
         == "HST0000002"
-    )
+    )
