@@ -22,6 +22,7 @@ class SourceDomain(StrEnum):
     MANUAL_VALIDATION = "manual_validation"
     INCIDENT = "incident"
     EVIDENCE = "evidence"
+    RESILIENCE = "resilience"
 
 
 class RiskLevel(StrEnum):
