@@ -42,6 +42,53 @@ class ScenarioExecutionPlan:
     entries: tuple[ScenarioExecutionPlanEntry, ...]
 
 
+def _validate_resilience_transition_targets(
+    *,
+    source: ScenarioExecutionTarget,
+    destination: ScenarioExecutionTarget,
+) -> None:
+    if (
+        source.service_instance_id is None
+        or source.site_id is None
+    ):
+        raise ScenarioExecutionPlanningError(
+            "Resilience transition source must resolve to "
+            "a Service Instance execution target."
+        )
+
+    if (
+        destination.service_instance_id is None
+        or destination.site_id is None
+    ):
+        raise ScenarioExecutionPlanningError(
+            "Resilience transition destination must resolve to "
+            "a Service Instance execution target."
+        )
+
+    if (
+        source.service_instance_id
+        == destination.service_instance_id
+    ):
+        raise ScenarioExecutionPlanningError(
+            "Resilience transition source and destination "
+            "instances must differ."
+        )
+
+    if source.service != destination.service:
+        raise ScenarioExecutionPlanningError(
+            "Resilience transition source and destination "
+            "must belong to the same Service: "
+            f"{source.service} != {destination.service}."
+        )
+
+    if source.component != destination.component:
+        raise ScenarioExecutionPlanningError(
+            "Resilience transition source and destination "
+            "must reference the same Component: "
+            f"{source.component} != {destination.component}."
+        )
+
+
 def build_scenario_execution_plan(
     *,
     scenario: ScenarioDefinition,
@@ -95,6 +142,11 @@ def build_scenario_execution_plan(
                             scenario.target.environment
                         ),
                     )
+                )
+
+                _validate_resilience_transition_targets(
+                    source=target,
+                    destination=resilience_transition_target,
                 )
 
         except (

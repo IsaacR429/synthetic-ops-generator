@@ -4,7 +4,8 @@ from pydantic import ValidationError
 from synthetic_ops_generator.config.enterprise_loader import (
     load_enterprise,
 )
-from synthetic_ops_generator.domain.enums import SourceDomain
+from synthetic_ops_generator.domain.enums import Environment, SourceDomain
+from synthetic_ops_generator.topology.models import ServiceInstance
 from synthetic_ops_generator.scenarios.execution_plan import (
     ScenarioExecutionPlanningError,
     build_scenario_execution_plan,
@@ -236,4 +237,201 @@ def test_legacy_execution_plan_has_no_resilience_peer_targets() -> None:
     assert all(
         entry.resilience_transition_target is None
         for entry in plan.entries
+    )
+
+
+
+def test_execution_plan_rejects_resilience_transition_from_component_target() -> None:
+    enterprise = load_bank_alpha()
+
+    behaviour = build_resilience_behaviour(
+        execution_node_id="payment_api",
+        to_execution_node_id="payment_api_secondary",
+    )
+
+    scenario = build_single_behaviour_scenario(
+        behaviour
+    )
+
+    with pytest.raises(
+        ScenarioExecutionPlanningError,
+        match=(
+            "source must resolve to "
+            "a Service Instance"
+        ),
+    ):
+        build_scenario_execution_plan(
+            scenario=scenario,
+            enterprise=enterprise,
+        )
+
+
+def test_execution_plan_rejects_resilience_transition_to_component_target() -> None:
+    enterprise = load_bank_alpha()
+
+    behaviour = build_resilience_behaviour(
+        execution_node_id="payment_api_primary",
+        to_execution_node_id="payment_api",
+    )
+
+    scenario = build_single_behaviour_scenario(
+        behaviour
+    )
+
+    with pytest.raises(
+        ScenarioExecutionPlanningError,
+        match=(
+            "destination must resolve to "
+            "a Service Instance"
+        ),
+    ):
+        build_scenario_execution_plan(
+            scenario=scenario,
+            enterprise=enterprise,
+        )
+
+
+def test_execution_plan_rejects_resilience_transition_to_same_instance() -> None:
+    enterprise = load_bank_alpha()
+
+    behaviour = build_resilience_behaviour(
+        execution_node_id="payment_api_primary",
+        to_execution_node_id="payment_api_primary",
+    )
+
+    scenario = build_single_behaviour_scenario(
+        behaviour
+    )
+
+    with pytest.raises(
+        ScenarioExecutionPlanningError,
+        match="instances must differ",
+    ):
+        build_scenario_execution_plan(
+            scenario=scenario,
+            enterprise=enterprise,
+        )
+
+
+
+def test_execution_plan_rejects_resilience_transition_across_services() -> None:
+    enterprise = load_bank_alpha()
+
+    behaviour = build_resilience_behaviour(
+        execution_node_id="payment_api_primary",
+        to_execution_node_id="account_database_secondary",
+    )
+
+    scenario = build_single_behaviour_scenario(
+        behaviour
+    )
+
+    with pytest.raises(
+        ScenarioExecutionPlanningError,
+        match="same Service",
+    ):
+        build_scenario_execution_plan(
+            scenario=scenario,
+            enterprise=enterprise,
+        )
+
+
+def test_execution_plan_rejects_resilience_transition_across_components() -> None:
+    enterprise = load_bank_alpha().model_copy(
+        deep=True
+    )
+
+    payment_worker = next(
+        component
+        for component in enterprise.components
+        if component.component_id == "payment_worker"
+    )
+
+    assert (
+        payment_worker.service_id
+        == "payment_service"
+    )
+    assert (
+        payment_worker.environment
+        == Environment.PRODUCTION
+    )
+
+    enterprise.service_instances.append(
+        ServiceInstance(
+            instance_id="payment_worker_secondary",
+            service_id="payment_service",
+            component_id=payment_worker.component_id,
+            site_id="bank_secondary",
+            environment=Environment.PRODUCTION,
+        )
+    )
+
+    behaviour = build_resilience_behaviour(
+        execution_node_id="payment_api_primary",
+        to_execution_node_id="payment_worker_secondary",
+    )
+
+    scenario = build_single_behaviour_scenario(
+        behaviour
+    )
+
+    with pytest.raises(
+        ScenarioExecutionPlanningError,
+        match="same Component",
+    ):
+        build_scenario_execution_plan(
+            scenario=scenario,
+            enterprise=enterprise,
+        )
+
+
+def test_execution_plan_allows_same_site_distinct_resilience_instances() -> None:
+    enterprise = load_bank_alpha().model_copy(
+        deep=True
+    )
+
+    enterprise.service_instances.append(
+        ServiceInstance(
+            instance_id="payment_api_primary_peer",
+            service_id="payment_service",
+            component_id="payment_api",
+            site_id="bank_primary",
+            environment=Environment.PRODUCTION,
+        )
+    )
+
+    behaviour = build_resilience_behaviour(
+        execution_node_id="payment_api_primary",
+        to_execution_node_id="payment_api_primary_peer",
+    )
+
+    scenario = build_single_behaviour_scenario(
+        behaviour
+    )
+
+    plan = build_scenario_execution_plan(
+        scenario=scenario,
+        enterprise=enterprise,
+    )
+
+    entry = plan.entries[0]
+
+    assert entry.execution_target is not None
+    assert (
+        entry.resilience_transition_target
+        is not None
+    )
+
+    assert (
+        entry.execution_target.site_id
+        == "bank_primary"
+    )
+    assert (
+        entry.resilience_transition_target.site_id
+        == "bank_primary"
+    )
+
+    assert (
+        entry.execution_target.service_instance_id
+        != entry.resilience_transition_target.service_instance_id
     )
