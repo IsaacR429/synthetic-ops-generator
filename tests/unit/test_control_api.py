@@ -111,6 +111,7 @@ def test_list_scenarios_returns_catalogue(
         "BANK-03",
         "BANK-04",
         "BANK-05",
+        "BANK-06",
         "BANK-07",
         "INS-01",
         "INS-02",
