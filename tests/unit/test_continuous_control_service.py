@@ -41,6 +41,14 @@ from synthetic_ops_generator.retention.sqlite import (
 from synthetic_ops_generator.scenarios.catalogue import (
     ScenarioCatalogue,
 )
+from synthetic_ops_generator.scenarios.continuous import (
+    ContinuousSourceBinding,
+    ContinuousSourceScheduler,
+)
+from synthetic_ops_generator.scenarios.models import (
+    ScenarioBehaviour,
+    ScenarioResilienceTransition,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_ROOT = PROJECT_ROOT / "config"
@@ -462,6 +470,273 @@ async def test_continuous_control_service_propagates_execution_target(
         for log_event in targeted_logs:
             assert log_event.service == "payment_service"
             assert log_event.component == "payment_database"
+
+    finally:
+        await active_run_manager.shutdown()
+        await run_store.stop()
+        await store.stop()
+
+
+
+@pytest.mark.asyncio
+async def test_continuous_control_service_keeps_resilience_transition_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.sqlite3"
+    )
+    run_store = SQLiteRunStore(
+        database_path=tmp_path / "runs.sqlite3"
+    )
+
+    await store.start()
+    await run_store.start()
+
+    active_run_manager = ActiveRunManager()
+
+    base_catalogue = ScenarioCatalogue(
+        CONFIG_ROOT / "scenarios"
+    )
+    original_scenario = base_catalogue.get_scenario(
+        "BANK-01"
+    )
+    assert original_scenario is not None
+
+    # Give the existing final-active continuous LOG a concrete
+    # secondary Service Instance execution identity.
+    updated_behaviours = []
+
+    for behaviour in original_scenario.behaviours:
+        if (
+            behaviour.continuous
+            and behaviour.source == SourceDomain.LOG
+        ):
+            updated_behaviours.append(
+                behaviour.model_copy(
+                    update={
+                        "execution_node_id": (
+                            "payment_api_secondary"
+                        )
+                    }
+                )
+            )
+        else:
+            updated_behaviours.append(
+                behaviour
+            )
+
+    # Add one bounded factual resilience transition.
+    resilience_behaviour = ScenarioBehaviour(
+        source=SourceDomain.RESILIENCE,
+        during_state=(
+            original_scenario.state_sequence[1]
+        ),
+        profile_id="failover_initiated",
+        continuous=False,
+        execution_node_id="payment_api_primary",
+        resilience_transition=(
+            ScenarioResilienceTransition(
+                to_execution_node_id=(
+                    "payment_api_secondary"
+                )
+            )
+        ),
+    )
+
+    mixed_scenario = original_scenario.model_copy(
+        update={
+            "behaviours": [
+                resilience_behaviour,
+                *updated_behaviours,
+            ],
+        }
+    )
+
+    class MockCatalogue(ScenarioCatalogue):
+        def __init__(self) -> None:
+            pass
+
+        def get_scenario(self, scenario_id: str):
+            if scenario_id == "BANK-01":
+                return mixed_scenario
+            return None
+
+    scheduler_entered = asyncio.Event()
+
+    captured_bindings: list[
+        ContinuousSourceBinding
+    ] = []
+
+    async def capture_scheduler_handoff(
+        self,
+        *,
+        context,
+        bindings,
+        publisher,
+    ) -> None:
+        del self, context, publisher
+
+        captured_bindings.extend(bindings)
+
+        scheduler_entered.set()
+
+        # Remain inside the continuous lifecycle until stop_run()
+        # cancels the managed background task.
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(
+        ContinuousSourceScheduler,
+        "run",
+        capture_scheduler_handoff,
+    )
+
+    try:
+        service = ControlService(
+            catalogue=MockCatalogue(),
+            enterprise_root=(
+                CONFIG_ROOT / "enterprises"
+            ),
+            generator_factory=GeneratorFactory(
+                config_root=CONFIG_ROOT
+            ),
+            ids=SQLiteIdFactory(
+                database_path=(
+                    tmp_path / "identifiers.sqlite3"
+                )
+            ),
+            store=store,
+            run_store=run_store,
+            replay_publisher=InMemoryPublisher(),
+            active_run_manager=active_run_manager,
+        )
+
+        started = await service.start_run(
+            scenario_id="BANK-01",
+            random_seed=42,
+            generation_lifecycle=(
+                GenerationLifecycle.CONTINUOUS
+            ),
+        )
+
+        assert started.status == RunStatus.RUNNING
+
+        await asyncio.wait_for(
+            scheduler_entered.wait(),
+            timeout=2.0,
+        )
+
+        # At this exact point the bounded prefix has completed,
+        # while the continuous scheduler has emitted nothing.
+        prefix_events = await store.get_run_events(
+            started.run_id
+        )
+
+        resilience_events = [
+            event
+            for event in prefix_events
+            if event.source_domain
+            == SourceDomain.RESILIENCE
+        ]
+
+        assert len(resilience_events) == 1
+
+        resilience_event = resilience_events[0]
+
+        assert (
+            resilience_event.site_id
+            == "bank_primary"
+        )
+        assert (
+            resilience_event.service_instance_id
+            == "payment_api_primary"
+        )
+
+        observation = resilience_event.data[
+            "resilience_observation"
+        ]
+
+        assert (
+            observation["from_site_id"]
+            == "bank_primary"
+        )
+        assert (
+            observation[
+                "from_service_instance_id"
+            ]
+            == "payment_api_primary"
+        )
+        assert (
+            observation["to_site_id"]
+            == "bank_secondary"
+        )
+        assert (
+            observation[
+                "to_service_instance_id"
+            ]
+            == "payment_api_secondary"
+        )
+
+        # Final-active continuous evidence must not have been
+        # emitted during the bounded prefix.
+        assert not any(
+            event.source_domain == SourceDomain.LOG
+            and event.service_instance_id
+            == "payment_api_secondary"
+            for event in prefix_events
+        )
+
+        # Resilience observations must never cross the continuous
+        # scheduler boundary.
+        assert all(
+            binding.behaviour.source
+            != SourceDomain.RESILIENCE
+            for binding in captured_bindings
+        )
+
+        secondary_log_bindings = [
+            binding
+            for binding in captured_bindings
+            if (
+                binding.behaviour.source
+                == SourceDomain.LOG
+                and binding.execution_target
+                is not None
+                and (
+                    binding.execution_target
+                    .service_instance_id
+                    == "payment_api_secondary"
+                )
+            )
+        ]
+
+        assert len(
+            secondary_log_bindings
+        ) > 0
+
+        for binding in secondary_log_bindings:
+            assert (
+                binding.execution_target
+                is not None
+            )
+            assert (
+                binding.execution_target.site_id
+                == "bank_secondary"
+            )
+            assert (
+                binding.execution_target.service
+                == "payment_service"
+            )
+            assert (
+                binding.execution_target.component
+                == "payment_api"
+            )
+
+        stopped = await service.stop_run(
+            started.run_id
+        )
+
+        assert stopped.status == RunStatus.STOPPED
 
     finally:
         await active_run_manager.shutdown()
