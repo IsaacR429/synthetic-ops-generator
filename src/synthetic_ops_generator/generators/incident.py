@@ -42,6 +42,18 @@ DEFAULT_CHANGE_INCIDENT = IncidentDefinition(
 )
 
 
+DEFAULT_OPERATIONAL_INCIDENT = IncidentDefinition(
+    title="Operational service degradation",
+    description=(
+        "Operational degradation detected during "
+        "normal production operations."
+    ),
+    severity=IncidentSeverity.HIGH,
+    component_scoped=True,
+    link_to_change=False,
+)
+
+
 class IncidentGenerator(SourceGenerator):
     """
     Generates synthetic ITSM Incident source records.
@@ -58,7 +70,7 @@ class IncidentGenerator(SourceGenerator):
         *,
         ids: IdFactory,
         behaviour: ScenarioBehaviour,
-        incident: IncidentDefinition = DEFAULT_CHANGE_INCIDENT,
+        incident: IncidentDefinition | None = None,
         event_history: Sequence[GeneratedEvent] | None = None,
     ) -> None:
         if behaviour.source != SourceDomain.INCIDENT:
@@ -109,24 +121,33 @@ class IncidentGenerator(SourceGenerator):
     ) -> AsyncIterator[GeneratedEvent]:
         incident_id = self._ids.incident_id()
 
+        incident_definition = self._incident
+
+        if incident_definition is None:
+            incident_definition = (
+                DEFAULT_CHANGE_INCIDENT
+                if context.chg_id is not None
+                else DEFAULT_OPERATIONAL_INCIDENT
+            )
+
         component = (
             context.component
-            if self._incident.component_scoped
+            if incident_definition.component_scoped
             else None
         )
 
         chg_id = (
             context.chg_id
-            if self._incident.link_to_change
+            if incident_definition.link_to_change
             else None
         )
 
         incident = Incident(
             incident_id=incident_id,
             chg_id=chg_id,
-            title=self._incident.title,
-            description=self._incident.description,
-            severity=self._incident.severity,
+            title=incident_definition.title,
+            description=incident_definition.description,
+            severity=incident_definition.severity,
             status=IncidentStatus.OPEN,
             service=context.service,
             component=component,

@@ -202,6 +202,17 @@ def test_incident_preserves_change_and_run_correlation() -> None:
     assert event.service == "payment_service"
     assert event.component == "payment_api"
 
+    incident = event.data["incident"]
+
+    assert incident["title"] == "Post-change service degradation"
+    assert (
+        incident["description"]
+        == (
+            "Operational degradation detected during "
+            "the post-change observation window."
+        )
+    )
+
 
 def test_incident_generator_supports_run_without_change() -> None:
     generator = IncidentGenerator(
@@ -227,6 +238,20 @@ def test_incident_generator_supports_run_without_change() -> None:
     assert (
         event.data["incident"]["chg_id"]
         is None
+    )
+
+    incident = event.data["incident"]
+
+    assert (
+        incident["title"]
+        == "Operational service degradation"
+    )
+    assert (
+        incident["description"]
+        == (
+            "Operational degradation detected during "
+            "normal production operations."
+        )
     )
 
 
