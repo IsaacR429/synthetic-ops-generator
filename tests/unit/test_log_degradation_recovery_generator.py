@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 from synthetic_ops_generator.core.identifiers import IdFactory
+from synthetic_ops_generator.core.randomness import SimulationRandom
 from synthetic_ops_generator.domain.enums import (
     Environment,
     OperationalState,
@@ -47,11 +48,13 @@ def build_behaviour(
     *,
     profile_id: str,
     state: OperationalState,
+    continuous: bool = False,
 ) -> ScenarioBehaviour:
     return ScenarioBehaviour(
         source=SourceDomain.LOG,
         during_state=state,
         profile_id=profile_id,
+        continuous=continuous,
     )
 
 
@@ -194,6 +197,41 @@ def test_recovery_profile_emits_recovery_evidence() -> None:
         event.data["scenario_state"]
         for event in events
     } == {"recovery"}
+
+
+def test_continuous_recovery_profile_does_not_repeat_semantics_within_batch(
+) -> None:
+    generator = LogGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(
+            profile_id="recovery_operational_logs",
+            state=OperationalState.RECOVERY,
+            continuous=True,
+        ),
+        random_source=SimulationRandom(0),
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(
+                state=OperationalState.RECOVERY,
+            ),
+        )
+    )
+
+    log_types = [
+        event.data["log"]["log_type"]
+        for event in events
+    ]
+
+    assert len(log_types) == 3
+    assert set(log_types) == {
+        "request_completed",
+        "dependency_recovered",
+        "service_health",
+    }
+    assert len(set(log_types)) == len(log_types)
 
 
 def test_log_profile_does_not_run_in_wrong_state() -> None:

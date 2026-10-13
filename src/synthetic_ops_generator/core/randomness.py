@@ -20,6 +20,13 @@ class SimulationRandom:
     def choice(self, values: Sequence[T]) -> T:
         return self._python.choice(values)
 
+    def sample(
+        self,
+        values: Sequence[T],
+        count: int,
+    ) -> list[T]:
+        return self._python.sample(values, count)
+
     def randint(self, minimum: int, maximum: int) -> int:
         return self._python.randint(minimum, maximum)
 

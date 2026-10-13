@@ -588,14 +588,17 @@ def test_bank_01_itsm_and_deployment_execution() -> None:
         for event in log_events
     } == {context.run_id}
 
-    assert [
+    log_types = [
         event.data["log"]["log_type"]
         for event in log_events
-    ] == [
-        "service_health",
-        "request_accepted",
-        "request_accepted",
     ]
+
+    assert set(log_types) == {
+        "request_accepted",
+        "request_completed",
+        "service_health",
+    }
+    assert len(set(log_types)) == len(log_types)
 
     incident_events = [
         event

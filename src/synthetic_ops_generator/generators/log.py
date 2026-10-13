@@ -216,8 +216,10 @@ class LogGenerator(SourceGenerator):
             )
 
         return tuple(
-            self._random.choice(definitions)
-            for _ in range(len(definitions))
+            self._random.sample(
+                definitions,
+                len(definitions),
+            )
         )
 
     async def generate(
