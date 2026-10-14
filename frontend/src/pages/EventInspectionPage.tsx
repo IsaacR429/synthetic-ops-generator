@@ -12,60 +12,12 @@ import type {
   RunResponse,
   SourceDomain,
 } from '../types/api'
+import {
+  SOURCE_DOMAIN_OPTIONS,
+  formatSourceDomain,
+} from '../types/sourceDomainPresentation'
 
 const EVENT_PAGE_SIZE = 100
-
-const SOURCE_DOMAIN_OPTIONS: {
-  value: SourceDomain
-  label: string
-}[] = [
-  {
-    value: 'itsm',
-    label: 'ITSM',
-  },
-  {
-    value: 'deployment',
-    label: 'Deployment',
-  },
-  {
-    value: 'application_test',
-    label: 'Application Test',
-  },
-  {
-    value: 'infrastructure_test',
-    label: 'Infrastructure Test',
-  },
-  {
-    value: 'metric',
-    label: 'Metric',
-  },
-  {
-    value: 'log',
-    label: 'Log',
-  },
-  {
-    value: 'manual_validation',
-    label: 'Manual Validation',
-  },
-  {
-    value: 'incident',
-    label: 'Incident',
-  },
-  {
-    value: 'evidence',
-    label: 'Evidence',
-  },
-]
-
-function formatSourceDomain(
-  value: SourceDomain,
-): string {
-  return (
-    SOURCE_DOMAIN_OPTIONS.find(
-      (option) => option.value === value,
-    )?.label ?? value
-  )
-}
 
 function formatEventTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {

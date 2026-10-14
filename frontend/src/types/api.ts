@@ -45,6 +45,7 @@ export type SourceDomain =
   | 'manual_validation'
   | 'incident'
   | 'evidence'
+  | 'resilience'
 
 export type TargetScope =
   | 'business_stream'
