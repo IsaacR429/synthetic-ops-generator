@@ -1,5 +1,8 @@
 import pytest
 
+from synthetic_ops_generator.config.enterprise_loader import (
+    load_enterprise_configuration,
+)
 from synthetic_ops_generator.domain.enterprise import (
     BusinessStream,
     Component,
@@ -242,3 +245,30 @@ def test_transitive_dependents_are_cycle_safe() -> None:
         "mobile_api",
     )
     assert "account_database" not in ids
+
+def test_bank_alpha_payment_api_calls_authentication_api() -> None:
+    enterprise = load_enterprise_configuration(
+        "config/enterprises/bank_alpha"
+    )
+    resolver = TopologyResolver(enterprise)
+
+    direct_dependencies = {
+        node.node_id
+        for node in resolver.direct_dependencies_of(
+            "payment_api"
+        )
+    }
+
+    assert "authentication_api" in direct_dependencies
+
+    dependency = next(
+        dependency
+        for dependency in enterprise.dependencies
+        if dependency.dependency_id
+        == "dep_payment_authentication"
+    )
+
+    assert dependency.source_id == "payment_api"
+    assert dependency.target_id == "authentication_api"
+    assert dependency.relationship_type.value == "calls"
+    assert dependency.criticality.value == "critical"

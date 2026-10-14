@@ -59,7 +59,7 @@ def test_bank_03_operational_degradation_configuration_loads() -> None:
         scenario.target.service_id
         == "payment_service"
     )
-    assert len(scenario.behaviours) == 8
+    assert len(scenario.behaviours) == 10
 
 
 HEALTH_METRIC_IDS = (

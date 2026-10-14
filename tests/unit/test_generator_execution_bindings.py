@@ -32,7 +32,7 @@ def test_execution_bindings_preserve_behaviour_order() -> None:
         CONFIG_ROOT
         / "scenarios"
         / "banking"
-        / "BANK-03.yaml"
+        / "BANK-01.yaml"
     )
     plan = build_scenario_execution_plan(
         scenario=scenario,

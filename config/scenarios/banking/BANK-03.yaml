@@ -68,6 +68,15 @@ behaviours:
       Payment Service metrics initially remain within normal operational
       behaviour.
 
+  - source: log
+    during_state: warning
+    profile_id: authentication_failure_logs
+    execution_node_id: authentication_api
+    description: >
+      Authentication API logs expose elevated authentication failures
+      before downstream Payment Service degradation reaches blocking
+      conditions.
+
   - source: metric
     during_state: warning
     profile_id: operational_warning
@@ -106,6 +115,15 @@ behaviours:
       An operational Incident is created for the degraded Payment Service
       without Change correlation.
 
+  - source: log
+    during_state: recovery
+    profile_id: authentication_recovery_logs
+    execution_node_id: authentication_api
+    description: >
+      Authentication API logs confirm authentication processing has
+      returned to normal before downstream Payment Service recovery
+      completes.
+
   - source: metric
     during_state: recovery
     profile_id: operational_recovery
@@ -143,10 +161,12 @@ expected_result:
 
   expected_evidence:
     - healthy_operational_baseline
+    - authentication_failure_logs
     - degraded_operational_metrics
     - degradation_logs
     - incident_record
     - recovery_observation
+    - authentication_recovery_logs
     - recovery_logs
     - incident_resolution
 

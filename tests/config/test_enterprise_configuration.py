@@ -14,7 +14,7 @@ def test_bank_alpha_configuration_loads() -> None:
     assert len(enterprise.components) == 9
     assert len(enterprise.sites) == 2
     assert len(enterprise.service_instances) == 4
-    assert len(enterprise.dependencies) == 5
+    assert len(enterprise.dependencies) == 6
 
 
 def test_insurer_alpha_configuration_loads() -> None:

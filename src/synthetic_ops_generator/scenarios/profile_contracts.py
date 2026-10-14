@@ -30,6 +30,8 @@ MANDATORY_TEST_REGRESSION = "mandatory_test_regression"
 NORMAL_OPERATIONAL_LOGS = "normal_operational_logs"
 DEGRADATION_ERROR_LOGS = "degradation_error_logs"
 RECOVERY_OPERATIONAL_LOGS = "recovery_operational_logs"
+AUTHENTICATION_FAILURE_LOGS = "authentication_failure_logs"
+AUTHENTICATION_RECOVERY_LOGS = "authentication_recovery_logs"
 
 ALL_REQUIRED_VALIDATIONS_PASS = (
     "all_required_validations_pass"
@@ -104,6 +106,8 @@ SUPPORTED_PROFILES_BY_SOURCE: dict[
             NORMAL_OPERATIONAL_LOGS,
             DEGRADATION_ERROR_LOGS,
             RECOVERY_OPERATIONAL_LOGS,
+            AUTHENTICATION_FAILURE_LOGS,
+            AUTHENTICATION_RECOVERY_LOGS,
         }
     ),
     SourceDomain.MANUAL_VALIDATION: frozenset(

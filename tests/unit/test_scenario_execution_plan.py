@@ -22,7 +22,7 @@ def test_execution_plan_preserves_legacy_base_target() -> None:
         "config/enterprises/bank_alpha"
     )
     scenario = load_scenario(
-        "config/scenarios/banking/BANK-03.yaml"
+        "config/scenarios/banking/BANK-01.yaml"
     )
     plan = build_scenario_execution_plan(
         scenario=scenario,

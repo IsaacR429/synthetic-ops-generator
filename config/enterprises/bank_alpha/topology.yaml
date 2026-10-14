@@ -12,6 +12,12 @@ dependencies:
     relationship_type: depends_on
     criticality: critical
 
+  - dependency_id: dep_payment_authentication
+    source_id: payment_api
+    target_id: authentication_api
+    relationship_type: calls
+    criticality: critical
+
   - dependency_id: dep_mobile_account
     source_id: mobile_api
     target_id: account_api

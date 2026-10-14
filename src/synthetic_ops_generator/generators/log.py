@@ -16,6 +16,8 @@ from synthetic_ops_generator.scenarios.models import (
     SourceDomain,
 )
 from synthetic_ops_generator.scenarios.profile_contracts import (
+    AUTHENTICATION_FAILURE_LOGS,
+    AUTHENTICATION_RECOVERY_LOGS,
     DEGRADATION_ERROR_LOGS,
     NORMAL_OPERATIONAL_LOGS,
     RECOVERY_OPERATIONAL_LOGS,
@@ -121,6 +123,63 @@ DEFAULT_RECOVERY_LOGS = (
 )
 
 
+DEFAULT_AUTHENTICATION_FAILURE_LOGS = (
+    LogDefinition(
+        log_type="authentication_failed",
+        severity=LogSeverity.ERROR,
+        message="Authentication request failed.",
+        error_code="AUTHENTICATION_FAILED",
+        attributes={
+            "authentication_status": "failed",
+        },
+    ),
+    LogDefinition(
+        log_type="authentication_failures_elevated",
+        severity=LogSeverity.WARNING,
+        message="Elevated authentication failures were observed.",
+        attributes={
+            "authentication_failure_state": "elevated",
+        },
+    ),
+    LogDefinition(
+        log_type="authentication_service_degraded",
+        severity=LogSeverity.WARNING,
+        message="Authentication processing is operating in a degraded state.",
+        attributes={
+            "health_status": "degraded",
+        },
+    ),
+)
+
+
+DEFAULT_AUTHENTICATION_RECOVERY_LOGS = (
+    LogDefinition(
+        log_type="authentication_succeeded",
+        severity=LogSeverity.INFO,
+        message="Authentication request completed successfully after recovery.",
+        attributes={
+            "authentication_status": "succeeded",
+        },
+    ),
+    LogDefinition(
+        log_type="authentication_failures_normalized",
+        severity=LogSeverity.INFO,
+        message="Authentication failure conditions returned to normal.",
+        attributes={
+            "authentication_failure_state": "normal",
+        },
+    ),
+    LogDefinition(
+        log_type="authentication_service_recovered",
+        severity=LogSeverity.INFO,
+        message="Authentication processing returned to normal operation.",
+        attributes={
+            "health_status": "recovered",
+        },
+    ),
+)
+
+
 class LogGenerator(SourceGenerator):
     """
     Generates structured synthetic operational logs.
@@ -192,6 +251,18 @@ class LogGenerator(SourceGenerator):
             == RECOVERY_OPERATIONAL_LOGS
         ):
             return DEFAULT_RECOVERY_LOGS
+
+        if (
+            self._behaviour.profile_id
+            == AUTHENTICATION_FAILURE_LOGS
+        ):
+            return DEFAULT_AUTHENTICATION_FAILURE_LOGS
+
+        if (
+            self._behaviour.profile_id
+            == AUTHENTICATION_RECOVERY_LOGS
+        ):
+            return DEFAULT_AUTHENTICATION_RECOVERY_LOGS
 
         raise ValueError(
             "Unsupported Log behaviour profile: "
