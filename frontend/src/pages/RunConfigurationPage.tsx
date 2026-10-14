@@ -21,6 +21,10 @@ import type {
   ScenarioSummary,
   StartRunRequest,
 } from '../types/api'
+import {
+  EXECUTION_VALIDATION_LABEL,
+  formatExecutionValidation,
+} from '../types/runValidationPresentation'
 
 function formatLabel(value: string): string {
   return value
@@ -1363,7 +1367,7 @@ export function RunConfigurationPage() {
 
                             <div className="p-4">
                               <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-slate-600">
-                                Validation
+                                {EXECUTION_VALIDATION_LABEL}
                               </div>
 
                               <div
@@ -1376,13 +1380,10 @@ export function RunConfigurationPage() {
                                       : 'text-slate-300',
                                 ].join(' ')}
                               >
-                                {activeRun.validation_passed === null
-                                  ? activeRun.status === 'running'
-                                    ? 'Pending'
-                                    : 'Not reported'
-                                  : activeRun.validation_passed
-                                    ? 'Passed'
-                                    : 'Failed'}
+                                {formatExecutionValidation(
+                                  activeRun.validation_passed,
+                                  activeRun.status === 'running',
+                                )}
                               </div>
                             </div>
                           </div>

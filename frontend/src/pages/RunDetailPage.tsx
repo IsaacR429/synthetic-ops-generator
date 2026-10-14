@@ -7,6 +7,10 @@ import { Link, useNavigate, useParams } from 'react-router'
 
 import { ApiError, getRun, stopRun } from '../api/client'
 import type { RunResponse, RunStatus } from '../types/api'
+import {
+  EXECUTION_VALIDATION_LABEL,
+  formatExecutionValidation,
+} from '../types/runValidationPresentation'
 
 function formatLabel(value: string): string {
   return value
@@ -351,16 +355,11 @@ export function RunDetailPage() {
                   />
 
                   <DetailRow
-                    label="Validation"
-                    value={
-                      run.validation_passed === null
-                        ? run.status === 'running'
-                          ? 'Pending'
-                          : 'Not reported'
-                        : run.validation_passed
-                          ? 'Passed'
-                          : 'Failed'
-                    }
+                    label={EXECUTION_VALIDATION_LABEL}
+                    value={formatExecutionValidation(
+                      run.validation_passed,
+                      run.status === 'running',
+                    )}
                     emphasis={
                       run.validation_passed
                         ? 'green'
