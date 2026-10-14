@@ -16,6 +16,12 @@ import {
   SOURCE_DOMAIN_OPTIONS,
   formatSourceDomain,
 } from '../types/sourceDomainPresentation'
+import {
+  getCapacityClassification,
+  getMetricClassification,
+  getMetricPayload,
+  type MetricPayload,
+} from '../types/metricPresentation'
 
 const EVENT_PAGE_SIZE = 100
 
@@ -64,44 +70,6 @@ function FilterInput({
       />
     </div>
   )
-}
-
-interface MetricPayload {
-  name?: unknown
-  observed_value?: unknown
-  unit?: unknown
-  classification?: unknown
-  evaluation_statistic?: unknown
-  direction?: unknown
-  scenario_state?: unknown
-
-  baseline?: {
-    center?: unknown
-    lower_bound?: unknown
-    upper_bound?: unknown
-  }
-
-  effective_benchmark?: {
-    reference_target?: unknown
-    warning_threshold?: unknown
-    blocking_threshold?: unknown
-  }
-}
-
-function getMetricPayload(
-  data: Record<string, unknown>,
-): MetricPayload | null {
-  const metric = data.metric
-
-  if (
-    !metric ||
-    typeof metric !== 'object' ||
-    Array.isArray(metric)
-  ) {
-    return null
-  }
-
-  return metric as MetricPayload
 }
 
 interface MetricValueProps {
@@ -828,7 +796,11 @@ export function EventInspectionPage() {
                       </th>
 
                       <th className="px-4 py-3 font-medium">
-                        Status
+                        Metric Classification
+                      </th>
+
+                      <th className="px-4 py-3 font-medium">
+                        Capacity Classification
                       </th>
 
                       <th className="px-4 py-3 font-medium">
@@ -898,10 +870,11 @@ export function EventInspectionPage() {
                             </td>
 
                             <td className="whitespace-nowrap px-4 py-3 text-xs">
-                              {metric &&
-                              typeof metric.classification === 'string'
-                                ? metric.classification
-                                : '—'}
+                              {getMetricClassification(metric) ?? '—'}
+                            </td>
+
+                            <td className="whitespace-nowrap px-4 py-3 text-xs">
+                              {getCapacityClassification(metric) ?? '—'}
                             </td>
 
                             <td className="whitespace-nowrap px-4 py-3">
@@ -915,7 +888,7 @@ export function EventInspectionPage() {
 
                           {isExpanded && (
                             <tr className="bg-white/[0.015]">
-                              <td colSpan={10} className="px-6 py-5">
+                              <td colSpan={11} className="px-6 py-5">
                                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_1fr]">
                                   <div>
                                     <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -1029,8 +1002,21 @@ export function EventInspectionPage() {
                                               />
 
                                               <MetricValue
-                                                label="Classification"
-                                                value={metric.classification}
+                                                label="Metric Classification"
+                                                value={
+                                                  getMetricClassification(
+                                                    metric,
+                                                  )
+                                                }
+                                              />
+
+                                              <MetricValue
+                                                label="Capacity Classification"
+                                                value={
+                                                  getCapacityClassification(
+                                                    metric,
+                                                  )
+                                                }
                                               />
 
                                               <MetricValue
