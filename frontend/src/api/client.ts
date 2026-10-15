@@ -5,6 +5,7 @@ import type {
   EventActivityWindow,
   HealthResponse,
   ReplayRunResponse,
+  RunEventFilter,
   RunEventQuery,
   RunEventsResponse,
   RunResponse,
@@ -123,12 +124,10 @@ export function getRun(
   )
 }
 
-export function getRunEvents(
-  runId: string,
-  query?: RunEventQuery,
-): Promise<RunEventsResponse> {
-  const searchParams = new URLSearchParams()
-
+function appendRunEventFilters(
+  searchParams: URLSearchParams,
+  query?: RunEventFilter,
+): void {
   if (query?.source_domain) {
     searchParams.set(
       'source_domain',
@@ -163,6 +162,19 @@ export function getRunEvents(
       query.component,
     )
   }
+}
+
+
+export function getRunEvents(
+  runId: string,
+  query?: RunEventQuery,
+): Promise<RunEventsResponse> {
+  const searchParams = new URLSearchParams()
+
+  appendRunEventFilters(
+    searchParams,
+    query,
+  )
 
   if (
     query?.after_sequence_number !== undefined
@@ -187,6 +199,26 @@ export function getRunEvents(
     (queryString ? `?${queryString}` : '')
 
   return request<RunEventsResponse>(path)
+}
+
+
+export function buildRunEventsExportUrl(
+  runId: string,
+  query?: RunEventFilter,
+): string {
+  const searchParams = new URLSearchParams()
+
+  appendRunEventFilters(
+    searchParams,
+    query,
+  )
+
+  const queryString = searchParams.toString()
+
+  return (
+    `/api/runs/${encodePathSegment(runId)}/export.csv` +
+    (queryString ? `?${queryString}` : '')
+  )
 }
 
 export function stopRun(

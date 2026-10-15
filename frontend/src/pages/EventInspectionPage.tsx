@@ -5,9 +5,14 @@ import {
 } from 'react'
 import { Link, useParams } from 'react-router'
 
-import { ApiError, getRun, getRunEvents } from '../api/client'
+import {
+  ApiError,
+  buildRunEventsExportUrl,
+  getRun,
+  getRunEvents,
+} from '../api/client'
 import type {
-  RunEventQuery,
+  RunEventFilter,
   RunEventsResponse,
   RunResponse,
   SourceDomain,
@@ -135,7 +140,7 @@ export function EventInspectionPage() {
   const [componentInput, setComponentInput] =
     useState('')
   const [appliedQuery, setAppliedQuery] =
-    useState<RunEventQuery | undefined>(
+    useState<RunEventFilter | undefined>(
       undefined,
     )
   const [
@@ -172,6 +177,13 @@ export function EventInspectionPage() {
         serviceInput.trim() ||
         componentInput.trim(),
     )
+
+  const exportUrl = runId
+    ? buildRunEventsExportUrl(
+        runId,
+        appliedQuery,
+      )
+    : undefined
 
   useEffect(() => {
     setRun(null)
@@ -329,7 +341,7 @@ export function EventInspectionPage() {
   ])
 
   function handleApplyFilters() {
-    const query: RunEventQuery = {}
+    const query: RunEventFilter = {}
 
     if (selectedSourceDomain) {
       query.source_domain =
@@ -707,6 +719,15 @@ export function EventInspectionPage() {
               </div>
 
               <div className="flex items-center gap-3">
+                <a
+                  href={exportUrl}
+                  download
+                  aria-disabled={!exportUrl}
+                  className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-4 py-2.5 text-[10px] font-semibold text-cyan-100 transition-all hover:border-cyan-400/30 hover:bg-cyan-500/[0.10]"
+                >
+                  Download CSV
+                </a>
+
                 <button
                   type="button"
                   onClick={handleClearFilters}

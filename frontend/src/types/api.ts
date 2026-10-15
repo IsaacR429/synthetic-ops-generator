@@ -252,13 +252,15 @@ export interface GeneratedEvent {
   data: Record<string, unknown>
 }
 
-export interface RunEventQuery {
+export interface RunEventFilter {
   source_domain?: SourceDomain
   source_system?: string
   event_type?: string
   service?: string
   component?: string
+}
 
+export interface RunEventQuery extends RunEventFilter {
   after_sequence_number?: number
   limit?: number
 }
