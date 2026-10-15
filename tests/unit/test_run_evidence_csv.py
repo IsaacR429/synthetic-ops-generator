@@ -3,12 +3,18 @@ import io
 import json
 from datetime import UTC, datetime
 
+from synthetic_ops_generator.domain.enums import (
+    Environment,
+    SourceDomain,
+)
+from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.reporting.csv_export import (
     RUN_EVIDENCE_CSV_COLUMNS,
     serialize_run_evidence_csv,
 )
 from synthetic_ops_generator.reporting.evidence_row import (
     RunEvidenceRow,
+    project_run_evidence_row,
 )
 
 EXPECTED_COLUMNS = (
@@ -223,3 +229,68 @@ def test_csv_preserves_input_order_and_serializes_missing_values_as_blank() -> N
     assert records[0]["benchmark_profile_id"] == ""
     assert records[0]["capacity_profile_id"] == ""
     assert records[0]["chg_id"] == "CHG0000031"
+
+
+
+def test_csv_preserves_unknown_future_scenario_payload() -> None:
+    event = GeneratedEvent(
+        event_id="evt-future-insurance",
+        event_type="insurance.future_signal",
+        schema_version="1.0",
+        event_time=datetime(
+            2026,
+            10,
+            15,
+            1,
+            0,
+            tzinfo=UTC,
+        ),
+        source_system="synthetic_future_provider",
+        source_domain=SourceDomain.EVIDENCE,
+        scenario_id="INS-FUTURE",
+        run_id="RUN-FUTURE",
+        chg_id=None,
+        business_stream="claims",
+        service="future_claims_service",
+        component="future_component",
+        environment=Environment.PRODUCTION,
+        site_id=None,
+        service_instance_id=None,
+        sequence_number=1,
+        synthetic=True,
+        data={
+            "future_domain": {
+                "new_field": "new-value",
+                "nested": {
+                    "confidence": 0.93,
+                },
+            },
+        },
+    )
+
+    row = project_run_evidence_row(event)
+
+    text = serialize_run_evidence_csv([row])
+
+    record = next(
+        csv.DictReader(
+            io.StringIO(text)
+        )
+    )
+
+    assert record["scenario_id"] == "INS-FUTURE"
+    assert record["event_type"] == "insurance.future_signal"
+
+    raw_event = json.loads(
+        record["raw_event_json"]
+    )
+
+    assert raw_event["data"]["future_domain"] == {
+        "new_field": "new-value",
+        "nested": {
+            "confidence": 0.93,
+        },
+    }
+
+    assert record["metric_definition_id"] == ""
+    assert record["capacity_profile_id"] == ""
