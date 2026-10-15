@@ -764,7 +764,7 @@ export function EventInspectionPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1050px] text-left text-sm">
+                <table className="w-full min-w-[1320px] text-left text-sm">
                   <thead className="border-b border-white/10 bg-white/[0.02] text-xs text-slate-400">
                     <tr>
                       <th className="px-4 py-3 font-medium">
@@ -809,6 +809,14 @@ export function EventInspectionPage() {
 
                       <th className="px-4 py-3 font-medium">
                         Component
+                      </th>
+
+                      <th className="px-4 py-3 font-medium">
+                        Site
+                      </th>
+
+                      <th className="px-4 py-3 font-medium">
+                        Service Instance
                       </th>
                     </tr>
                   </thead>
@@ -884,11 +892,19 @@ export function EventInspectionPage() {
                             <td className="whitespace-nowrap px-4 py-3">
                               {event.component ?? '—'}
                             </td>
+
+                            <td className="whitespace-nowrap px-4 py-3">
+                              {event.site_id ?? '—'}
+                            </td>
+
+                            <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                              {event.service_instance_id ?? '—'}
+                            </td>
                           </tr>
 
                           {isExpanded && (
                             <tr className="bg-white/[0.015]">
-                              <td colSpan={11} className="px-6 py-5">
+                              <td colSpan={13} className="px-6 py-5">
                                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_1fr]">
                                   <div>
                                     <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -938,6 +954,24 @@ export function EventInspectionPage() {
                                         </dt>
                                         <dd className="mt-0.5 text-slate-300">
                                           {event.environment ?? '—'}
+                                        </dd>
+                                      </div>
+
+                                      <div>
+                                        <dt className="text-slate-600">
+                                          Site
+                                        </dt>
+                                        <dd className="mt-0.5 font-mono text-slate-300">
+                                          {event.site_id ?? '—'}
+                                        </dd>
+                                      </div>
+
+                                      <div>
+                                        <dt className="text-slate-600">
+                                          Service Instance
+                                        </dt>
+                                        <dd className="mt-0.5 font-mono text-slate-300">
+                                          {event.service_instance_id ?? '—'}
                                         </dd>
                                       </div>
 

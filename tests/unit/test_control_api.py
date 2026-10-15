@@ -1431,6 +1431,51 @@ def test_get_run_events_returns_retained_events_in_sequence_order(
     )
 
 
+def test_get_run_events_preserves_non_null_placement_fields(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-06",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+    run_id = started.json()["run_id"]
+
+    wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    response = client.get(
+        f"/runs/{run_id}/events"
+    )
+
+    assert response.status_code == 200
+
+    events = response.json()["events"]
+
+    assert events
+
+    assert all(
+        "site_id" in event
+        and "service_instance_id" in event
+        for event in events
+    )
+
+    placed_events = [
+        event
+        for event in events
+        if event["site_id"] is not None
+        and event["service_instance_id"] is not None
+    ]
+
+    assert placed_events
+
+
 def test_get_run_events_supports_sequence_cursor_pagination(
     client: TestClient,
 ) -> None:

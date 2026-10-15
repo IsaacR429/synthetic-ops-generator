@@ -242,6 +242,8 @@ export interface GeneratedEvent {
   service: string | null
   component: string | null
   environment: Environment | null
+  site_id: string | null
+  service_instance_id: string | null
 
   sequence_number: number
 
