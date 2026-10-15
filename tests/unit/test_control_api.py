@@ -1,3 +1,5 @@
+import csv
+import io
 import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -29,7 +31,6 @@ from synthetic_ops_generator.control.service import (
 from synthetic_ops_generator.domain.enums import (
     OperationalState,
 )
-
 
 
 @pytest.fixture
@@ -2020,4 +2021,284 @@ def test_get_event_activity_includes_current_partial_bucket(
 
     assert payload["buckets"][-1]["started_at"] == (
         "2026-08-19T18:15:00Z"
+    )
+
+
+def test_export_run_events_csv_returns_all_retained_events(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    completed = wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    response = client.get(
+        f"/runs/{run_id}/export.csv"
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == (
+        "text/csv; charset=utf-8"
+    )
+    assert response.headers["content-disposition"] == (
+        'attachment; '
+        f'filename="streamops-{run_id}-events.csv"'
+    )
+
+    rows = list(
+        csv.DictReader(
+            io.StringIO(response.text)
+        )
+    )
+
+    assert len(rows) == completed["event_count"]
+
+    assert {
+        row["run_id"]
+        for row in rows
+    } == {run_id}
+
+    assert [
+        int(row["sequence_number"])
+        for row in rows
+    ] == list(
+        range(
+            1,
+            len(rows) + 1,
+        )
+    )
+
+    assert all(
+        row["raw_event_json"]
+        for row in rows
+    )
+
+
+def test_export_run_events_csv_reuses_run_event_filters(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    unfiltered_response = client.get(
+        f"/runs/{run_id}/events"
+    )
+
+    assert unfiltered_response.status_code == 200
+
+    events = unfiltered_response.json()["events"]
+    assert events
+
+    filter_candidates = {}
+
+    for parameter in (
+        "source_domain",
+        "source_system",
+        "event_type",
+        "service",
+        "component",
+    ):
+        value = next(
+            (
+                event[parameter]
+                for event in events
+                if event.get(parameter) is not None
+            ),
+            None,
+        )
+
+        assert value is not None
+
+        filter_candidates[parameter] = value
+
+    for parameter, value in filter_candidates.items():
+        expected_response = client.get(
+            f"/runs/{run_id}/events",
+            params={
+                parameter: value,
+            },
+        )
+
+        assert expected_response.status_code == 200
+
+        expected_events = expected_response.json()["events"]
+        assert expected_events
+
+        export_response = client.get(
+            f"/runs/{run_id}/export.csv",
+            params={
+                parameter: value,
+            },
+        )
+
+        assert export_response.status_code == 200
+
+        rows = list(
+            csv.DictReader(
+                io.StringIO(
+                    export_response.text
+                )
+            )
+        )
+
+        assert [
+            row["event_id"]
+            for row in rows
+        ] == [
+            event["event_id"]
+            for event in expected_events
+        ]
+
+        assert len(rows) == (
+            expected_response.json()[
+                "retained_event_count"
+            ]
+        )
+
+
+def test_export_run_events_csv_rejects_invalid_source_domain(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    response = client.get(
+        f"/runs/{run_id}/export.csv",
+        params={
+            "source_domain": "banana",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_export_run_events_csv_returns_404_for_unknown_run(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        "/runs/RUN9999999/export.csv"
+    )
+
+    assert response.status_code == 404
+
+    assert response.json() == {
+        "detail": (
+            "Run 'RUN9999999' was not found."
+        )
+    }
+
+
+
+def test_export_run_events_csv_combines_filters_with_and_semantics(
+    client: TestClient,
+) -> None:
+    started = client.post(
+        "/runs",
+        json={
+            "scenario_id": "BANK-01",
+            "random_seed": 42,
+        },
+    )
+
+    assert started.status_code == 202
+
+    run_id = started.json()["run_id"]
+
+    wait_for_terminal_run(
+        client,
+        run_id,
+    )
+
+    all_events_response = client.get(
+        f"/runs/{run_id}/events"
+    )
+
+    assert all_events_response.status_code == 200
+
+    candidate = next(
+        event
+        for event in all_events_response.json()["events"]
+        if (
+            event["source_domain"] is not None
+            and event["service"] is not None
+        )
+    )
+
+    params = {
+        "source_domain": candidate["source_domain"],
+        "service": candidate["service"],
+    }
+
+    expected_response = client.get(
+        f"/runs/{run_id}/events",
+        params=params,
+    )
+
+    assert expected_response.status_code == 200
+
+    expected_events = expected_response.json()["events"]
+    assert expected_events
+
+    export_response = client.get(
+        f"/runs/{run_id}/export.csv",
+        params=params,
+    )
+
+    assert export_response.status_code == 200
+
+    rows = list(
+        csv.DictReader(
+            io.StringIO(export_response.text)
+        )
+    )
+
+    assert [
+        row["event_id"]
+        for row in rows
+    ] == [
+        event["event_id"]
+        for event in expected_events
+    ]
+
+    assert all(
+        row["source_domain"]
+        == candidate["source_domain"]
+        and row["service"]
+        == candidate["service"]
+        for row in rows
     )

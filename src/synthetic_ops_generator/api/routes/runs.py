@@ -6,6 +6,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     status,
 )
 
@@ -30,6 +31,12 @@ from synthetic_ops_generator.control.service import (
 )
 from synthetic_ops_generator.domain.enums import (
     SourceDomain,
+)
+from synthetic_ops_generator.reporting.csv_export import (
+    serialize_run_evidence_csv,
+)
+from synthetic_ops_generator.reporting.evidence_row import (
+    project_run_evidence_row,
 )
 
 router = APIRouter(
@@ -244,6 +251,73 @@ async def get_run_events(
         next_after_sequence_number=(
             next_after_sequence_number
         ),
+    )
+
+
+@router.get(
+    "/{run_id}/export.csv",
+)
+async def export_run_events_csv(
+    run_id: str,
+    service: ControlServiceDependency,
+    source_domain: SourceDomain | None = None,
+    source_system: str | None = None,
+    event_type: str | None = None,
+    service_name: Annotated[
+        str | None,
+        Query(alias="service"),
+    ] = None,
+    component: str | None = None,
+) -> Response:
+    has_filters = any(
+        value is not None
+        for value in (
+            source_domain,
+            source_system,
+            event_type,
+            service_name,
+            component,
+        )
+    )
+
+    try:
+        if has_filters:
+            events = await service.query_run_events(
+                run_id,
+                source_domain=source_domain,
+                source_system=source_system,
+                event_type=event_type,
+                service=service_name,
+                component=component,
+            )
+        else:
+            events = await service.get_run_events(
+                run_id
+            )
+    except RunNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    rows = [
+        project_run_evidence_row(event)
+        for event in events
+    ]
+
+    content = serialize_run_evidence_csv(
+        rows
+    )
+
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                "attachment; "
+                f'filename="streamops-{run_id}-events.csv"'
+            ),
+        },
     )
 
 
