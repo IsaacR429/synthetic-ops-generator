@@ -73,6 +73,14 @@ ScenarioExecutionNodeId = Annotated[
     ),
 ]
 
+ScenarioBehaviourId = Annotated[
+    str,
+    StringConstraints(
+        min_length=1,
+        pattern=r"^\S+$",
+    ),
+]
+
 
 class ScenarioResilienceTransition(BaseModel):
     to_execution_node_id: ScenarioExecutionNodeId
@@ -100,6 +108,8 @@ class ScenarioMetricSelection(BaseModel):
 
 
 class ScenarioBehaviour(BaseModel):
+    behaviour_id: ScenarioBehaviourId | None = None
+
     source: SourceDomain
 
     during_state: OperationalState
@@ -284,5 +294,17 @@ class ScenarioDefinition(BaseModel):
                     f"Behaviour profile {behaviour.profile_id} "
                     "references a state not used by the Scenario."
                 )
+
+        behaviour_ids = [
+            behaviour.behaviour_id
+            for behaviour in self.behaviours
+            if behaviour.behaviour_id is not None
+        ]
+        if len(behaviour_ids) != len(
+            set(behaviour_ids)
+        ):
+            raise ValueError(
+                "Scenario behaviour IDs must be unique."
+            )
 
         return self

@@ -58,6 +58,7 @@ state_sequence:
 
 behaviours:
   - source: metric
+    behaviour_id: metric_normal_healthy_baseline_at_payment_api_primary
     during_state: normal
     profile_id: healthy_baseline
     execution_node_id: payment_api_primary
@@ -70,6 +71,7 @@ behaviours:
       The primary Payment API begins from a healthy production baseline.
 
   - source: infrastructure_test
+    behaviour_id: infrastructure_test_normal_all_required_checks_pass_at_payment_api_primary
     during_state: normal
     profile_id: all_required_checks_pass
     execution_node_id: payment_api_primary
@@ -78,6 +80,7 @@ behaviours:
       Service Instance is initially healthy.
 
   - source: infrastructure_test
+    behaviour_id: infrastructure_test_failure_required_check_failed_at_payment_api_primary
     during_state: failure
     profile_id: required_check_failed
     execution_node_id: payment_api_primary
@@ -86,6 +89,7 @@ behaviours:
       Service Instance is unavailable.
 
   - source: metric
+    behaviour_id: metric_degraded_operational_degradation_at_payment_api_primary
     during_state: degraded
     profile_id: operational_degradation
     execution_node_id: payment_api_primary
@@ -99,6 +103,7 @@ behaviours:
       during the availability loss.
 
   - source: log
+    behaviour_id: log_failure_degradation_error_logs_at_payment_api_primary
     during_state: failure
     profile_id: degradation_error_logs
     execution_node_id: payment_api_primary
@@ -107,6 +112,7 @@ behaviours:
       unavailable Service Instance.
 
   - source: resilience
+    behaviour_id: resilience_remediation_failover_initiated_at_payment_api_primary_to_payment_api_secondary
     during_state: remediation
     profile_id: failover_initiated
     execution_node_id: payment_api_primary
@@ -119,6 +125,7 @@ behaviours:
       Service Instance.
 
   - source: resilience
+    behaviour_id: resilience_remediation_traffic_switch_started_at_payment_api_primary_to_payment_api_secondary
     during_state: remediation
     profile_id: traffic_switch_started
     execution_node_id: payment_api_primary
@@ -130,6 +137,7 @@ behaviours:
       the secondary Service Instance begins.
 
   - source: resilience
+    behaviour_id: resilience_remediation_traffic_switch_completed_at_payment_api_primary_to_payment_api_secondary
     during_state: remediation
     profile_id: traffic_switch_completed
     execution_node_id: payment_api_primary
@@ -141,6 +149,7 @@ behaviours:
       configured secondary Service Instance completes.
 
   - source: resilience
+    behaviour_id: resilience_remediation_instance_activated_at_payment_api_secondary
     during_state: remediation
     profile_id: instance_activated
     execution_node_id: payment_api_secondary
@@ -150,6 +159,7 @@ behaviours:
       state.
 
   - source: resilience
+    behaviour_id: resilience_remediation_instance_serving_at_payment_api_secondary
     during_state: remediation
     profile_id: instance_serving
     execution_node_id: payment_api_secondary
@@ -159,6 +169,7 @@ behaviours:
       traffic.
 
   - source: infrastructure_test
+    behaviour_id: infrastructure_test_recovery_all_required_checks_pass_at_payment_api_primary
     during_state: recovery
     profile_id: all_required_checks_pass
     execution_node_id: payment_api_primary
@@ -167,6 +178,7 @@ behaviours:
       Payment API Service Instance.
 
   - source: metric
+    behaviour_id: metric_recovery_operational_recovery_at_payment_api_primary
     during_state: recovery
     profile_id: operational_recovery
     execution_node_id: payment_api_primary
@@ -180,6 +192,7 @@ behaviours:
       conditions after the original availability loss.
 
   - source: metric
+    behaviour_id: metric_recovery_operational_recovery_at_payment_api_secondary
     during_state: recovery
     profile_id: operational_recovery
     execution_node_id: payment_api_secondary
@@ -194,6 +207,7 @@ behaviours:
       reference conditions while the secondary instance continues serving.
 
   - source: log
+    behaviour_id: log_recovery_recovery_operational_logs_at_payment_api_secondary
     during_state: recovery
     profile_id: recovery_operational_logs
     execution_node_id: payment_api_secondary

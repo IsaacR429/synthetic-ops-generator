@@ -56,6 +56,7 @@ state_sequence:
 
 behaviours:
   - source: metric
+    behaviour_id: metric_normal_healthy_baseline
     during_state: normal
     profile_id: healthy_baseline
     selection:
@@ -68,6 +69,7 @@ behaviours:
       behaviour.
 
   - source: metric
+    behaviour_id: metric_warning_operational_warning
     during_state: warning
     profile_id: operational_warning
     selection:
@@ -80,6 +82,7 @@ behaviours:
       problems reaching the dependent Account Database.
 
   - source: infrastructure_test
+    behaviour_id: infrastructure_test_degraded_required_check_failed_at_account_database
     during_state: degraded
     profile_id: required_check_failed
     execution_node_id: account_database
@@ -88,6 +91,7 @@ behaviours:
       on the Account Database.
 
   - source: log
+    behaviour_id: log_degraded_degradation_error_logs_at_account_api
     during_state: degraded
     profile_id: degradation_error_logs
     execution_node_id: account_api
@@ -96,6 +100,7 @@ behaviours:
       failures while Account Database connectivity is unavailable.
 
   - source: metric
+    behaviour_id: metric_degraded_operational_degradation
     during_state: degraded
     profile_id: operational_degradation
     selection:
@@ -108,6 +113,7 @@ behaviours:
       the dependent database remains unavailable.
 
   - source: log
+    behaviour_id: log_degraded_degradation_error_logs
     during_state: degraded
     profile_id: degradation_error_logs
     description: >
@@ -115,6 +121,7 @@ behaviours:
       dependency errors during the database connectivity outage.
 
   - source: infrastructure_test
+    behaviour_id: infrastructure_test_recovery_all_required_checks_pass_at_account_database
     during_state: recovery
     profile_id: all_required_checks_pass
     execution_node_id: account_database
@@ -123,6 +130,7 @@ behaviours:
       connectivity and service health.
 
   - source: log
+    behaviour_id: log_recovery_recovery_operational_logs_at_account_api
     during_state: recovery
     profile_id: recovery_operational_logs
     execution_node_id: account_api
@@ -131,6 +139,7 @@ behaviours:
       Account API logs confirm restored downstream dependency access.
 
   - source: metric
+    behaviour_id: metric_recovery_operational_recovery
     during_state: recovery
     profile_id: operational_recovery
     selection:
@@ -144,6 +153,7 @@ behaviours:
       targets after database connectivity is restored.
 
   - source: log
+    behaviour_id: log_recovery_recovery_operational_logs
     during_state: recovery
     profile_id: recovery_operational_logs
     continuous: true

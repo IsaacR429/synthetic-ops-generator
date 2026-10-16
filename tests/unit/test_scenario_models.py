@@ -146,6 +146,49 @@ def test_behaviour_execution_node_defaults_to_none() -> None:
     assert behaviour.execution_node_id is None
 
 
+def test_behaviour_can_declare_behaviour_id() -> None:
+    behaviour = ScenarioBehaviour(
+        behaviour_id="degraded_error_logs",
+        source=SourceDomain.LOG,
+        during_state=OperationalState.DEGRADED,
+        profile_id="degradation_error_logs",
+    )
+    assert behaviour.behaviour_id == "degraded_error_logs"
+
+
+def test_behaviour_rejects_blank_behaviour_id() -> None:
+    with pytest.raises(ValidationError):
+        ScenarioBehaviour(
+            behaviour_id="   ",
+            source=SourceDomain.LOG,
+            during_state=OperationalState.DEGRADED,
+            profile_id="degradation_error_logs",
+        )
+
+
+def test_scenario_rejects_duplicate_behaviour_ids() -> None:
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-01.yaml"
+    )
+
+    data = scenario.model_dump()
+
+    data["behaviours"][0][
+        "behaviour_id"
+    ] = "duplicate_behaviour"
+
+    data["behaviours"][1][
+        "behaviour_id"
+    ] = "duplicate_behaviour"
+
+    with pytest.raises(
+        ValidationError,
+        match="Scenario behaviour IDs must be unique",
+    ):
+        type(scenario).model_validate(data)
+
+
+
 def test_behaviour_rejects_unsupported_continuous_source() -> None:
     with pytest.raises(
         ValidationError,

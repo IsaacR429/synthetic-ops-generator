@@ -67,6 +67,7 @@ state_sequence:
 behaviours:
 
   - source: itsm
+    behaviour_id: itsm_normal_approved_change
     during_state: normal
     profile_id: approved_change
     description: >
@@ -74,6 +75,7 @@ behaviours:
       implementation metadata.
 
   - source: metric
+    behaviour_id: metric_normal_healthy_baseline
     during_state: normal
     profile_id: healthy_baseline
     selection:
@@ -86,24 +88,28 @@ behaviours:
       Service behaviour.
 
   - source: infrastructure_test
+    behaviour_id: infrastructure_test_normal_all_required_checks_pass
     during_state: normal
     profile_id: all_required_checks_pass
     description: >
       Required infrastructure validations complete successfully.
 
   - source: deployment
+    behaviour_id: deployment_implementing_successful_deployment
     during_state: implementing
     profile_id: successful_deployment
     description: >
       Payment API artifact is deployed successfully.
 
   - source: application_test
+    behaviour_id: application_test_observing_all_mandatory_tests_pass
     during_state: observing
     profile_id: all_mandatory_tests_pass
     description: >
       Mandatory application validation passes after deployment.
 
   - source: metric
+    behaviour_id: metric_observing_healthy_post_change
     during_state: observing
     profile_id: healthy_post_change
     selection:
@@ -117,6 +123,7 @@ behaviours:
       healthy relative to the effective Service policy.
 
   - source: log
+    behaviour_id: log_observing_normal_operational_logs
     during_state: observing
     profile_id: normal_operational_logs
     continuous: true
@@ -125,12 +132,14 @@ behaviours:
       is generated.
 
   - source: incident
+    behaviour_id: incident_observing_no_incident
     during_state: observing
     profile_id: no_incident
     description: >
       No Change-attributable operational Incident is created.
 
   - source: evidence
+    behaviour_id: evidence_observing_complete_validation_evidence
     during_state: observing
     profile_id: complete_validation_evidence
     description: >

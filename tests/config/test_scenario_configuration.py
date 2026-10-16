@@ -95,3 +95,32 @@ def test_existing_payment_scenarios_explicitly_select_health_metrics(
             tuple(behaviour.selection.metric_ids)
             == HEALTH_METRIC_IDS
         )
+
+
+SCENARIO_PATHS = (
+    "config/scenarios/banking/BANK-01.yaml",
+    "config/scenarios/banking/BANK-02.yaml",
+    "config/scenarios/banking/BANK-03.yaml",
+    "config/scenarios/banking/BANK-04.yaml",
+    "config/scenarios/banking/BANK-05.yaml",
+    "config/scenarios/banking/BANK-06.yaml",
+    "config/scenarios/banking/BANK-07.yaml",
+    "config/scenarios/insurance/INS-01.yaml",
+    "config/scenarios/insurance/INS-02.yaml",
+)
+
+
+def test_production_scenarios_have_unique_behaviour_ids() -> None:
+    for scenario_path in SCENARIO_PATHS:
+        scenario = load_scenario(scenario_path)
+        behaviour_ids = [
+            behaviour.behaviour_id
+            for behaviour in scenario.behaviours
+        ]
+        assert all(
+            behaviour_id is not None
+            for behaviour_id in behaviour_ids
+        ), scenario_path
+        assert len(behaviour_ids) == len(
+            set(behaviour_ids)
+        ), scenario_path

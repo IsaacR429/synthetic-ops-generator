@@ -57,6 +57,7 @@ state_sequence:
 
 behaviours:
   - source: metric
+    behaviour_id: metric_normal_healthy_baseline
     during_state: normal
     profile_id: healthy_baseline
     selection:
@@ -69,6 +70,7 @@ behaviours:
       behaviour.
 
   - source: log
+    behaviour_id: log_warning_authentication_failure_logs_at_authentication_api
     during_state: warning
     profile_id: authentication_failure_logs
     execution_node_id: authentication_api
@@ -78,6 +80,7 @@ behaviours:
       conditions.
 
   - source: metric
+    behaviour_id: metric_warning_operational_warning
     during_state: warning
     profile_id: operational_warning
     selection:
@@ -90,6 +93,7 @@ behaviours:
       failures begin to affect normal production operations.
 
   - source: metric
+    behaviour_id: metric_degraded_operational_degradation
     during_state: degraded
     profile_id: operational_degradation
     selection:
@@ -102,6 +106,7 @@ behaviours:
       authentication failure spike.
 
   - source: log
+    behaviour_id: log_degraded_degradation_error_logs
     during_state: degraded
     profile_id: degradation_error_logs
     description: >
@@ -109,6 +114,7 @@ behaviours:
       degraded Service health.
 
   - source: incident
+    behaviour_id: incident_degraded_incident_created
     during_state: degraded
     profile_id: incident_created
     description: >
@@ -116,6 +122,7 @@ behaviours:
       without Change correlation.
 
   - source: log
+    behaviour_id: log_recovery_authentication_recovery_logs_at_authentication_api
     during_state: recovery
     profile_id: authentication_recovery_logs
     execution_node_id: authentication_api
@@ -125,6 +132,7 @@ behaviours:
       completes.
 
   - source: metric
+    behaviour_id: metric_recovery_operational_recovery
     during_state: recovery
     profile_id: operational_recovery
     selection:
@@ -138,6 +146,7 @@ behaviours:
       during recovery.
 
   - source: log
+    behaviour_id: log_recovery_recovery_operational_logs
     during_state: recovery
     profile_id: recovery_operational_logs
     continuous: true
@@ -146,6 +155,7 @@ behaviours:
       recovery.
 
   - source: incident
+    behaviour_id: incident_recovery_incident_resolved
     during_state: recovery
     profile_id: incident_resolved
     description: >

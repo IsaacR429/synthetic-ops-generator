@@ -61,6 +61,7 @@ state_sequence:
 
 behaviours:
   - source: itsm
+    behaviour_id: itsm_normal_approved_change
     during_state: normal
     profile_id: approved_change
     description: >
@@ -68,6 +69,7 @@ behaviours:
       metadata.
 
   - source: metric
+    behaviour_id: metric_normal_healthy_baseline
     during_state: normal
     profile_id: healthy_baseline
     description: >
@@ -75,12 +77,14 @@ behaviours:
       Service behaviour.
 
   - source: infrastructure_test
+    behaviour_id: infrastructure_test_normal_all_required_checks_pass
     during_state: normal
     profile_id: all_required_checks_pass
     description: >
       Required infrastructure validations complete successfully.
 
   - source: deployment
+    behaviour_id: deployment_implementing_successful_deployment
     during_state: implementing
     profile_id: successful_deployment
     description: >
@@ -88,6 +92,7 @@ behaviours:
       regression becomes observable.
 
   - source: application_test
+    behaviour_id: application_test_observing_mandatory_test_regression
     during_state: observing
     profile_id: mandatory_test_regression
     description: >
@@ -95,6 +100,7 @@ behaviours:
       a regression.
 
   - source: metric
+    behaviour_id: metric_degraded_degraded_post_change
     during_state: degraded
     profile_id: degraded_post_change
     description: >
@@ -102,6 +108,7 @@ behaviours:
       to the effective benchmark policy.
 
   - source: log
+    behaviour_id: log_degraded_degradation_error_logs
     during_state: degraded
     profile_id: degradation_error_logs
     description: >
@@ -109,6 +116,7 @@ behaviours:
       Service-health evidence.
 
   - source: incident
+    behaviour_id: incident_degraded_incident_created
     during_state: degraded
     profile_id: incident_created
     description: >
@@ -116,12 +124,14 @@ behaviours:
       the degraded Claims Service.
 
   - source: deployment
+    behaviour_id: deployment_rollback_successful_rollback
     during_state: rollback
     profile_id: successful_rollback
     description: >
       The deployed Claims API release is rolled back successfully.
 
   - source: metric
+    behaviour_id: metric_recovery_recovered_post_rollback
     during_state: recovery
     profile_id: recovered_post_rollback
     description: >
@@ -129,6 +139,7 @@ behaviours:
       rollback.
 
   - source: log
+    behaviour_id: log_recovery_recovery_operational_logs
     during_state: recovery
     profile_id: recovery_operational_logs
     description: >
@@ -136,6 +147,7 @@ behaviours:
       dependency health and Service recovery.
 
   - source: incident
+    behaviour_id: incident_recovery_incident_resolved
     during_state: recovery
     profile_id: incident_resolved
     description: >
@@ -143,6 +155,7 @@ behaviours:
       recovery.
 
   - source: evidence
+    behaviour_id: evidence_recovery_rollback_validation_evidence
     during_state: recovery
     profile_id: rollback_validation_evidence
     description: >

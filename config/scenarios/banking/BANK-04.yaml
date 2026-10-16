@@ -59,6 +59,7 @@ state_sequence:
 
 behaviours:
   - source: metric
+    behaviour_id: metric_normal_healthy_baseline
     during_state: normal
     profile_id: healthy_baseline
     selection:
@@ -71,6 +72,7 @@ behaviours:
       operational behaviour.
 
   - source: metric
+    behaviour_id: metric_warning_capacity_pressure
     during_state: warning
     profile_id: capacity_pressure
     selection:
@@ -81,6 +83,7 @@ behaviours:
       threshold.
 
   - source: metric
+    behaviour_id: metric_warning_operational_warning
     during_state: warning
     profile_id: operational_warning
     selection:
@@ -94,6 +97,7 @@ behaviours:
       Service.
 
   - source: metric
+    behaviour_id: metric_degraded_capacity_saturation
     during_state: degraded
     profile_id: capacity_saturation
     selection:
@@ -103,6 +107,7 @@ behaviours:
       Payment throughput reaches the configured saturation threshold.
 
   - source: metric
+    behaviour_id: metric_degraded_operational_degradation
     during_state: degraded
     profile_id: operational_degradation
     selection:
@@ -115,6 +120,7 @@ behaviours:
       conditions.
 
   - source: log
+    behaviour_id: log_degraded_degradation_error_logs
     during_state: degraded
     profile_id: degradation_error_logs
     description: >
@@ -122,6 +128,7 @@ behaviours:
       dependency errors and degraded Service health during saturation.
 
   - source: incident
+    behaviour_id: incident_degraded_incident_created
     during_state: degraded
     profile_id: incident_created
     description: >
@@ -129,6 +136,7 @@ behaviours:
       Payment Service without Change correlation.
 
   - source: metric
+    behaviour_id: metric_recovery_capacity_recovery
     during_state: recovery
     profile_id: capacity_recovery
     selection:
@@ -140,6 +148,7 @@ behaviours:
       the configured capacity pressure threshold.
 
   - source: metric
+    behaviour_id: metric_recovery_operational_recovery
     during_state: recovery
     profile_id: operational_recovery
     selection:
@@ -152,6 +161,7 @@ behaviours:
       Service health metrics recover as transaction pressure subsides.
 
   - source: log
+    behaviour_id: log_recovery_recovery_operational_logs
     during_state: recovery
     profile_id: recovery_operational_logs
     continuous: true
@@ -160,6 +170,7 @@ behaviours:
       recovery after capacity pressure subsides.
 
   - source: incident
+    behaviour_id: incident_recovery_incident_resolved
     during_state: recovery
     profile_id: incident_resolved
     description: >
