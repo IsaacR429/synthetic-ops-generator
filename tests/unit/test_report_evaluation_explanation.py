@@ -1,4 +1,4 @@
-﻿from datetime import UTC, datetime
+from datetime import UTC, datetime
 
 from synthetic_ops_generator.reporting.evaluation_explanation import (
     build_metric_evaluation_explanations,
@@ -240,3 +240,87 @@ def test_non_metric_evidence_is_not_given_metric_explanation() -> None:
     assert build_metric_evaluation_explanations(
         (row,)
     ) == ()
+
+
+def test_lower_is_better_exposes_canonical_threshold_rule() -> None:
+    row = _metric_row(
+        metric_direction="lower_is_better",
+    )
+
+    explanations = build_metric_evaluation_explanations(
+        (row,)
+    )
+
+    rule = explanations[0].rule
+
+    assert rule is not None
+    assert rule.mode == "threshold"
+    assert rule.evaluation_order == (
+        "blocking",
+        "warning",
+        "normal",
+    )
+    assert rule.blocking_operator == ">="
+    assert rule.warning_operator == ">="
+    assert rule.fallback_classification == "normal"
+
+
+def test_higher_is_better_exposes_canonical_threshold_rule() -> None:
+    row = _metric_row(
+        metric_direction="higher_is_better",
+        observed_value=97.0,
+        benchmark_reference_target=99.9,
+        benchmark_warning_threshold=98.0,
+        benchmark_blocking_threshold=95.0,
+        metric_classification="normal",
+    )
+
+    explanations = build_metric_evaluation_explanations(
+        (row,)
+    )
+
+    rule = explanations[0].rule
+
+    assert rule is not None
+    assert rule.mode == "threshold"
+    assert rule.evaluation_order == (
+        "blocking",
+        "warning",
+        "normal",
+    )
+    assert rule.blocking_operator == "<="
+    assert rule.warning_operator == "<="
+    assert rule.fallback_classification == "normal"
+
+
+def test_context_dependent_exposes_context_required_rule() -> None:
+    row = _metric_row(
+        metric_direction="context_dependent",
+        evaluation_status="context_required",
+        metric_classification=None,
+        benchmark_profile_id=None,
+        benchmark_reference_target=None,
+        benchmark_warning_threshold=None,
+        benchmark_blocking_threshold=None,
+        benchmark_source_id=None,
+        benchmark_source_type=None,
+        benchmark_source_name=None,
+        benchmark_source_reference=None,
+        benchmark_source_version=None,
+        benchmark_source_retrieved_on=None,
+        benchmark_source_rationale=None,
+        benchmark_applied_overrides=(),
+    )
+
+    explanations = build_metric_evaluation_explanations(
+        (row,)
+    )
+
+    rule = explanations[0].rule
+
+    assert rule is not None
+    assert rule.mode == "context_required"
+    assert rule.evaluation_order == ()
+    assert rule.blocking_operator is None
+    assert rule.warning_operator is None
+    assert rule.fallback_classification is None

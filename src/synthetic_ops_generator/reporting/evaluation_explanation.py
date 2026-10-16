@@ -1,8 +1,12 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from synthetic_ops_generator.metrics.models import (
+    MetricClassification,
+    MetricDirection,
+)
 from synthetic_ops_generator.reporting.evidence_row import (
     RunEvidenceRow,
 )
@@ -44,6 +48,18 @@ class ReportMetricBenchmark:
 
 
 @dataclass(frozen=True)
+class ReportMetricEvaluationRule:
+    mode: str
+
+    evaluation_order: tuple[str, ...]
+
+    blocking_operator: str | None
+    warning_operator: str | None
+
+    fallback_classification: str | None
+
+
+@dataclass(frozen=True)
 class ReportMetricEvaluationExplanation:
     event_id: str
     sequence_number: int
@@ -59,6 +75,8 @@ class ReportMetricEvaluationExplanation:
     evaluation_status: str | None
 
     recorded_classification: str | None
+
+    rule: ReportMetricEvaluationRule | None
 
     baseline: ReportMetricBaseline | None
     benchmark: ReportMetricBenchmark | None
@@ -183,6 +201,54 @@ def _build_benchmark(
     )
 
 
+def _build_evaluation_rule(
+    row: RunEvidenceRow,
+) -> ReportMetricEvaluationRule | None:
+    threshold_evaluation_order = (
+        MetricClassification.BLOCKING.value,
+        MetricClassification.WARNING.value,
+        MetricClassification.NORMAL.value,
+    )
+    if (
+        row.metric_direction
+        == MetricDirection.LOWER_IS_BETTER.value
+    ):
+        return ReportMetricEvaluationRule(
+            mode="threshold",
+            evaluation_order=threshold_evaluation_order,
+            blocking_operator=">=",
+            warning_operator=">=",
+            fallback_classification=(
+                MetricClassification.NORMAL.value
+            ),
+        )
+    if (
+        row.metric_direction
+        == MetricDirection.HIGHER_IS_BETTER.value
+    ):
+        return ReportMetricEvaluationRule(
+            mode="threshold",
+            evaluation_order=threshold_evaluation_order,
+            blocking_operator="<=",
+            warning_operator="<=",
+            fallback_classification=(
+                MetricClassification.NORMAL.value
+            ),
+        )
+    if (
+        row.metric_direction
+        == MetricDirection.CONTEXT_DEPENDENT.value
+    ):
+        return ReportMetricEvaluationRule(
+            mode="context_required",
+            evaluation_order=(),
+            blocking_operator=None,
+            warning_operator=None,
+            fallback_classification=None,
+        )
+    return None
+
+
 def build_metric_evaluation_explanations(
     rows: Iterable[RunEvidenceRow],
 ) -> tuple[ReportMetricEvaluationExplanation, ...]:
@@ -214,6 +280,7 @@ def build_metric_evaluation_explanations(
                 recorded_classification=(
                     row.metric_classification
                 ),
+                rule=_build_evaluation_rule(row),
                 baseline=_build_baseline(row),
                 benchmark=_build_benchmark(row),
                 behaviour_profile_id=(
