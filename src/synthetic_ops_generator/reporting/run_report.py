@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -12,6 +12,10 @@ from synthetic_ops_generator.domain.enterprise import (
 )
 from synthetic_ops_generator.events.envelope import (
     GeneratedEvent,
+)
+from synthetic_ops_generator.reporting.evaluation_explanation import (
+    ReportMetricEvaluationExplanation,
+    build_metric_evaluation_explanations,
 )
 from synthetic_ops_generator.reporting.evidence_row import (
     RunEvidenceRow,
@@ -106,6 +110,10 @@ class RunReportData:
     target: RunReportTarget
 
     evidence_rows: tuple[RunEvidenceRow, ...]
+    metric_evaluation_explanations: tuple[
+        ReportMetricEvaluationExplanation,
+        ...,
+    ]
 
 
 def _resolve_business_stream(
@@ -250,6 +258,11 @@ def build_run_report_data(
                 "Report Scenario ID."
             )
 
+    evidence_rows = tuple(
+        project_run_evidence_row(event)
+        for event in report_events
+    )
+
     return RunReportData(
         generated_at=generated_at,
         context_resolution="current_catalogue",
@@ -325,8 +338,10 @@ def build_run_report_data(
             components=components,
             environment=target.environment.value,
         ),
-        evidence_rows=tuple(
-            project_run_evidence_row(event)
-            for event in report_events
+        evidence_rows=evidence_rows,
+        metric_evaluation_explanations=(
+            build_metric_evaluation_explanations(
+                evidence_rows
+            )
         ),
     )

@@ -1,4 +1,4 @@
-﻿from datetime import UTC, datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -279,6 +279,7 @@ def test_run_report_data_projects_run_scenario_and_target_context() -> None:
     )
 
     assert report.evidence_rows == ()
+    assert report.metric_evaluation_explanations == ()
 
 
 def test_run_report_data_requires_run_target_snapshot() -> None:
@@ -468,6 +469,7 @@ def test_run_report_data_projects_supplied_evidence() -> None:
         row.raw_event["event_id"]
         == event.event_id
     )
+    assert report.metric_evaluation_explanations == ()
 
 
 def test_run_report_data_rejects_evidence_from_another_run() -> None:
@@ -578,3 +580,91 @@ def test_run_report_data_preserves_one_shot_event_iterable() -> None:
         report.evidence_rows[0].event_id
         == event.event_id
     )
+
+
+def test_run_report_data_exposes_metric_evaluation_explanations() -> None:
+    enterprise = load_enterprise_configuration(
+        "config/enterprises/bank_alpha"
+    )
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-01.yaml"
+    )
+    run = _make_report_run(
+        scenario=scenario,
+    )
+    event = GeneratedEvent(
+        event_id="evt-report-1",
+        event_type="metric.observed",
+        schema_version="1.0",
+        event_time=datetime(
+            2026,
+            10,
+            15,
+            8,
+            1,
+            tzinfo=UTC,
+        ),
+        source_system="synthetic_report_test",
+        source_domain=SourceDomain.METRIC,
+        scenario_id=run.scenario_id,
+        run_id=run.run_id,
+        chg_id="CHG-REPORT-EVIDENCE",
+        business_stream="payments",
+        service="payment_service",
+        component="payment_api",
+        environment=Environment.PRODUCTION,
+        site_id=None,
+        service_instance_id=None,
+        sequence_number=1,
+        synthetic=True,
+        data={
+            "metric": {
+                "metric_definition_id": "request_latency",
+                "name": "Request Latency",
+                "observed_value": 820.0,
+                "unit": "ms",
+                "evaluation_statistic": "p95",
+                "direction": "lower_is_better",
+                "evaluation_status": "evaluated",
+                "classification": "blocking",
+            },
+        },
+    )
+
+    report = build_run_report_data(
+        run=run,
+        scenario=scenario,
+        enterprise=enterprise,
+        events=(event,),
+        generated_at=datetime(
+            2026,
+            10,
+            15,
+            9,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    assert len(report.evidence_rows) == 1
+    assert len(
+        report.metric_evaluation_explanations
+    ) == 1
+
+    explanation = (
+        report.metric_evaluation_explanations[0]
+    )
+
+    assert explanation.event_id == event.event_id
+    assert (
+        explanation.metric_definition_id
+        == "request_latency"
+    )
+    assert (
+        explanation.recorded_classification
+        == "blocking"
+    )
+    assert explanation.rule is not None
+    assert explanation.rule.mode == "threshold"
+    assert explanation.rule.blocking_operator == ">="
+    assert explanation.rule.warning_operator == ">="
