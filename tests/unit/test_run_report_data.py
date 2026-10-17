@@ -668,3 +668,52 @@ def test_run_report_data_exposes_metric_evaluation_explanations() -> None:
     assert explanation.rule.mode == "threshold"
     assert explanation.rule.blocking_operator == ">="
     assert explanation.rule.warning_operator == ">="
+
+def test_run_report_data_preserves_behaviour_provenance() -> None:
+    enterprise = load_enterprise_configuration(
+        "config/enterprises/bank_alpha"
+    )
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-01.yaml"
+    )
+
+    run = _make_report_run(
+        scenario=scenario,
+    )
+
+    event = _make_report_event(
+        run_id=run.run_id,
+        scenario_id=run.scenario_id,
+    ).model_copy(
+        update={
+            "behaviour_id": (
+                "metric_normal_healthy_baseline"
+            )
+        }
+    )
+
+    report = build_run_report_data(
+        run=run,
+        scenario=scenario,
+        enterprise=enterprise,
+        events=(event,),
+        generated_at=datetime(
+            2026,
+            10,
+            17,
+            2,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    assert len(report.evidence_rows) == 1
+
+    row = report.evidence_rows[0]
+
+    assert row.behaviour_id == (
+        "metric_normal_healthy_baseline"
+    )
+    assert row.raw_event["behaviour_id"] == (
+        "metric_normal_healthy_baseline"
+    )

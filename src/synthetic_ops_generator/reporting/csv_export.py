@@ -21,6 +21,7 @@ RUN_EVIDENCE_CSV_COLUMNS = (
     "source_domain",
     "scenario_id",
     "run_id",
+    "behaviour_id",
     "chg_id",
     "business_stream",
     "service",

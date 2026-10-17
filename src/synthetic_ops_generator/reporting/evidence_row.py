@@ -37,6 +37,8 @@ class RunEvidenceRow:
 
     raw_event: dict[str, Any]
 
+
+    behaviour_id: str | None = None
     metric_definition_id: str | None = None
     metric_name: str | None = None
     observed_value: float | None = None
@@ -172,6 +174,7 @@ def project_run_evidence_row(
         ),
         scenario_id=event.scenario_id,
         run_id=event.run_id,
+        behaviour_id=event.behaviour_id,
         chg_id=event.chg_id,
         business_stream=event.business_stream,
         service=event.service,

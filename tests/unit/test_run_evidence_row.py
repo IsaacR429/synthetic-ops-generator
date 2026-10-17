@@ -218,3 +218,52 @@ def test_run_evidence_row_requires_raw_event() -> None:
     )
 
     assert raw_event_field.default is MISSING
+
+def test_run_evidence_row_projects_behaviour_provenance() -> None:
+    from datetime import UTC, datetime
+
+    from synthetic_ops_generator.domain.enums import (
+        Environment,
+        SourceDomain,
+    )
+    from synthetic_ops_generator.events.envelope import (
+        GeneratedEvent,
+    )
+
+    event = GeneratedEvent(
+        event_id="evt-behaviour-provenance",
+        event_type="metric.observed",
+        schema_version="1.0",
+        event_time=datetime(
+            2026,
+            10,
+            17,
+            1,
+            0,
+            tzinfo=UTC,
+        ),
+        source_system="synthetic_observability",
+        source_domain=SourceDomain.METRIC,
+        scenario_id="INS-02",
+        run_id="RUN-TRACE-1C",
+        behaviour_id="metric_degraded_claims_latency",
+        chg_id="CHG-TRACE-1C",
+        business_stream="claims",
+        service="claims_service",
+        component="claims_api",
+        environment=Environment.PRODUCTION,
+        site_id="claims-primary",
+        service_instance_id="claims-api-primary",
+        sequence_number=1,
+        synthetic=True,
+        data={},
+    )
+
+    row = project_run_evidence_row(event)
+
+    assert row.behaviour_id == (
+        "metric_degraded_claims_latency"
+    )
+    assert row.raw_event["behaviour_id"] == (
+        "metric_degraded_claims_latency"
+    )

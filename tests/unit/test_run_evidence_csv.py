@@ -27,6 +27,7 @@ EXPECTED_COLUMNS = (
     "source_domain",
     "scenario_id",
     "run_id",
+    "behaviour_id",
     "chg_id",
     "business_stream",
     "service",
@@ -294,3 +295,47 @@ def test_csv_preserves_unknown_future_scenario_payload() -> None:
 
     assert record["metric_definition_id"] == ""
     assert record["capacity_profile_id"] == ""
+    assert record["behaviour_id"] == ""
+
+def test_csv_exports_behaviour_provenance_as_first_class_column() -> None:
+    event = GeneratedEvent(
+        event_id="evt-trace-csv",
+        event_type="metric.observed",
+        schema_version="1.0",
+        event_time=datetime(
+            2026,
+            10,
+            17,
+            1,
+            15,
+            tzinfo=UTC,
+        ),
+        source_system="synthetic_observability",
+        source_domain=SourceDomain.METRIC,
+        scenario_id="INS-02",
+        run_id="RUN-TRACE-CSV",
+        behaviour_id="metric_degraded_claims_latency",
+        chg_id=None,
+        business_stream="claims",
+        service="claims_service",
+        component="claims_api",
+        environment=Environment.PRODUCTION,
+        site_id=None,
+        service_instance_id=None,
+        sequence_number=1,
+        synthetic=True,
+        data={},
+    )
+
+    row = project_run_evidence_row(event)
+    text = serialize_run_evidence_csv([row])
+
+    record = next(
+        csv.DictReader(
+            io.StringIO(text)
+        )
+    )
+
+    assert record["behaviour_id"] == (
+        "metric_degraded_claims_latency"
+    )
