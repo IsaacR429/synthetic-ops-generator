@@ -1,9 +1,12 @@
 from pydantic import BaseModel, Field
 
 from synthetic_ops_generator.domain.enums import (
+    AssetClass,
     Criticality,
     Environment,
     Industry,
+    MissionCriticality,
+    ServiceClass,
     WorkloadClass,
 )
 from synthetic_ops_generator.topology.models import (
@@ -27,6 +30,9 @@ class Service(BaseModel):
     owner: str = Field(min_length=1)
     criticality: Criticality
 
+    service_class: ServiceClass | None = None
+    mission_criticality: MissionCriticality | None = None
+
     workload_class: WorkloadClass | None = None
 
     benchmark_profile_id: str | None = None
@@ -38,6 +44,7 @@ class Component(BaseModel):
     component_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     component_type: str = Field(min_length=1)
+    asset_class: AssetClass | None = None
 
     service_id: str = Field(min_length=1)
     environment: Environment

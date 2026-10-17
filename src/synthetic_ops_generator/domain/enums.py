@@ -39,6 +39,29 @@ class Criticality(StrEnum):
     CRITICAL = "critical"
 
 
+class ServiceClass(StrEnum):
+    BUSINESS_APPLICATION = "business_application"
+    BUSINESS_SERVICE = "business_service"
+    INFRASTRUCTURE_SERVICE = "infrastructure_service"
+
+
+class MissionCriticality(StrEnum):
+    MISSION_CRITICAL = "mission_critical"
+    NON_MISSION_CRITICAL = "non_mission_critical"
+
+
+class AssetClass(StrEnum):
+    APPLICATION = "application"
+    DATABASE = "database"
+    MIDDLEWARE = "middleware"
+    LINUX = "linux"
+    WINDOWS = "windows"
+    MAINFRAME = "mainframe"
+    NETWORK = "network"
+    DIGITAL_INFRASTRUCTURE = "digital_infrastructure"
+    INFORMATION_SECURITY = "information_security"
+
+
 class WorkloadClass(StrEnum):
     INTERACTIVE_TRANSACTIONAL = "interactive_transactional"
     INTERACTIVE_CUSTOMER_FACING = "interactive_customer_facing"

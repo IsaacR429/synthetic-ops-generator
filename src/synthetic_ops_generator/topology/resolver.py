@@ -6,7 +6,11 @@ from synthetic_ops_generator.domain.enterprise import (
     Enterprise,
 )
 from synthetic_ops_generator.domain.enums import (
+    AssetClass,
+    Criticality,
     Environment,
+    MissionCriticality,
+    ServiceClass,
 )
 from synthetic_ops_generator.topology.models import (
     Dependency,
@@ -30,6 +34,15 @@ class ResolvedTopologyNode:
     ]
     service_id: str
     business_stream_id: str
+
+    service_class: ServiceClass | None = None
+    service_owner: str | None = None
+    service_criticality: Criticality | None = None
+    mission_criticality: MissionCriticality | None = None
+
+    component_type: str | None = None
+    asset_class: AssetClass | None = None
+
     component_id: str | None = None
     environment: Environment | None = None
     site_id: str | None = None
@@ -50,6 +63,11 @@ class TopologyResolver:
             for service in enterprise.services
         }
 
+        components = {
+            component.component_id: component
+            for component in enterprise.components
+        }
+
         self._nodes: dict[str, ResolvedTopologyNode] = {}
         for service in enterprise.services:
             self._nodes[service.service_id] = ResolvedTopologyNode(
@@ -57,6 +75,10 @@ class TopologyResolver:
                 node_type="service",
                 service_id=service.service_id,
                 business_stream_id=service.business_stream_id,
+                service_class=service.service_class,
+                service_owner=service.owner,
+                service_criticality=service.criticality,
+                mission_criticality=service.mission_criticality,
             )
 
         for component in enterprise.components:
@@ -66,6 +88,12 @@ class TopologyResolver:
                 node_type="component",
                 service_id=service.service_id,
                 business_stream_id=service.business_stream_id,
+                service_class=service.service_class,
+                service_owner=service.owner,
+                service_criticality=service.criticality,
+                mission_criticality=service.mission_criticality,
+                component_type=component.component_type,
+                asset_class=component.asset_class,
                 component_id=component.component_id,
                 environment=component.environment,
             )
@@ -77,6 +105,11 @@ class TopologyResolver:
 
         for instance in enterprise.service_instances:
             service = services[instance.service_id]
+            component = (
+                components[instance.component_id]
+                if instance.component_id is not None
+                else None
+            )
             self._service_instance_nodes[
                 instance.instance_id
             ] = ResolvedTopologyNode(
@@ -84,6 +117,20 @@ class TopologyResolver:
                 node_type="service_instance",
                 service_id=instance.service_id,
                 business_stream_id=service.business_stream_id,
+                service_class=service.service_class,
+                service_owner=service.owner,
+                service_criticality=service.criticality,
+                mission_criticality=service.mission_criticality,
+                component_type=(
+                    component.component_type
+                    if component is not None
+                    else None
+                ),
+                asset_class=(
+                    component.asset_class
+                    if component is not None
+                    else None
+                ),
                 component_id=instance.component_id,
                 environment=instance.environment,
                 site_id=instance.site_id,
