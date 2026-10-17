@@ -5,6 +5,8 @@ services:
     business_stream_id: payments
     owner: payments_operations
     criticality: critical
+    service_class: business_application
+    mission_criticality: mission_critical
     workload_class: interactive_transactional
     benchmark_profile_id: critical_interactive_transaction
     baseline_profile_id: payment_processing_nominal
@@ -15,6 +17,8 @@ services:
     business_stream_id: customer_identity
     owner: identity_operations
     criticality: critical
+    service_class: business_service
+    mission_criticality: mission_critical
     workload_class: interactive_customer_facing
     benchmark_profile_id: critical_interactive_transaction
 
@@ -23,6 +27,8 @@ services:
     business_stream_id: core_banking
     owner: core_banking_operations
     criticality: critical
+    service_class: business_service
+    mission_criticality: mission_critical
     workload_class: interactive_transactional
     benchmark_profile_id: critical_interactive_transaction
 
@@ -31,6 +37,8 @@ services:
     business_stream_id: digital_banking
     owner: digital_banking_operations
     criticality: high
+    service_class: business_application
+    mission_criticality: mission_critical
     workload_class: interactive_customer_facing
     benchmark_profile_id: business_critical_interactive
 
@@ -39,4 +47,70 @@ services:
     business_stream_id: lending
     owner: lending_operations
     criticality: high
+    service_class: business_application
+    mission_criticality: non_mission_critical
     workload_class: business_workflow
+
+  - service_id: bank_database_platform
+    name: Enterprise Database Platform
+    business_stream_id: enterprise_infrastructure
+    owner: database_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: bank_middleware_platform
+    name: Enterprise Middleware Platform
+    business_stream_id: enterprise_infrastructure
+    owner: middleware_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: bank_linux_platform
+    name: Enterprise Linux Platform
+    business_stream_id: enterprise_infrastructure
+    owner: linux_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: bank_windows_platform
+    name: Enterprise Windows Platform
+    business_stream_id: enterprise_infrastructure
+    owner: windows_operations
+    criticality: high
+    service_class: infrastructure_service
+    mission_criticality: non_mission_critical
+
+  - service_id: bank_mainframe_platform
+    name: Enterprise Mainframe Platform
+    business_stream_id: enterprise_infrastructure
+    owner: mainframe_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: bank_network_service
+    name: Enterprise Network Service
+    business_stream_id: enterprise_infrastructure
+    owner: network_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: bank_digital_platform
+    name: Enterprise Digital Platform
+    business_stream_id: enterprise_infrastructure
+    owner: digital_platform_operations
+    criticality: high
+    service_class: infrastructure_service
+    mission_criticality: non_mission_critical
+
+  - service_id: bank_security_service
+    name: Enterprise Information Security Service
+    business_stream_id: enterprise_infrastructure
+    owner: security_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical

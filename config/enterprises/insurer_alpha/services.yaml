@@ -5,6 +5,8 @@ services:
     business_stream_id: claims
     owner: claims_operations
     criticality: high
+    service_class: business_application
+    mission_criticality: mission_critical
     workload_class: business_workflow
     benchmark_profile_id: business_critical_interactive
     baseline_profile_id: business_workflow_nominal
@@ -14,6 +16,8 @@ services:
     business_stream_id: claims
     owner: claims_payment_operations
     criticality: critical
+    service_class: business_service
+    mission_criticality: mission_critical
     workload_class: interactive_transactional
     benchmark_profile_id: critical_interactive_transaction
 
@@ -22,6 +26,8 @@ services:
     business_stream_id: customer_broker
     owner: broker_operations
     criticality: high
+    service_class: business_application
+    mission_criticality: non_mission_critical
     workload_class: interactive_customer_facing
     benchmark_profile_id: business_critical_interactive
 
@@ -30,6 +36,8 @@ services:
     business_stream_id: policy_administration
     owner: policy_operations
     criticality: high
+    service_class: business_application
+    mission_criticality: mission_critical
     workload_class: business_workflow
 
   - service_id: document_service
@@ -37,4 +45,70 @@ services:
     business_stream_id: document_services
     owner: document_operations
     criticality: medium
+    service_class: business_service
+    mission_criticality: non_mission_critical
     workload_class: background_async
+
+  - service_id: insurer_database_platform
+    name: Enterprise Database Platform
+    business_stream_id: enterprise_infrastructure
+    owner: database_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: insurer_middleware_platform
+    name: Enterprise Middleware Platform
+    business_stream_id: enterprise_infrastructure
+    owner: middleware_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: insurer_linux_platform
+    name: Enterprise Linux Platform
+    business_stream_id: enterprise_infrastructure
+    owner: linux_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: insurer_windows_platform
+    name: Enterprise Windows Platform
+    business_stream_id: enterprise_infrastructure
+    owner: windows_operations
+    criticality: high
+    service_class: infrastructure_service
+    mission_criticality: non_mission_critical
+
+  - service_id: insurer_mainframe_platform
+    name: Enterprise Mainframe Platform
+    business_stream_id: enterprise_infrastructure
+    owner: mainframe_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: insurer_network_service
+    name: Enterprise Network Service
+    business_stream_id: enterprise_infrastructure
+    owner: network_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical
+
+  - service_id: insurer_digital_platform
+    name: Enterprise Digital Platform
+    business_stream_id: enterprise_infrastructure
+    owner: digital_platform_operations
+    criticality: high
+    service_class: infrastructure_service
+    mission_criticality: non_mission_critical
+
+  - service_id: insurer_security_service
+    name: Enterprise Information Security Service
+    business_stream_id: enterprise_infrastructure
+    owner: security_operations
+    criticality: critical
+    service_class: infrastructure_service
+    mission_criticality: mission_critical

@@ -35,3 +35,51 @@ dependencies:
     target_id: account_database
     relationship_type: depends_on
     criticality: high
+
+  - dependency_id: dep_payment_shared_database_platform
+    source_id: payment_database
+    target_id: bank_database_platform
+    relationship_type: runs_on
+    criticality: critical
+
+  - dependency_id: dep_payment_middleware_platform
+    source_id: payment_worker
+    target_id: bank_middleware_platform
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_payment_linux_platform
+    source_id: payment_api
+    target_id: bank_linux_platform
+    relationship_type: runs_on
+    criticality: critical
+
+  - dependency_id: dep_loan_windows_platform
+    source_id: loan_service
+    target_id: bank_windows_platform
+    relationship_type: runs_on
+    criticality: high
+
+  - dependency_id: dep_account_mainframe_platform
+    source_id: account_service
+    target_id: bank_mainframe_platform
+    relationship_type: calls
+    criticality: critical
+
+  - dependency_id: dep_identity_network_service
+    source_id: identity_service
+    target_id: bank_network_service
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_mobile_digital_platform
+    source_id: mobile_banking_service
+    target_id: bank_digital_platform
+    relationship_type: depends_on
+    criticality: high
+
+  - dependency_id: dep_payment_security_service
+    source_id: payment_service
+    target_id: bank_security_service
+    relationship_type: depends_on
+    criticality: critical

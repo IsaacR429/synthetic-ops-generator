@@ -9,26 +9,24 @@ def test_bank_alpha_configuration_loads() -> None:
 
     assert enterprise.enterprise_id == "bank_alpha"
     assert enterprise.industry == Industry.BANKING
-    assert len(enterprise.business_streams) == 5
-    assert len(enterprise.services) == 5
-    assert len(enterprise.components) == 9
+    assert len(enterprise.business_streams) == 6
+    assert len(enterprise.services) == 13
+    assert len(enterprise.components) == 17
     assert len(enterprise.sites) == 2
     assert len(enterprise.service_instances) == 4
-    assert len(enterprise.dependencies) == 6
-
+    assert len(enterprise.dependencies) == 14
 
 def test_insurer_alpha_configuration_loads() -> None:
     enterprise = load_enterprise_configuration("config/enterprises/insurer_alpha")
 
     assert enterprise.enterprise_id == "insurer_alpha"
     assert enterprise.industry == Industry.INSURANCE
-    assert len(enterprise.business_streams) == 6
-    assert len(enterprise.services) == 5
-    assert len(enterprise.components) == 6
+    assert len(enterprise.business_streams) == 7
+    assert len(enterprise.services) == 13
+    assert len(enterprise.components) == 14
     assert len(enterprise.sites) == 2
     assert len(enterprise.service_instances) == 4
-    assert len(enterprise.dependencies) == 3
-
+    assert len(enterprise.dependencies) == 11
 
 def test_bank_alpha_payment_service_loads_capacity_profile_reference() -> None:
     enterprise = load_enterprise_configuration(

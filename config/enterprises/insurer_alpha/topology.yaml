@@ -17,3 +17,51 @@ dependencies:
     target_id: document_worker
     relationship_type: depends_on
     criticality: medium
+
+  - dependency_id: dep_claims_shared_database_platform
+    source_id: claims_database
+    target_id: insurer_database_platform
+    relationship_type: runs_on
+    criticality: critical
+
+  - dependency_id: dep_claims_middleware_platform
+    source_id: claims_service
+    target_id: insurer_middleware_platform
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_claims_linux_platform
+    source_id: claims_api
+    target_id: insurer_linux_platform
+    relationship_type: runs_on
+    criticality: critical
+
+  - dependency_id: dep_broker_windows_platform
+    source_id: broker_portal
+    target_id: insurer_windows_platform
+    relationship_type: runs_on
+    criticality: high
+
+  - dependency_id: dep_policy_mainframe_platform
+    source_id: policy_service
+    target_id: insurer_mainframe_platform
+    relationship_type: calls
+    criticality: critical
+
+  - dependency_id: dep_claims_network_service
+    source_id: claims_service
+    target_id: insurer_network_service
+    relationship_type: depends_on
+    criticality: critical
+
+  - dependency_id: dep_broker_digital_platform
+    source_id: broker_portal
+    target_id: insurer_digital_platform
+    relationship_type: depends_on
+    criticality: high
+
+  - dependency_id: dep_claims_payment_security_service
+    source_id: claims_payment_service
+    target_id: insurer_security_service
+    relationship_type: depends_on
+    criticality: critical

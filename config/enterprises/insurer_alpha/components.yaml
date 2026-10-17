@@ -3,35 +3,97 @@ components:
   - component_id: claims_api
     name: Claims API
     component_type: api
+    asset_class: application
     service_id: claims_service
     environment: production
 
   - component_id: claims_database
     name: Claims Database
     component_type: database
+    asset_class: database
     service_id: claims_service
     environment: production
 
   - component_id: claims_payment_api
     name: Claims Payment API
     component_type: api
+    asset_class: application
     service_id: claims_payment_service
     environment: production
 
   - component_id: broker_web
     name: Broker Web Application
     component_type: web
+    asset_class: application
     service_id: broker_portal
     environment: production
 
   - component_id: policy_api
     name: Policy API
     component_type: api
+    asset_class: application
     service_id: policy_service
     environment: production
 
   - component_id: document_worker
     name: Document Worker
     component_type: worker
+    asset_class: application
     service_id: document_service
+    environment: production
+
+  - component_id: insurer_shared_database
+    name: Shared Database Platform
+    component_type: database_platform
+    asset_class: database
+    service_id: insurer_database_platform
+    environment: production
+
+  - component_id: insurer_message_broker
+    name: Enterprise Message Broker
+    component_type: message_broker
+    asset_class: middleware
+    service_id: insurer_middleware_platform
+    environment: production
+
+  - component_id: insurer_linux_cluster
+    name: Enterprise Linux Cluster
+    component_type: linux_cluster
+    asset_class: linux
+    service_id: insurer_linux_platform
+    environment: production
+
+  - component_id: insurer_windows_cluster
+    name: Enterprise Windows Cluster
+    component_type: windows_cluster
+    asset_class: windows
+    service_id: insurer_windows_platform
+    environment: production
+
+  - component_id: insurer_mainframe
+    name: Enterprise Mainframe
+    component_type: mainframe
+    asset_class: mainframe
+    service_id: insurer_mainframe_platform
+    environment: production
+
+  - component_id: insurer_core_network
+    name: Enterprise Core Network
+    component_type: network
+    asset_class: network
+    service_id: insurer_network_service
+    environment: production
+
+  - component_id: insurer_digital_runtime
+    name: Enterprise Digital Runtime
+    component_type: digital_platform
+    asset_class: digital_infrastructure
+    service_id: insurer_digital_platform
+    environment: production
+
+  - component_id: insurer_security_controls
+    name: Enterprise Security Controls
+    component_type: security_control
+    asset_class: information_security
+    service_id: insurer_security_service
     environment: production

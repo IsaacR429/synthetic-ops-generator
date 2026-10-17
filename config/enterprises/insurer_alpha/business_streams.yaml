@@ -17,3 +17,6 @@ business_streams:
 
   - stream_id: document_services
     name: Document Services
+
+  - stream_id: enterprise_infrastructure
+    name: Enterprise Infrastructure

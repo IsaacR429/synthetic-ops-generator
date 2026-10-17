@@ -3,53 +3,118 @@ components:
   - component_id: payment_api
     name: Payment API
     component_type: api
+    asset_class: application
     service_id: payment_service
     environment: production
 
   - component_id: payment_database
     name: Payment Database
     component_type: database
+    asset_class: database
     service_id: payment_service
     environment: production
 
   - component_id: payment_worker
     name: Payment Worker
     component_type: worker
+    asset_class: application
     service_id: payment_service
     environment: production
 
   - component_id: authentication_api
     name: Authentication API
     component_type: api
+    asset_class: application
     service_id: identity_service
     environment: production
 
   - component_id: identity_database
     name: Identity Database
     component_type: database
+    asset_class: database
     service_id: identity_service
     environment: production
 
   - component_id: account_api
     name: Account API
     component_type: api
+    asset_class: application
     service_id: account_service
     environment: production
 
   - component_id: account_database
     name: Account Database
     component_type: database
+    asset_class: database
     service_id: account_service
     environment: production
 
   - component_id: mobile_api
     name: Mobile API
     component_type: api
+    asset_class: application
     service_id: mobile_banking_service
     environment: production
 
   - component_id: loan_api
     name: Loan API
     component_type: api
+    asset_class: application
     service_id: loan_service
+    environment: production
+
+  - component_id: bank_shared_database
+    name: Shared Database Platform
+    component_type: database_platform
+    asset_class: database
+    service_id: bank_database_platform
+    environment: production
+
+  - component_id: bank_message_broker
+    name: Enterprise Message Broker
+    component_type: message_broker
+    asset_class: middleware
+    service_id: bank_middleware_platform
+    environment: production
+
+  - component_id: bank_linux_cluster
+    name: Enterprise Linux Cluster
+    component_type: linux_cluster
+    asset_class: linux
+    service_id: bank_linux_platform
+    environment: production
+
+  - component_id: bank_windows_cluster
+    name: Enterprise Windows Cluster
+    component_type: windows_cluster
+    asset_class: windows
+    service_id: bank_windows_platform
+    environment: production
+
+  - component_id: bank_mainframe
+    name: Enterprise Mainframe
+    component_type: mainframe
+    asset_class: mainframe
+    service_id: bank_mainframe_platform
+    environment: production
+
+  - component_id: bank_core_network
+    name: Enterprise Core Network
+    component_type: network
+    asset_class: network
+    service_id: bank_network_service
+    environment: production
+
+  - component_id: bank_digital_runtime
+    name: Enterprise Digital Runtime
+    component_type: digital_platform
+    asset_class: digital_infrastructure
+    service_id: bank_digital_platform
+    environment: production
+
+  - component_id: bank_security_controls
+    name: Enterprise Security Controls
+    component_type: security_control
+    asset_class: information_security
+    service_id: bank_security_service
     environment: production
