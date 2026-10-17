@@ -67,6 +67,25 @@ class ScenarioExecutionTarget(BaseModel):
     service_instance_id: str | None = None
 
 
+class ScenarioExecutionProvenance(BaseModel):
+    """
+    Immutable provenance for one behaviour execution.
+
+    This identifies which declared Scenario behaviour
+    produced evidence. It does not imply root cause,
+    topology impact, or downstream interpretation.
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+    )
+
+    behaviour_id: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=r"^\S+$",
+    )
+
 class ScenarioContext(BaseModel):
     """
     Generator-facing Scenario execution context.
@@ -83,6 +102,11 @@ class ScenarioContext(BaseModel):
         repr=False,
     )
     target: ScenarioExecutionTarget = Field(
+        exclude=True,
+        repr=False,
+    )
+    provenance: ScenarioExecutionProvenance = Field(
+        default_factory=ScenarioExecutionProvenance,
         exclude=True,
         repr=False,
     )
@@ -182,6 +206,10 @@ class ScenarioContext(BaseModel):
     def service_instance_id(self) -> str | None:
         return self.target.service_instance_id
 
+    @property
+    def behaviour_id(self) -> str | None:
+        return self.provenance.behaviour_id
+
     @computed_field
     @property
     def risk(self) -> RiskLevel:
@@ -266,4 +294,24 @@ class ScenarioContext(BaseModel):
         return ScenarioContext(
             execution_state=self.execution_state,
             target=target,
+            provenance=self.provenance,
+        )
+
+    def for_behaviour(
+        self,
+        behaviour_id: str,
+    ) -> "ScenarioContext":
+        """
+        Create a behaviour-bound facade over this Run.
+
+        Behaviour provenance is independent of evidence
+        placement and shared mutable Run state.
+        """
+
+        return ScenarioContext(
+            execution_state=self.execution_state,
+            target=self.target,
+            provenance=ScenarioExecutionProvenance(
+                behaviour_id=behaviour_id,
+            ),
         )

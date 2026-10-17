@@ -11,6 +11,7 @@ def test_valid_event_envelope() -> None:
         source_system="synthetic_itsm",
         scenario_id="BANK-01",
         run_id="RUN0000001",
+        behaviour_id="itsm_normal_approved_change",
         chg_id="CHG0000001",
         business_stream="payments",
         service="payment_service",
@@ -22,3 +23,6 @@ def test_valid_event_envelope() -> None:
 
     assert event.synthetic is True
     assert event.chg_id == "CHG0000001"
+    assert event.behaviour_id == (
+        "itsm_normal_approved_change"
+    )

@@ -22,6 +22,12 @@ class GeneratedEvent(BaseModel):
     scenario_id: str = Field(min_length=1)
     run_id: str = Field(min_length=1)
 
+    behaviour_id: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=r"^\S+$",
+    )
+
     chg_id: str | None = None
 
     business_stream: str | None = None

@@ -488,6 +488,11 @@ class ContextRecordingGenerator(SourceGenerator):
             component=context.component,
             environment=context.environment,
             sequence_number=sequence_number,
+            data={
+                "context_behaviour_id": (
+                    context.behaviour_id
+                ),
+            },
         )
 
 
@@ -531,6 +536,15 @@ async def test_execute_bindings_projects_target_context() -> None:
     assert event.business_stream == "core_banking"
     assert event.service == "account_service"
     assert event.component == "account_database"
+
+    assert event.data["context_behaviour_id"] == (
+        binding.behaviour.behaviour_id
+    )
+
+    assert event.behaviour_id == (
+        binding.behaviour.behaviour_id
+    )
+
     assert context.service == "payment_service"
 
 
@@ -582,3 +596,66 @@ async def test_execute_bindings_shares_run_state_and_sequence() -> None:
     assert event_a.chg_id == event_b.chg_id
     assert event_a.sequence_number == 1
     assert event_b.sequence_number == 2
+
+@pytest.mark.asyncio
+async def test_execute_bindings_rejects_conflicting_behaviour_provenance() -> None:
+    scenario = build_scenario()
+    enterprise = build_enterprise()
+
+    clock = ManualSimulationClock(
+        datetime(2026, 8, 15, 10, 0, tzinfo=UTC)
+    )
+
+    runner = ScenarioRunner(
+        ids=IdFactory(),
+        clock=clock,
+    )
+
+    context = runner.create_context(
+        scenario=scenario,
+        enterprise=enterprise,
+        random_seed=42,
+    )
+
+    class ConflictingProvenanceGenerator(SourceGenerator):
+        source_system = "test"
+
+        async def generate(
+            self,
+            context: ScenarioContext,
+        ) -> AsyncIterator[GeneratedEvent]:
+            sequence_number = context.next_sequence()
+
+            yield GeneratedEvent(
+                event_id=f"EVT-{sequence_number}",
+                event_type="test.conflicting_provenance",
+                event_time=context.simulation_time,
+                source_system=self.source_system,
+                scenario_id=context.scenario_id,
+                run_id=context.run_id,
+                behaviour_id="conflicting_behaviour",
+                chg_id=context.chg_id,
+                business_stream=context.business_stream,
+                service=context.service,
+                component=context.component,
+                environment=context.environment,
+                sequence_number=sequence_number,
+            )
+
+    binding = SourceExecutionBinding(
+        behaviour=scenario.behaviours[0],
+        generator=ConflictingProvenanceGenerator(),
+        execution_target=None,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="provenance conflicts with",
+    ):
+        await runner.execute_bindings(
+            scenario=scenario,
+            context=context,
+            bindings=[binding],
+            publisher=InMemoryPublisher(),
+            stop_at_state=OperationalState.NORMAL,
+        )

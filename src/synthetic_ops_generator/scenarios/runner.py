@@ -128,7 +128,7 @@ class ScenarioRunner:
             scenario=scenario,
             context=context,
             sources=[
-                (generator, None)
+                (generator, None, None)
                 for generator in generators
             ],
             publisher=publisher,
@@ -161,6 +161,7 @@ class ScenarioRunner:
                 (
                     binding.generator,
                     binding.execution_target,
+                    binding.behaviour.behaviour_id,
                 )
                 for binding in bindings
             ],
@@ -179,6 +180,7 @@ class ScenarioRunner:
             tuple[
                 SourceGenerator,
                 ScenarioExecutionTarget | None,
+                str | None,
             ]
         ],
         publisher: EventPublisher,
@@ -258,7 +260,11 @@ class ScenarioRunner:
                     len(self._event_history),
                 )
 
-            for generator, execution_target in sources:
+            for (
+                generator,
+                execution_target,
+                behaviour_id,
+            ) in sources:
                 generator_context = (
                     context
                     if execution_target is None
@@ -267,9 +273,37 @@ class ScenarioRunner:
                     )
                 )
 
+                if behaviour_id is not None:
+                    generator_context = (
+                        generator_context.for_behaviour(
+                            behaviour_id
+                        )
+                    )
+
                 async for event in generator.generate(
                     generator_context
                 ):
+                    if behaviour_id is not None:
+                        if (
+                            event.behaviour_id is not None
+                            and event.behaviour_id
+                            != behaviour_id
+                        ):
+                            raise ValueError(
+                                "Generated event behaviour "
+                                "provenance conflicts with "
+                                "the execution binding."
+                            )
+
+                        if event.behaviour_id is None:
+                            event = event.model_copy(
+                                update={
+                                    "behaviour_id": (
+                                        behaviour_id
+                                    )
+                                }
+                            )
+
                     await publisher.publish(event)
 
                     self._event_history.append(event)

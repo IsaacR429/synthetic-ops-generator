@@ -143,3 +143,45 @@ def test_deserializes_legacy_event_without_source_domain() -> None:
     )
 
     assert restored.source_domain is None
+
+def test_serialization_preserves_behaviour_provenance() -> None:
+    base = make_event()
+
+    event = base.model_copy(
+        update={
+            "behaviour_id": "metric_normal_healthy_baseline",
+        }
+    )
+
+    payload = serialize_generated_event(event)
+
+    decoded = json.loads(
+        payload.decode("utf-8")
+    )
+
+    assert decoded["behaviour_id"] == (
+        "metric_normal_healthy_baseline"
+    )
+
+    restored = deserialize_generated_event(payload)
+
+    assert restored.behaviour_id == (
+        "metric_normal_healthy_baseline"
+    )
+
+def test_deserializes_legacy_event_without_behaviour_id() -> None:
+    event = make_event()
+
+    payload = event.model_dump(
+        mode="json"
+    )
+    payload.pop(
+        "behaviour_id",
+        None,
+    )
+
+    restored = deserialize_generated_event(
+        json.dumps(payload).encode("utf-8")
+    )
+
+    assert restored.behaviour_id is None

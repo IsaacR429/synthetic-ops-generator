@@ -173,3 +173,32 @@ def test_for_target_shares_execution_state_object() -> None:
     )
 
     assert projected.target is not context.target
+
+def test_behaviour_provenance_is_orthogonal_to_target() -> None:
+    context = build_context()
+
+    targeted = context.for_target(
+        ScenarioExecutionTarget(
+            business_stream="payments",
+            service="payment_service",
+            component="payment_api",
+            environment=Environment.PRODUCTION,
+        )
+    )
+
+    bound = targeted.for_behaviour(
+        "metric_degraded_operational_degradation"
+    )
+
+    assert bound.behaviour_id == (
+        "metric_degraded_operational_degradation"
+    )
+
+    assert bound.execution_state is context.execution_state
+    assert bound.target is targeted.target
+
+    assert bound.service == "payment_service"
+    assert bound.component == "payment_api"
+
+    assert context.behaviour_id is None
+    assert targeted.behaviour_id is None
