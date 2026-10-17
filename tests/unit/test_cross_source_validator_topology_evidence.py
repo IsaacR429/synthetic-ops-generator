@@ -577,6 +577,7 @@ def build_target_execution_plan(
     target: ScenarioExecutionTarget | None,
 ) -> ScenarioExecutionPlan:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_cross_source_validator_topology_evidence_01",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id="execution_target_test",
@@ -675,6 +676,7 @@ def build_scope_scenario(
         ],
         behaviours=[
             ScenarioBehaviour(
+                behaviour_id="fixture_test_cross_source_validator_topology_evidence_02",
                 source=SourceDomain.LOG,
                 during_state=OperationalState.OBSERVING,
                 profile_id="scope_test",

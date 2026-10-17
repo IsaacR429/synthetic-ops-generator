@@ -55,6 +55,7 @@ def build_behaviour(
     profile_id: str = "all_required_validations_pass",
 ) -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_manual_validation_generator_01",
         source=SourceDomain.MANUAL_VALIDATION,
         during_state=OperationalState.OBSERVING,
         profile_id=profile_id,
@@ -389,6 +390,7 @@ def test_generator_does_not_run_outside_behaviour_state() -> None:
 
 def test_generator_rejects_wrong_source_domain() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_manual_validation_generator_02",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id="all_required_validations_pass",

@@ -36,6 +36,7 @@ def build_resilience_scenario():
     )
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_resilience_execution_bindings_01",
         source=SourceDomain.RESILIENCE,
         during_state=scenario.behaviours[0].during_state,
         profile_id="failover_initiated",

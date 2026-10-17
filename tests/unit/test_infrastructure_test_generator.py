@@ -52,6 +52,7 @@ def build_context(
 
 def build_behaviour() -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_infrastructure_test_generator_01",
         source=SourceDomain.INFRASTRUCTURE_TEST,
         during_state=OperationalState.NORMAL,
         profile_id="all_required_checks_pass",
@@ -333,6 +334,7 @@ def test_generator_does_not_run_outside_behaviour_state() -> None:
 
 def test_generator_rejects_wrong_source_domain() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_infrastructure_test_generator_02",
         source=SourceDomain.APPLICATION_TEST,
         during_state=OperationalState.NORMAL,
         profile_id="all_required_checks_pass",
@@ -350,6 +352,7 @@ def test_generator_rejects_wrong_source_domain() -> None:
 
 def test_generator_rejects_unknown_profile() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_infrastructure_test_generator_03",
         source=SourceDomain.INFRASTRUCTURE_TEST,
         during_state=OperationalState.NORMAL,
         profile_id="unknown_profile",
@@ -374,6 +377,7 @@ def test_generator_rejects_unknown_profile() -> None:
 
 def test_required_check_failure_generates_failed_result() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_infrastructure_test_generator_04",
         source=SourceDomain.INFRASTRUCTURE_TEST,
         during_state=OperationalState.NORMAL,
         profile_id="required_check_failed",
@@ -419,6 +423,7 @@ def test_required_check_failure_generates_failed_result() -> None:
 
 def test_required_check_failure_fails_only_first_mandatory_check() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_infrastructure_test_generator_05",
         source=SourceDomain.INFRASTRUCTURE_TEST,
         during_state=OperationalState.NORMAL,
         profile_id="required_check_failed",
@@ -465,6 +470,7 @@ def test_required_check_failure_fails_only_first_mandatory_check() -> None:
 
 def test_required_check_failure_rejects_no_mandatory_checks_before_emitting() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_infrastructure_test_generator_06",
         source=SourceDomain.INFRASTRUCTURE_TEST,
         during_state=OperationalState.NORMAL,
         profile_id="required_check_failed",

@@ -528,6 +528,7 @@ async def test_continuous_control_service_keeps_resilience_transition_bounded(
 
     # Add one bounded factual resilience transition.
     resilience_behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_control_service_01",
         source=SourceDomain.RESILIENCE,
         during_state=(
             original_scenario.state_sequence[1]

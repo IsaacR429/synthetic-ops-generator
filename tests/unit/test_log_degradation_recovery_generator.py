@@ -51,6 +51,7 @@ def build_behaviour(
     continuous: bool = False,
 ) -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_log_degradation_recovery_generator_01",
         source=SourceDomain.LOG,
         during_state=state,
         profile_id=profile_id,

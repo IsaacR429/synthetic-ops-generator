@@ -169,6 +169,7 @@ def test_context_projects_service_instance_identity() -> None:
 @pytest.mark.asyncio
 async def test_targeted_log_event_preserves_instance_lineage() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_service_instance_execution_identity_01",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id=NORMAL_OPERATIONAL_LOGS,
@@ -213,6 +214,7 @@ def test_execution_scope_distinguishes_primary_and_secondary_instances(
     enterprise = load_bank_alpha()
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_service_instance_execution_identity_02",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id=NORMAL_OPERATIONAL_LOGS,
@@ -264,6 +266,7 @@ def test_execution_scope_accepts_authorized_secondary_instance(
     enterprise = load_bank_alpha()
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_service_instance_execution_identity_03",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id=NORMAL_OPERATIONAL_LOGS,
@@ -583,6 +586,7 @@ def test_e55_primary_secondary_instances_resolve_independently(
 async def test_e55_primary_secondary_log_generation_shares_run_state_without_identity_bleed(
 ) -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_service_instance_execution_identity_04",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id=NORMAL_OPERATIONAL_LOGS,

@@ -51,6 +51,7 @@ def build_context(
 
 def build_behaviour() -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_deployment_rollback_generator_01",
         source=SourceDomain.DEPLOYMENT,
         during_state=OperationalState.ROLLBACK,
         profile_id="successful_rollback",

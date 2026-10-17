@@ -108,7 +108,7 @@ class ScenarioMetricSelection(BaseModel):
 
 
 class ScenarioBehaviour(BaseModel):
-    behaviour_id: ScenarioBehaviourId | None = None
+    behaviour_id: ScenarioBehaviourId
 
     source: SourceDomain
 

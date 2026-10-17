@@ -52,6 +52,7 @@ def build_context(
 
 def build_behaviour() -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_application_test_generator_01",
         source=SourceDomain.APPLICATION_TEST,
         during_state=OperationalState.OBSERVING,
         profile_id="all_mandatory_tests_pass",
@@ -339,6 +340,7 @@ def test_generator_does_not_run_outside_behaviour_state() -> None:
 
 def test_generator_rejects_wrong_source_domain() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_application_test_generator_02",
         source=SourceDomain.INFRASTRUCTURE_TEST,
         during_state=OperationalState.OBSERVING,
         profile_id="all_mandatory_tests_pass",
@@ -356,6 +358,7 @@ def test_generator_rejects_wrong_source_domain() -> None:
 
 def test_generator_rejects_unknown_profile() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_application_test_generator_03",
         source=SourceDomain.APPLICATION_TEST,
         during_state=OperationalState.OBSERVING,
         profile_id="unknown_profile",

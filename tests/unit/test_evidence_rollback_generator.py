@@ -49,6 +49,7 @@ def build_context() -> ScenarioContext:
 
 def build_behaviour() -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_evidence_rollback_generator_01",
         source=SourceDomain.EVIDENCE,
         during_state=OperationalState.RECOVERY,
         profile_id="rollback_validation_evidence",

@@ -77,6 +77,7 @@ def build_behaviour(
     state: OperationalState = OperationalState.NORMAL,
 ) -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_metric_generator_01",
         source=SourceDomain.METRIC,
         during_state=state,
         profile_id=profile_id,
@@ -459,6 +460,7 @@ def test_metric_generation_is_deterministic_for_same_seed() -> None:
 
 def test_generator_rejects_wrong_source_domain() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_metric_generator_02",
         source=SourceDomain.LOG,
         during_state=OperationalState.NORMAL,
         profile_id="healthy_baseline",

@@ -53,6 +53,7 @@ def build_behaviour(
     state: OperationalState,
 ) -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_incident_resolution_generator_01",
         source=SourceDomain.INCIDENT,
         during_state=state,
         profile_id=profile_id,

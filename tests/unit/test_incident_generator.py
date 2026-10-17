@@ -55,6 +55,7 @@ def build_behaviour(
     profile_id: str = "incident_created",
 ) -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_incident_generator_01",
         source=SourceDomain.INCIDENT,
         during_state=OperationalState.OBSERVING,
         profile_id=profile_id,
@@ -400,6 +401,7 @@ def test_incident_can_be_unlinked_from_change() -> None:
 
 def test_generator_rejects_wrong_source_domain() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_incident_generator_02",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id="incident_created",

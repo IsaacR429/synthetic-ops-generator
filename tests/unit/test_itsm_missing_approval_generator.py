@@ -43,6 +43,7 @@ def build_context(
 
 def build_behaviour() -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_itsm_missing_approval_generator_01",
         source=SourceDomain.ITSM,
         during_state=OperationalState.NORMAL,
         profile_id="missing_required_approval",

@@ -227,6 +227,7 @@ async def test_continuous_source_scheduler_schedules_metric_events_on_shared_tim
     sleep = SleepRecorder()
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_01",
         source=SourceDomain.METRIC,
         during_state=OperationalState.OBSERVING,
         profile_id="metric",
@@ -276,6 +277,7 @@ async def test_continuous_source_scheduler_schedules_log_events_by_severity() ->
     sleep = SleepRecorder()
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_02",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id="log",
@@ -321,6 +323,7 @@ async def test_continuous_source_scheduler_interleaves_multiple_sources_on_share
     sleep = SleepRecorder()
 
     metric_behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_03",
         source=SourceDomain.METRIC,
         during_state=OperationalState.OBSERVING,
         profile_id="metric",
@@ -328,6 +331,7 @@ async def test_continuous_source_scheduler_interleaves_multiple_sources_on_share
     )
 
     infrastructure_behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_04",
         source=SourceDomain.INFRASTRUCTURE_TEST,
         during_state=OperationalState.OBSERVING,
         profile_id="infra",
@@ -409,6 +413,7 @@ async def test_scheduler_rejects_non_continuous_behaviour() -> None:
     clock = ManualSimulationClock(start)
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_05",
         source=SourceDomain.METRIC,
         during_state=OperationalState.OBSERVING,
         profile_id="metric",
@@ -489,6 +494,7 @@ async def test_continuous_scheduler_projects_target_context() -> None:
     context = make_context(clock)
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_06",
         source=SourceDomain.METRIC,
         during_state=OperationalState.OBSERVING,
         profile_id="operational_metrics",
@@ -541,6 +547,7 @@ async def test_continuous_scheduler_rejects_targeted_raw_async_generator() -> No
     context = make_context(clock)
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_07",
         source=SourceDomain.METRIC,
         during_state=OperationalState.OBSERVING,
         profile_id="operational_metrics",

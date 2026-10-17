@@ -47,6 +47,7 @@ def build_resilience_behaviour(
     )
 
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_resilience_transition_planning_01",
         source=SourceDomain.RESILIENCE,
         during_state=scenario.behaviours[0].during_state,
         profile_id="failover_initiated",
@@ -98,6 +99,7 @@ def test_non_resilience_behaviour_rejects_resilience_transition() -> None:
         ),
     ):
         ScenarioBehaviour(
+            behaviour_id="fixture_test_resilience_transition_planning_02",
             source=SourceDomain.LOG,
             during_state=scenario.behaviours[0].during_state,
             profile_id="normal_operational_logs",

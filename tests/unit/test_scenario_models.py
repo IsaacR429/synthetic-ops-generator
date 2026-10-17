@@ -42,6 +42,7 @@ def test_behaviour_state_must_exist_in_sequence() -> None:
 
 def test_metric_behaviour_can_select_metric_ids() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_scenario_models_01",
         source=SourceDomain.METRIC,
         during_state=OperationalState.WARNING,
         profile_id="operational_warning",
@@ -65,6 +66,7 @@ def test_non_metric_behaviour_rejects_metric_selection() -> None:
         match="Metric selection is only valid for Metric behaviour",
     ):
         ScenarioBehaviour(
+            behaviour_id="fixture_test_scenario_models_02",
             source=SourceDomain.LOG,
             during_state=OperationalState.WARNING,
             profile_id="operational_degradation",
@@ -116,6 +118,7 @@ def test_metric_selection_rejects_duplicate_metric_ids() -> None:
 
 def test_behaviour_can_declare_execution_node_id() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_scenario_models_03",
         source=SourceDomain.LOG,
         during_state=OperationalState.DEGRADED,
         profile_id="degradation_error_logs",
@@ -130,6 +133,7 @@ def test_behaviour_can_declare_execution_node_id() -> None:
 def test_behaviour_rejects_blank_execution_node_id() -> None:
     with pytest.raises(ValidationError):
         ScenarioBehaviour(
+            behaviour_id="fixture_test_scenario_models_04",
             source=SourceDomain.LOG,
             during_state=OperationalState.DEGRADED,
             profile_id="degradation_error_logs",
@@ -139,6 +143,7 @@ def test_behaviour_rejects_blank_execution_node_id() -> None:
 
 def test_behaviour_execution_node_defaults_to_none() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_scenario_models_05",
         source=SourceDomain.LOG,
         during_state=OperationalState.DEGRADED,
         profile_id="degradation_error_logs",
@@ -160,6 +165,15 @@ def test_behaviour_rejects_blank_behaviour_id() -> None:
     with pytest.raises(ValidationError):
         ScenarioBehaviour(
             behaviour_id="   ",
+            source=SourceDomain.LOG,
+            during_state=OperationalState.DEGRADED,
+            profile_id="degradation_error_logs",
+        )
+
+
+def test_behaviour_requires_behaviour_id() -> None:
+    with pytest.raises(ValidationError):
+        ScenarioBehaviour(
             source=SourceDomain.LOG,
             during_state=OperationalState.DEGRADED,
             profile_id="degradation_error_logs",
@@ -198,6 +212,7 @@ def test_behaviour_rejects_unsupported_continuous_source() -> None:
         ),
     ):
         ScenarioBehaviour(
+            behaviour_id="fixture_test_scenario_models_09",
             source=SourceDomain.DEPLOYMENT,
             during_state=OperationalState.OBSERVING,
             profile_id="successful_deployment",
@@ -208,6 +223,7 @@ def test_behaviour_rejects_unsupported_continuous_source() -> None:
 def test_non_continuous_behaviour_allows_source_without_continuous_scheduler(
 ) -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_scenario_models_10",
         source=SourceDomain.DEPLOYMENT,
         during_state=OperationalState.OBSERVING,
         profile_id="successful_deployment",

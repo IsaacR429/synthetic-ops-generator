@@ -113,11 +113,13 @@ def build_scenario() -> ScenarioDefinition:
         ],
         behaviours=[
             ScenarioBehaviour(
+                behaviour_id="fixture_test_scenario_runner_01",
                 source=SourceDomain.ITSM,
                 during_state=OperationalState.NORMAL,
                 profile_id="approved_change",
             ),
             ScenarioBehaviour(
+                behaviour_id="fixture_test_scenario_runner_02",
                 source=SourceDomain.DEPLOYMENT,
                 during_state=OperationalState.IMPLEMENTING,
                 profile_id="successful_deployment",

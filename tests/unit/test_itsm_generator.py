@@ -49,6 +49,7 @@ def build_behaviour(
     profile_id: str = "approved_change",
 ) -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_itsm_generator_01",
         source=SourceDomain.ITSM,
         during_state=OperationalState.NORMAL,
         profile_id=profile_id,
@@ -305,6 +306,7 @@ def test_itsm_generator_does_not_generate_outside_behaviour_state() -> None:
 
 def test_itsm_generator_rejects_non_itsm_behaviour() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_itsm_generator_02",
         source=SourceDomain.DEPLOYMENT,
         during_state=OperationalState.NORMAL,
         profile_id="successful_deployment",
@@ -324,6 +326,7 @@ def test_itsm_generator_rejects_non_itsm_behaviour() -> None:
 
 def test_itsm_generator_rejects_unknown_profile() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_itsm_generator_03",
         source=SourceDomain.ITSM,
         during_state=OperationalState.NORMAL,
         profile_id="unknown_profile",

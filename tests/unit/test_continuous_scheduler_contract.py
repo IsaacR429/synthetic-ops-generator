@@ -239,6 +239,7 @@ async def test_finite_metric_cycle_is_repeated_by_scheduler(
     sleep = SleepRecorder()
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_contract_01",
         source=SourceDomain.METRIC,
         during_state=OperationalState.OBSERVING,
         profile_id="healthy_post_change",
@@ -309,6 +310,7 @@ async def test_metric_interval_applies_between_cycles_not_events(
     sleep = SleepRecorder()
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_contract_02",
         source=SourceDomain.METRIC,
         during_state=OperationalState.OBSERVING,
         profile_id="healthy_post_change",
@@ -366,6 +368,7 @@ async def test_real_metric_generator_advances_values_between_continuous_cycles(
     )
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_contract_03",
         source=SourceDomain.METRIC,
         during_state=OperationalState.OBSERVING,
         profile_id="healthy_post_change",
@@ -473,6 +476,7 @@ async def test_scheduler_only_runs_continuous_behaviour_for_active_state(
     )
 
     recovery_behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_contract_04",
         source=SourceDomain.METRIC,
         during_state=OperationalState.RECOVERY,
         profile_id="recovered_post_rollback",
@@ -521,6 +525,7 @@ async def test_finite_infrastructure_cycle_is_repeated_as_batch(
     sleep = SleepRecorder()
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_contract_05",
         source=SourceDomain.INFRASTRUCTURE_TEST,
         during_state=OperationalState.OBSERVING,
         profile_id="all_required_checks_pass",
@@ -593,6 +598,7 @@ async def test_finite_log_profile_is_restarted_after_exhaustion(
     sleep = SleepRecorder()
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_contract_06",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id="normal_operational_logs",
@@ -681,6 +687,7 @@ async def test_continuous_log_cycles_do_not_repeat_identical_semantic_block(
     )
 
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_contract_07",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id="normal_operational_logs",
@@ -755,6 +762,7 @@ async def test_continuous_log_cycles_do_not_repeat_identical_semantic_block(
 async def test_continuous_log_generation_is_reproducible_for_same_seed(
 ) -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_continuous_scheduler_contract_08",
         source=SourceDomain.LOG,
         during_state=OperationalState.OBSERVING,
         profile_id="normal_operational_logs",

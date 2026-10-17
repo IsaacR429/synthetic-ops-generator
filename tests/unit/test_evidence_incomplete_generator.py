@@ -149,6 +149,7 @@ def build_context(
 
 def build_behaviour() -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_evidence_incomplete_generator_01",
         source=SourceDomain.EVIDENCE,
         during_state=OperationalState.OBSERVING,
         profile_id="incomplete_validation_evidence",

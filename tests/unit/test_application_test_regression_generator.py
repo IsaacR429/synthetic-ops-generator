@@ -51,6 +51,7 @@ def build_context(
 
 def build_behaviour() -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_application_test_regression_generator_01",
         source=SourceDomain.APPLICATION_TEST,
         during_state=OperationalState.OBSERVING,
         profile_id="mandatory_test_regression",

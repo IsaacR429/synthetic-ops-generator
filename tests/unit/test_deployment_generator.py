@@ -46,6 +46,7 @@ def build_context(
 
 def build_behaviour() -> ScenarioBehaviour:
     return ScenarioBehaviour(
+        behaviour_id="fixture_test_deployment_generator_01",
         source=SourceDomain.DEPLOYMENT,
         during_state=OperationalState.IMPLEMENTING,
         profile_id="successful_deployment",
@@ -290,6 +291,7 @@ def test_deployment_generator_does_not_generate_outside_state() -> None:
 
 def test_deployment_generator_rejects_non_deployment_behaviour() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_deployment_generator_02",
         source=SourceDomain.ITSM,
         during_state=OperationalState.IMPLEMENTING,
         profile_id="approved_change",
@@ -309,6 +311,7 @@ def test_deployment_generator_rejects_non_deployment_behaviour() -> None:
 
 def test_deployment_generator_rejects_unknown_profile() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_deployment_generator_03",
         source=SourceDomain.DEPLOYMENT,
         during_state=OperationalState.IMPLEMENTING,
         profile_id="unknown_profile",
@@ -335,6 +338,7 @@ def test_deployment_generator_rejects_unknown_profile() -> None:
 
 def test_failed_deployment_generates_failed_terminal_event() -> None:
     behaviour = ScenarioBehaviour(
+        behaviour_id="fixture_test_deployment_generator_04",
         source=SourceDomain.DEPLOYMENT,
         during_state=OperationalState.IMPLEMENTING,
         profile_id="failed_deployment",
