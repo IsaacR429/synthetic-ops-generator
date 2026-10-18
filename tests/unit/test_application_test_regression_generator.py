@@ -9,8 +9,13 @@ from synthetic_ops_generator.domain.enums import (
     OperationalState,
     RiskLevel,
 )
+from synthetic_ops_generator.checks.catalogue import (
+    APPLICATION_FUNCTIONAL_VALIDATION,
+)
+from synthetic_ops_generator.checks.models import (
+    CheckExecutionSpec,
+)
 from synthetic_ops_generator.generators.application_test import (
-    ApplicationTestDefinition,
     ApplicationTestGenerator,
 )
 from synthetic_ops_generator.scenarios.context import ScenarioContext
@@ -155,9 +160,16 @@ def test_regression_requires_at_least_one_mandatory_test() -> None:
     context = build_context()
 
     tests = (
-        ApplicationTestDefinition(
-            test_type="optional_check",
-            name="Optional check",
+        CheckExecutionSpec(
+            definition=(
+                APPLICATION_FUNCTIONAL_VALIDATION.model_copy(
+                    update={
+                        "check_definition_id": "fixture.application.optional_check",
+                        "test_type": "optional_check",
+                        "name": "Optional check",
+                    }
+                )
+            ),
             mandatory=False,
         ),
     )

@@ -63,3 +63,19 @@ class CheckDefinition(BaseModel):
     applicability: CheckApplicability = Field(
         default_factory=CheckApplicability
     )
+
+class CheckExecutionSpec(BaseModel):
+    """
+    Binds a reusable CheckDefinition to execution-context semantics.
+
+    `mandatory` belongs here rather than on CheckDefinition because
+    whether a check is required depends on the operational/policy
+    context in which it is used.
+
+    This is intentionally a thin P1B bridge. Rich requirement,
+    evidence and policy semantics belong to later P2.5-P slices.
+    """
+
+    definition: CheckDefinition
+
+    mandatory: bool = True

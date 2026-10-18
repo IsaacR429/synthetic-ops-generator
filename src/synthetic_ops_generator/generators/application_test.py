@@ -1,6 +1,10 @@
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
-
+from synthetic_ops_generator.checks.catalogue import (
+    DEFAULT_APPLICATION_CHECKS,
+)
+from synthetic_ops_generator.checks.models import (
+    CheckExecutionSpec,
+)
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.domain.operational_test import (
     OperationalTest,
@@ -21,27 +25,6 @@ from synthetic_ops_generator.scenarios.profile_contracts import (
 )
 
 
-@dataclass(frozen=True)
-class ApplicationTestDefinition:
-    test_type: str
-    name: str
-    mandatory: bool = True
-
-
-DEFAULT_MANDATORY_TESTS = (
-    ApplicationTestDefinition(
-        test_type="functional_validation",
-        name="Service functional validation",
-    ),
-    ApplicationTestDefinition(
-        test_type="transaction_processing",
-        name="Service transaction processing validation",
-    ),
-    ApplicationTestDefinition(
-        test_type="post_deployment_smoke",
-        name="Post-deployment smoke validation",
-    ),
-)
 
 
 class ApplicationTestGenerator(SourceGenerator):
@@ -59,10 +42,7 @@ class ApplicationTestGenerator(SourceGenerator):
         *,
         ids: IdFactory,
         behaviour: ScenarioBehaviour,
-        tests: tuple[
-            ApplicationTestDefinition,
-            ...,
-        ] = DEFAULT_MANDATORY_TESTS,
+        tests: tuple[CheckExecutionSpec, ...] = DEFAULT_APPLICATION_CHECKS,
     ) -> None:
         if behaviour.source != SourceDomain.APPLICATION_TEST:
             raise ValueError(
@@ -74,6 +54,16 @@ class ApplicationTestGenerator(SourceGenerator):
             raise ValueError(
                 "ApplicationTestGenerator requires "
                 "at least one test definition."
+            )
+
+        if any(
+            spec.definition.category
+            != TestCategory.APPLICATION
+            for spec in tests
+        ):
+            raise ValueError(
+                "ApplicationTestGenerator requires "
+                "application CheckDefinitions."
             )
 
         self._ids = ids
@@ -120,7 +110,8 @@ class ApplicationTestGenerator(SourceGenerator):
         self,
         context: ScenarioContext,
     ) -> AsyncIterator[GeneratedEvent]:
-        for definition in self._tests:
+        for spec in self._tests:
+            definition = spec.definition
             test_id = self._ids.test_id()
 
             planned = OperationalTest(
@@ -131,7 +122,7 @@ class ApplicationTestGenerator(SourceGenerator):
                 name=definition.name,
                 service=context.service,
                 component=context.component,
-                mandatory=definition.mandatory,
+                mandatory=spec.mandatory,
                 status=TestExecutionStatus.PLANNED,
                 planned_at=context.simulation_time,
             )
@@ -150,7 +141,7 @@ class ApplicationTestGenerator(SourceGenerator):
                 name=definition.name,
                 service=context.service,
                 component=context.component,
-                mandatory=definition.mandatory,
+                mandatory=spec.mandatory,
                 status=TestExecutionStatus.EXECUTED,
                 result=TestResult.PASSED,
                 planned_at=planned.planned_at,
@@ -173,23 +164,25 @@ class ApplicationTestGenerator(SourceGenerator):
                 "change correlation."
             )
 
-        mandatory_tests = [
-            definition
-            for definition in self._tests
-            if definition.mandatory
+        mandatory_specs = [
+            spec
+            for spec in self._tests
+            if spec.mandatory
         ]
 
-        if not mandatory_tests:
+        if not mandatory_specs:
             raise ValueError(
                 "Mandatory Test regression requires "
                 "at least one mandatory Test."
             )
 
         regression_test_type = (
-            mandatory_tests[-1].test_type
+            mandatory_specs[-1]
+            .definition.test_type
         )
 
-        for definition in self._tests:
+        for spec in self._tests:
+            definition = spec.definition
             test_id = self._ids.test_id()
 
             planned = OperationalTest(
@@ -200,7 +193,7 @@ class ApplicationTestGenerator(SourceGenerator):
                 name=definition.name,
                 service=context.service,
                 component=context.component,
-                mandatory=definition.mandatory,
+                mandatory=spec.mandatory,
                 status=TestExecutionStatus.PLANNED,
                 planned_at=context.simulation_time,
             )
@@ -224,7 +217,7 @@ class ApplicationTestGenerator(SourceGenerator):
                 name=definition.name,
                 service=context.service,
                 component=context.component,
-                mandatory=definition.mandatory,
+                mandatory=spec.mandatory,
                 status=TestExecutionStatus.EXECUTED,
                 result=(
                     TestResult.FAILED

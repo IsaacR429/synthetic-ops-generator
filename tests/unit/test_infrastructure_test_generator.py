@@ -12,8 +12,13 @@ from synthetic_ops_generator.domain.enums import (
     OperationalState,
     RiskLevel,
 )
+from synthetic_ops_generator.checks.catalogue import (
+    INFRASTRUCTURE_CONNECTIVITY,
+)
+from synthetic_ops_generator.checks.models import (
+    CheckExecutionSpec,
+)
 from synthetic_ops_generator.generators.infrastructure_test import (
-    InfrastructureCheckDefinition,
     InfrastructureTestGenerator,
 )
 from synthetic_ops_generator.scenarios.context import ScenarioContext
@@ -279,13 +284,29 @@ def test_event_times_progress() -> None:
 
 def test_custom_check_definitions_are_supported() -> None:
     checks = (
-        InfrastructureCheckDefinition(
-            test_type="dns",
-            name="DNS resolution",
+        CheckExecutionSpec(
+            definition=(
+                INFRASTRUCTURE_CONNECTIVITY.model_copy(
+                    update={
+                        "check_definition_id": "fixture.infrastructure.dns",
+                        "test_type": "dns",
+                        "name": "DNS resolution",
+                    }
+                )
+            ),
+            mandatory=True,
         ),
-        InfrastructureCheckDefinition(
-            test_type="certificate",
-            name="Certificate validity",
+        CheckExecutionSpec(
+            definition=(
+                INFRASTRUCTURE_CONNECTIVITY.model_copy(
+                    update={
+                        "check_definition_id": "fixture.infrastructure.certificate",
+                        "test_type": "certificate",
+                        "name": "Certificate validity",
+                    }
+                )
+            ),
+            mandatory=True,
         ),
     )
 
@@ -384,9 +405,16 @@ def test_required_check_failure_generates_failed_result() -> None:
     )
 
     checks = (
-        InfrastructureCheckDefinition(
-            test_type="connectivity",
-            name="Service connectivity validation",
+        CheckExecutionSpec(
+            definition=(
+                INFRASTRUCTURE_CONNECTIVITY.model_copy(
+                    update={
+                        "check_definition_id": "fixture.infrastructure.connectivity",
+                        "test_type": "connectivity",
+                        "name": "Service connectivity validation",
+                    }
+                )
+            ),
             mandatory=True,
         ),
     )
@@ -477,9 +505,16 @@ def test_required_check_failure_rejects_no_mandatory_checks_before_emitting() ->
     )
 
     checks = (
-        InfrastructureCheckDefinition(
-            test_type="optional_probe",
-            name="Optional infrastructure probe",
+        CheckExecutionSpec(
+            definition=(
+                INFRASTRUCTURE_CONNECTIVITY.model_copy(
+                    update={
+                        "check_definition_id": "fixture.infrastructure.optional_probe",
+                        "test_type": "optional_probe",
+                        "name": "Optional infrastructure probe",
+                    }
+                )
+            ),
             mandatory=False,
         ),
     )

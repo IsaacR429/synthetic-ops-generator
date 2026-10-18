@@ -12,8 +12,13 @@ from synthetic_ops_generator.domain.enums import (
     OperationalState,
     RiskLevel,
 )
+from synthetic_ops_generator.checks.catalogue import (
+    APPLICATION_FUNCTIONAL_VALIDATION,
+)
+from synthetic_ops_generator.checks.models import (
+    CheckExecutionSpec,
+)
 from synthetic_ops_generator.generators.application_test import (
-    ApplicationTestDefinition,
     ApplicationTestGenerator,
 )
 from synthetic_ops_generator.scenarios.context import ScenarioContext
@@ -281,13 +286,29 @@ def test_application_event_times_progress() -> None:
 
 def test_custom_application_tests_are_supported() -> None:
     tests = (
-        ApplicationTestDefinition(
-            test_type="api_contract",
-            name="Payment API contract validation",
+        CheckExecutionSpec(
+            definition=(
+                APPLICATION_FUNCTIONAL_VALIDATION.model_copy(
+                    update={
+                        "check_definition_id": "fixture.application.api_contract",
+                        "test_type": "api_contract",
+                        "name": "Payment API contract validation",
+                    }
+                )
+            ),
+            mandatory=True,
         ),
-        ApplicationTestDefinition(
-            test_type="payment_submission",
-            name="Payment submission validation",
+        CheckExecutionSpec(
+            definition=(
+                APPLICATION_FUNCTIONAL_VALIDATION.model_copy(
+                    update={
+                        "check_definition_id": "fixture.application.payment_submission",
+                        "test_type": "payment_submission",
+                        "name": "Payment submission validation",
+                    }
+                )
+            ),
+            mandatory=True,
         ),
     )
 

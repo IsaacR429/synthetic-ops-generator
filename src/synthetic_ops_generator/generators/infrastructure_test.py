@@ -1,6 +1,10 @@
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
-
+from synthetic_ops_generator.checks.catalogue import (
+    DEFAULT_INFRASTRUCTURE_CHECKS,
+)
+from synthetic_ops_generator.checks.models import (
+    CheckExecutionSpec,
+)
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.domain.operational_test import (
     OperationalTest,
@@ -21,27 +25,6 @@ from synthetic_ops_generator.scenarios.profile_contracts import (
 )
 
 
-@dataclass(frozen=True)
-class InfrastructureCheckDefinition:
-    test_type: str
-    name: str
-    mandatory: bool = True
-
-
-DEFAULT_REQUIRED_CHECKS = (
-    InfrastructureCheckDefinition(
-        test_type="connectivity",
-        name="Service connectivity validation",
-    ),
-    InfrastructureCheckDefinition(
-        test_type="service_health",
-        name="Service health validation",
-    ),
-    InfrastructureCheckDefinition(
-        test_type="dependency_connectivity",
-        name="Dependency connectivity validation",
-    ),
-)
 
 
 class InfrastructureTestGenerator(SourceGenerator):
@@ -59,10 +42,7 @@ class InfrastructureTestGenerator(SourceGenerator):
         *,
         ids: IdFactory,
         behaviour: ScenarioBehaviour,
-        checks: tuple[
-            InfrastructureCheckDefinition,
-            ...,
-        ] = DEFAULT_REQUIRED_CHECKS,
+        checks: tuple[CheckExecutionSpec, ...] = DEFAULT_INFRASTRUCTURE_CHECKS,
     ) -> None:
         if behaviour.source != SourceDomain.INFRASTRUCTURE_TEST:
             raise ValueError(
@@ -74,6 +54,16 @@ class InfrastructureTestGenerator(SourceGenerator):
             raise ValueError(
                 "InfrastructureTestGenerator requires "
                 "at least one check."
+            )
+
+        if any(
+            spec.definition.category
+            != TestCategory.INFRASTRUCTURE
+            for spec in checks
+        ):
+            raise ValueError(
+                "InfrastructureTestGenerator requires "
+                "infrastructure CheckDefinitions."
             )
 
         self._ids = ids
@@ -116,7 +106,8 @@ class InfrastructureTestGenerator(SourceGenerator):
         self,
         context: ScenarioContext,
     ) -> AsyncIterator[GeneratedEvent]:
-        for check in self._checks:
+        for spec in self._checks:
+            check = spec.definition
             test_id = self._ids.test_id()
 
             planned = OperationalTest(
@@ -127,7 +118,7 @@ class InfrastructureTestGenerator(SourceGenerator):
                 name=check.name,
                 service=context.service,
                 component=context.component,
-                mandatory=check.mandatory,
+                mandatory=spec.mandatory,
                 status=TestExecutionStatus.PLANNED,
                 planned_at=context.simulation_time,
             )
@@ -146,7 +137,7 @@ class InfrastructureTestGenerator(SourceGenerator):
                 name=check.name,
                 service=context.service,
                 component=context.component,
-                mandatory=check.mandatory,
+                mandatory=spec.mandatory,
                 status=TestExecutionStatus.EXECUTED,
                 result=TestResult.PASSED,
                 planned_at=planned.planned_at,
@@ -163,7 +154,7 @@ class InfrastructureTestGenerator(SourceGenerator):
         self,
         context: ScenarioContext,
     ) -> AsyncIterator[GeneratedEvent]:
-        if not any(check.mandatory for check in self._checks):
+        if not any(spec.mandatory for spec in self._checks):
             raise ValueError(
                 "required_check_failed requires at least "
                 "one mandatory infrastructure check."
@@ -171,7 +162,8 @@ class InfrastructureTestGenerator(SourceGenerator):
 
         failure_emitted = False
 
-        for check in self._checks:
+        for spec in self._checks:
+            check = spec.definition
             test_id = self._ids.test_id()
 
             planned = OperationalTest(
@@ -182,7 +174,7 @@ class InfrastructureTestGenerator(SourceGenerator):
                 name=check.name,
                 service=context.service,
                 component=context.component,
-                mandatory=check.mandatory,
+                mandatory=spec.mandatory,
                 status=TestExecutionStatus.PLANNED,
                 planned_at=context.simulation_time,
             )
@@ -194,7 +186,7 @@ class InfrastructureTestGenerator(SourceGenerator):
             )
 
             should_fail = (
-                check.mandatory
+                spec.mandatory
                 and not failure_emitted
             )
 
@@ -207,7 +199,7 @@ class InfrastructureTestGenerator(SourceGenerator):
                     name=check.name,
                     service=context.service,
                     component=context.component,
-                    mandatory=check.mandatory,
+                    mandatory=spec.mandatory,
                     status=TestExecutionStatus.EXECUTED,
                     result=TestResult.FAILED,
                     planned_at=planned.planned_at,
@@ -228,7 +220,7 @@ class InfrastructureTestGenerator(SourceGenerator):
                     name=check.name,
                     service=context.service,
                     component=context.component,
-                    mandatory=check.mandatory,
+                    mandatory=spec.mandatory,
                     status=TestExecutionStatus.EXECUTED,
                     result=TestResult.PASSED,
                     planned_at=planned.planned_at,
