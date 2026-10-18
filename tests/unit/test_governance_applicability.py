@@ -645,4 +645,3 @@ def test_applicability_context_does_not_embed_change_lifecycle() -> None:
     assert "chg_id" not in fields
     assert "change_status" not in fields
     assert "approvals" not in fields
-
