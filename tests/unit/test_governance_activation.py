@@ -411,4 +411,3 @@ def test_activation_result_is_frozen() -> None:
 
     with pytest.raises(Exception):
         result.status = ControlActivationStatus.EXPIRED
-
