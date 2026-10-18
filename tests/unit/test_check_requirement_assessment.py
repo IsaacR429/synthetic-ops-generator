@@ -671,4 +671,3 @@ def test_unrecognised_result_is_insufficient() -> None:
         assessment.status
         == RequirementAssessmentStatus.INSUFFICIENT
     )
-
