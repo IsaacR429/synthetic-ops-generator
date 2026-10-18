@@ -39,6 +39,14 @@ class RunEvidenceRow:
 
 
     behaviour_id: str | None = None
+
+    check_definition_id: str | None = None
+    operational_test_id: str | None = None
+    operational_test_category: str | None = None
+    operational_test_type: str | None = None
+    operational_test_status: str | None = None
+    operational_test_result: str | None = None
+
     metric_definition_id: str | None = None
     metric_name: str | None = None
     observed_value: float | None = None
@@ -128,6 +136,7 @@ def _string_tuple(
 def project_run_evidence_row(
     event: GeneratedEvent,
 ) -> RunEvidenceRow:
+    test = _mapping(event.data.get("test"))
     metric = _mapping(event.data.get("metric"))
 
     baseline = (
@@ -189,6 +198,36 @@ def project_run_evidence_row(
             event.service_instance_id
         ),
         synthetic=event.synthetic,
+        check_definition_id=(
+            _string(test.get("check_definition_id"))
+            if test is not None
+            else None
+        ),
+        operational_test_id=(
+            _string(test.get("test_id"))
+            if test is not None
+            else None
+        ),
+        operational_test_category=(
+            _string(test.get("category"))
+            if test is not None
+            else None
+        ),
+        operational_test_type=(
+            _string(test.get("test_type"))
+            if test is not None
+            else None
+        ),
+        operational_test_status=(
+            _string(test.get("status"))
+            if test is not None
+            else None
+        ),
+        operational_test_result=(
+            _string(test.get("result"))
+            if test is not None
+            else None
+        ),
         metric_definition_id=(
             _string(metric.get("metric_definition_id"))
             if metric is not None

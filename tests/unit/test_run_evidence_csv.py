@@ -1,4 +1,4 @@
-﻿import csv
+import csv
 import io
 import json
 from datetime import UTC, datetime
@@ -36,6 +36,12 @@ EXPECTED_COLUMNS = (
     "site_id",
     "service_instance_id",
     "synthetic",
+    "check_definition_id",
+    "operational_test_id",
+    "operational_test_category",
+    "operational_test_type",
+    "operational_test_status",
+    "operational_test_result",
     "metric_definition_id",
     "metric_name",
     "observed_value",

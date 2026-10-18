@@ -32,6 +32,7 @@ def test_valid_planned_infrastructure_test() -> None:
 
     test = OperationalTest(
         test_id="TST0000001",
+        check_definition_id="fixture.operational_test",
         chg_id="CHG0000001",
         category=Category.INFRASTRUCTURE,
         test_type="connectivity",
@@ -60,6 +61,7 @@ def test_valid_executed_application_test() -> None:
 
     test = OperationalTest(
         test_id="TST0000001",
+        check_definition_id="fixture.operational_test",
         chg_id="CHG0000001",
         category=Category.APPLICATION,
         test_type="functional",
@@ -95,6 +97,7 @@ def test_planned_test_rejects_result() -> None:
     ):
         OperationalTest(
             test_id="TST0000001",
+            check_definition_id="fixture.operational_test",
             chg_id="CHG0000001",
             category=Category.APPLICATION,
             test_type="functional",
@@ -123,6 +126,7 @@ def test_executed_test_requires_execution_time() -> None:
     ):
         OperationalTest(
             test_id="TST0000001",
+            check_definition_id="fixture.operational_test",
             chg_id="CHG0000001",
             category=Category.INFRASTRUCTURE,
             test_type="connectivity",
@@ -151,6 +155,7 @@ def test_executed_test_requires_result() -> None:
     ):
         OperationalTest(
             test_id="TST0000001",
+            check_definition_id="fixture.operational_test",
             chg_id="CHG0000001",
             category=Category.INFRASTRUCTURE,
             test_type="connectivity",
@@ -181,6 +186,7 @@ def test_test_rejects_execution_before_planning() -> None:
     ):
         OperationalTest(
             test_id="TST0000001",
+            check_definition_id="fixture.operational_test",
             chg_id="CHG0000001",
             category=Category.APPLICATION,
             test_type="functional",
@@ -212,6 +218,7 @@ def test_test_rejects_naive_timestamp() -> None:
     ):
         OperationalTest(
             test_id="TST0000001",
+            check_definition_id="fixture.operational_test",
             chg_id="CHG0000001",
             category=Category.INFRASTRUCTURE,
             test_type="connectivity",
@@ -226,6 +233,7 @@ def test_test_rejects_naive_timestamp() -> None:
 def test_operational_test_allows_no_change_correlation() -> None:
     test = OperationalTest(
         test_id="TST0000001",
+        check_definition_id="fixture.operational_test",
         chg_id=None,
         category=TestCategory.INFRASTRUCTURE,
         test_type="service_health",

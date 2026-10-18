@@ -112,6 +112,7 @@ class InfrastructureTestGenerator(SourceGenerator):
 
             planned = OperationalTest(
                 test_id=test_id,
+                check_definition_id=check.check_definition_id,
                 chg_id=context.chg_id,
                 category=TestCategory.INFRASTRUCTURE,
                 test_type=check.test_type,
@@ -131,6 +132,7 @@ class InfrastructureTestGenerator(SourceGenerator):
 
             executed = OperationalTest(
                 test_id=test_id,
+                check_definition_id=check.check_definition_id,
                 chg_id=context.chg_id,
                 category=TestCategory.INFRASTRUCTURE,
                 test_type=check.test_type,
@@ -168,6 +170,7 @@ class InfrastructureTestGenerator(SourceGenerator):
 
             planned = OperationalTest(
                 test_id=test_id,
+                check_definition_id=check.check_definition_id,
                 chg_id=context.chg_id,
                 category=TestCategory.INFRASTRUCTURE,
                 test_type=check.test_type,
@@ -193,6 +196,7 @@ class InfrastructureTestGenerator(SourceGenerator):
             if should_fail:
                 executed = OperationalTest(
                     test_id=test_id,
+                    check_definition_id=check.check_definition_id,
                     chg_id=context.chg_id,
                     category=TestCategory.INFRASTRUCTURE,
                     test_type=check.test_type,
@@ -214,6 +218,7 @@ class InfrastructureTestGenerator(SourceGenerator):
             else:
                 executed = OperationalTest(
                     test_id=test_id,
+                    check_definition_id=check.check_definition_id,
                     chg_id=context.chg_id,
                     category=TestCategory.INFRASTRUCTURE,
                     test_type=check.test_type,

@@ -204,9 +204,15 @@ def test_application_generator_consumes_canonical_execution_spec() -> None:
     assert executed["mandatory"] is False
     assert executed["result"] == "passed"
 
-    # P1B preserves the existing evidence contract.
-    assert "check_definition_id" not in planned
-    assert "check_definition_id" not in executed
+    # P1C adds stable semantic definition lineage.
+    assert (
+        planned["check_definition_id"]
+        == APPLICATION_FUNCTIONAL_VALIDATION.check_definition_id
+    )
+    assert (
+        executed["check_definition_id"]
+        == APPLICATION_FUNCTIONAL_VALIDATION.check_definition_id
+    )
 
 
 def test_infrastructure_generator_consumes_canonical_execution_spec() -> None:
@@ -246,7 +252,10 @@ def test_infrastructure_generator_consumes_canonical_execution_spec() -> None:
     assert test_data["name"] == "Service connectivity validation"
     assert test_data["mandatory"] is True
     assert test_data["result"] == "passed"
-    assert "check_definition_id" not in test_data
+    assert (
+        test_data["check_definition_id"]
+        == INFRASTRUCTURE_CONNECTIVITY.check_definition_id
+    )
 
 
 def test_application_generator_rejects_infrastructure_definition() -> None:

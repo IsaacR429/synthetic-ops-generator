@@ -116,6 +116,7 @@ class ApplicationTestGenerator(SourceGenerator):
 
             planned = OperationalTest(
                 test_id=test_id,
+                check_definition_id=definition.check_definition_id,
                 chg_id=context.chg_id,
                 category=TestCategory.APPLICATION,
                 test_type=definition.test_type,
@@ -135,6 +136,7 @@ class ApplicationTestGenerator(SourceGenerator):
 
             executed = OperationalTest(
                 test_id=test_id,
+                check_definition_id=definition.check_definition_id,
                 chg_id=context.chg_id,
                 category=TestCategory.APPLICATION,
                 test_type=definition.test_type,
@@ -187,6 +189,7 @@ class ApplicationTestGenerator(SourceGenerator):
 
             planned = OperationalTest(
                 test_id=test_id,
+                check_definition_id=definition.check_definition_id,
                 chg_id=context.chg_id,
                 category=TestCategory.APPLICATION,
                 test_type=definition.test_type,
@@ -211,6 +214,7 @@ class ApplicationTestGenerator(SourceGenerator):
 
             executed = OperationalTest(
                 test_id=test_id,
+                check_definition_id=definition.check_definition_id,
                 chg_id=context.chg_id,
                 category=TestCategory.APPLICATION,
                 test_type=definition.test_type,
