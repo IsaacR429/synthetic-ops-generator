@@ -31,6 +31,7 @@ def test_catalogue_lists_available_scenarios() -> None:
         "BANK-07",
         "INS-01",
         "INS-02",
+        "INS-03",
         "INS-06",
     ]
 
