@@ -46,6 +46,8 @@ TRAFFIC_SWITCH_STARTED = "traffic_switch_started"
 TRAFFIC_SWITCH_COMPLETED = "traffic_switch_completed"
 INSTANCE_ACTIVATED = "instance_activated"
 INSTANCE_SERVING = "instance_serving"
+SERVICE_UNAVAILABLE = "service_unavailable"
+SERVICE_AVAILABLE = "service_available"
 
 COMPLETE_VALIDATION_EVIDENCE = (
     "complete_validation_evidence"
@@ -129,6 +131,8 @@ SUPPORTED_PROFILES_BY_SOURCE: dict[
             TRAFFIC_SWITCH_COMPLETED,
             INSTANCE_ACTIVATED,
             INSTANCE_SERVING,
+            SERVICE_UNAVAILABLE,
+            SERVICE_AVAILABLE,
         }
     ),
     SourceDomain.EVIDENCE: frozenset(

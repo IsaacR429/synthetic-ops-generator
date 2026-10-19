@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 from datetime import UTC, datetime
 
 import pytest
@@ -28,6 +28,8 @@ from synthetic_ops_generator.scenarios.profile_contracts import (
     FAILOVER_INITIATED,
     INSTANCE_ACTIVATED,
     INSTANCE_SERVING,
+    SERVICE_AVAILABLE,
+    SERVICE_UNAVAILABLE,
     SUPPORTED_PROFILES_BY_SOURCE,
     TRAFFIC_SWITCH_COMPLETED,
     TRAFFIC_SWITCH_STARTED,
@@ -51,6 +53,8 @@ RESILIENCE_PROFILES = frozenset(
         TRAFFIC_SWITCH_COMPLETED,
         INSTANCE_ACTIVATED,
         INSTANCE_SERVING,
+        SERVICE_UNAVAILABLE,
+        SERVICE_AVAILABLE,
     }
 )
 

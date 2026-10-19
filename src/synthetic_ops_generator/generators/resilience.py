@@ -5,6 +5,8 @@ from synthetic_ops_generator.domain.enums import SourceDomain
 from synthetic_ops_generator.domain.resilience import (
     ResilienceObservation,
     ResilienceObservationType,
+    ServiceAvailabilityObservation,
+    ServiceAvailabilityState,
 )
 from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.generators.base import SourceGenerator
@@ -19,6 +21,8 @@ from synthetic_ops_generator.scenarios.profile_contracts import (
     FAILOVER_INITIATED,
     INSTANCE_ACTIVATED,
     INSTANCE_SERVING,
+    SERVICE_AVAILABLE,
+    SERVICE_UNAVAILABLE,
     TRAFFIC_SWITCH_COMPLETED,
     TRAFFIC_SWITCH_STARTED,
 )
@@ -56,6 +60,16 @@ _INSTANCE_STATE_PROFILES = frozenset(
         INSTANCE_SERVING,
     }
 )
+
+
+_AVAILABILITY_PROFILE_TO_STATE = {
+    SERVICE_UNAVAILABLE: (
+        ServiceAvailabilityState.UNAVAILABLE
+    ),
+    SERVICE_AVAILABLE: (
+        ServiceAvailabilityState.AVAILABLE
+    ),
+}
 
 
 class ResilienceGenerator(SourceGenerator):
@@ -98,8 +112,16 @@ class ResilienceGenerator(SourceGenerator):
         observation_type = _PROFILE_TO_OBSERVATION_TYPE.get(
             profile_id
         )
+        availability_state = (
+            _AVAILABILITY_PROFILE_TO_STATE.get(
+                profile_id
+            )
+        )
 
-        if observation_type is None:
+        if (
+            observation_type is None
+            and availability_state is None
+        ):
             raise ValueError(
                 "Unsupported Resilience behaviour profile: "
                 f"{profile_id}"
@@ -152,6 +174,27 @@ class ResilienceGenerator(SourceGenerator):
                 observed_at=context.simulation_time,
             )
 
+        elif profile_id in _AVAILABILITY_PROFILE_TO_STATE:
+            if self._transition_target is not None:
+                raise ValueError(
+                    "Resilience availability profile "
+                    "cannot use a transition target."
+                )
+
+            observation = ServiceAvailabilityObservation(
+                observation_id=(
+                    self._ids.resilience_observation_id()
+                ),
+                availability_state=availability_state,
+                service=context.service,
+                component=context.component,
+                site_id=context.site_id,
+                service_instance_id=(
+                    context.service_instance_id
+                ),
+                observed_at=context.simulation_time,
+            )
+
         else:
             raise ValueError(
                 "Unsupported Resilience behaviour profile: "
@@ -175,7 +218,12 @@ class ResilienceGenerator(SourceGenerator):
             service_instance_id=context.service_instance_id,
             sequence_number=context.next_sequence(),
             data={
-                "resilience_observation": (
+                (
+                    "service_availability_observation"
+                    if profile_id
+                    in _AVAILABILITY_PROFILE_TO_STATE
+                    else "resilience_observation"
+                ): (
                     observation.model_dump(
                         mode="json"
                     )
