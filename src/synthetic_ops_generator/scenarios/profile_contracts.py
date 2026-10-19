@@ -48,6 +48,7 @@ INSTANCE_ACTIVATED = "instance_activated"
 INSTANCE_SERVING = "instance_serving"
 SERVICE_UNAVAILABLE = "service_unavailable"
 SERVICE_AVAILABLE = "service_available"
+REPLICATION_OBSERVED = "replication_observed"
 
 COMPLETE_VALIDATION_EVIDENCE = (
     "complete_validation_evidence"
@@ -133,6 +134,7 @@ SUPPORTED_PROFILES_BY_SOURCE: dict[
             INSTANCE_SERVING,
             SERVICE_UNAVAILABLE,
             SERVICE_AVAILABLE,
+            REPLICATION_OBSERVED,
         }
     ),
     SourceDomain.EVIDENCE: frozenset(

@@ -1,8 +1,10 @@
 from collections.abc import AsyncIterator
+from datetime import timedelta
 
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.domain.enums import SourceDomain
 from synthetic_ops_generator.domain.resilience import (
+    ReplicationObservation,
     ResilienceObservation,
     ResilienceObservationType,
     ServiceAvailabilityObservation,
@@ -21,6 +23,7 @@ from synthetic_ops_generator.scenarios.profile_contracts import (
     FAILOVER_INITIATED,
     INSTANCE_ACTIVATED,
     INSTANCE_SERVING,
+    REPLICATION_OBSERVED,
     SERVICE_AVAILABLE,
     SERVICE_UNAVAILABLE,
     TRAFFIC_SWITCH_COMPLETED,
@@ -89,6 +92,7 @@ class ResilienceGenerator(SourceGenerator):
         ids: IdFactory,
         behaviour: ScenarioBehaviour,
         transition_target: ScenarioExecutionTarget | None = None,
+        replication_target: ScenarioExecutionTarget | None = None,
     ) -> None:
         if behaviour.source != SourceDomain.RESILIENCE:
             raise ValueError(
@@ -99,6 +103,7 @@ class ResilienceGenerator(SourceGenerator):
         self._ids = ids
         self._behaviour = behaviour
         self._transition_target = transition_target
+        self._replication_target = replication_target
 
     async def generate(
         self,
@@ -118,9 +123,14 @@ class ResilienceGenerator(SourceGenerator):
             )
         )
 
+        is_replication_profile = (
+            profile_id == REPLICATION_OBSERVED
+        )
+
         if (
             observation_type is None
             and availability_state is None
+            and not is_replication_profile
         ):
             raise ValueError(
                 "Unsupported Resilience behaviour profile: "
@@ -195,6 +205,62 @@ class ResilienceGenerator(SourceGenerator):
                 observed_at=context.simulation_time,
             )
 
+        elif is_replication_profile:
+            if self._behaviour.resilience_replication is None:
+                raise ValueError(
+                    "Resilience replication profile requires "
+                    "replication configuration."
+                )
+
+            if self._replication_target is None:
+                raise ValueError(
+                    "Resilience replication profile requires "
+                    "a replication target."
+                )
+
+            if self._transition_target is not None:
+                raise ValueError(
+                    "Resilience replication profile cannot use "
+                    "a transition target."
+                )
+
+            offset_seconds = (
+                self._behaviour.resilience_replication
+                .last_successful_replication_offset_seconds
+            )
+
+            last_successful_replication_at = (
+                context.simulation_time
+                - timedelta(seconds=offset_seconds)
+                if offset_seconds is not None
+                else None
+            )
+
+            observation = ReplicationObservation(
+                observation_id=(
+                    self._ids.resilience_observation_id()
+                ),
+                service=context.service,
+                component=context.component,
+                from_site_id=context.site_id,
+                from_service_instance_id=(
+                    context.service_instance_id
+                ),
+                to_site_id=self._replication_target.site_id,
+                to_service_instance_id=(
+                    self._replication_target
+                    .service_instance_id
+                ),
+                replication_status=(
+                    self._behaviour.resilience_replication
+                    .replication_status
+                ),
+                last_successful_replication_at=(
+                    last_successful_replication_at
+                ),
+                observed_at=context.simulation_time,
+            )
+
         else:
             raise ValueError(
                 "Unsupported Resilience behaviour profile: "
@@ -222,7 +288,11 @@ class ResilienceGenerator(SourceGenerator):
                     "service_availability_observation"
                     if profile_id
                     in _AVAILABILITY_PROFILE_TO_STATE
-                    else "resilience_observation"
+                    else (
+                        "replication_observation"
+                        if is_replication_profile
+                        else "resilience_observation"
+                    )
                 ): (
                     observation.model_dump(
                         mode="json"

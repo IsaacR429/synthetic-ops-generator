@@ -19,3 +19,7 @@ class SourceExecutionBinding:
     resilience_transition_target: (
         ScenarioExecutionTarget | None
     ) = None
+
+    resilience_replication_target: (
+        ScenarioExecutionTarget | None
+    ) = None

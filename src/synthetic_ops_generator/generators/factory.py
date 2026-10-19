@@ -89,6 +89,9 @@ class GeneratorFactory:
         resilience_transition_target: (
             ScenarioExecutionTarget | None
         ) = None,
+        resilience_replication_target: (
+            ScenarioExecutionTarget | None
+        ) = None,
     ) -> list[SourceGenerator]:
         generators: list[SourceGenerator] = []
 
@@ -291,6 +294,9 @@ class GeneratorFactory:
                         transition_target=(
                             resilience_transition_target
                         ),
+                        replication_target=(
+                            resilience_replication_target
+                        ),
                     )
                 )
 
@@ -343,6 +349,9 @@ class GeneratorFactory:
                 resilience_transition_target=(
                     entry.resilience_transition_target
                 ),
+                resilience_replication_target=(
+                    entry.resilience_replication_target
+                ),
             )
 
             if len(generators) != 1:
@@ -358,6 +367,9 @@ class GeneratorFactory:
                     execution_target=entry.execution_target,
                     resilience_transition_target=(
                         entry.resilience_transition_target
+                    ),
+                    resilience_replication_target=(
+                        entry.resilience_replication_target
                     ),
                 )
             )
