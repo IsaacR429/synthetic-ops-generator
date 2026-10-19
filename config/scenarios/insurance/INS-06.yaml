@@ -1,0 +1,316 @@
+scenario_id: INS-06
+
+name: Claims Platform Disaster Recovery
+
+description: >
+  Simulates loss of the primary Insurer Alpha Claims API Service Instance.
+  Operational evidence records explicit primary unavailability, degraded
+  replication state, failover initiation, traffic switching to the secondary
+  Service Instance, secondary activation, availability and serving state, and
+  subsequent recovery of the primary Service Instance. Generated source events
+  describe observed facts only; actual data loss, RTO/RPO compliance, DR
+  success and residual-risk interpretation remain outside StreamOps.
+
+family: resilience_dr
+
+industry: insurance
+
+target:
+  enterprise_id: insurer_alpha
+  business_stream_id: claims
+  service_id: claims_service
+
+  component_ids:
+    - claims_api
+    - claims_database
+
+  environment: production
+
+correlation:
+  change_required: false
+
+risk: high
+
+initial_conditions:
+  - Claims Service is operating normally.
+  - The primary Claims API Service Instance is healthy and serving claims intake traffic.
+  - The secondary Claims API Service Instance is available for resilience operations.
+  - Required Claims API infrastructure validations are active.
+  - Claims Service baseline and benchmark configuration is valid.
+  - No production Change is associated with the failover event.
+
+trigger:
+  source: infrastructure_test
+  trigger_type: primary_claims_api_unavailable
+  description: >
+    Required infrastructure validation detects loss of availability on the
+    primary Claims API Service Instance, disrupting claims intake.
+
+state_sequence:
+  - initialising
+  - normal
+  - degraded
+  - failure
+  - remediation
+  - recovery
+  - completed
+
+behaviours:
+  - source: metric
+    behaviour_id: metric_normal_healthy_baseline_at_claims_api_primary
+    during_state: normal
+    profile_id: healthy_baseline
+    execution_node_id: claims_api_primary
+    description: >
+      The primary Claims API begins from healthy Claims Service operating
+      conditions.
+
+  - source: infrastructure_test
+    behaviour_id: infrastructure_test_normal_all_required_checks_pass_at_claims_api_primary
+    during_state: normal
+    profile_id: all_required_checks_pass
+    execution_node_id: claims_api_primary
+    description: >
+      Required infrastructure validation confirms that the primary Claims API
+      Service Instance is initially healthy.
+
+  - source: metric
+    behaviour_id: metric_degraded_operational_degradation_at_claims_api_primary
+    during_state: degraded
+    profile_id: operational_degradation
+    execution_node_id: claims_api_primary
+    description: >
+      Claims Service telemetry records degraded operational conditions as the
+      primary Claims API loses availability.
+
+  - source: infrastructure_test
+    behaviour_id: infrastructure_test_failure_required_check_failed_at_claims_api_primary
+    during_state: failure
+    profile_id: required_check_failed
+    execution_node_id: claims_api_primary
+    description: >
+      Required infrastructure validation detects that the primary Claims API
+      Service Instance is unavailable.
+
+  - source: resilience
+    behaviour_id: resilience_failure_service_unavailable_at_claims_api_primary
+    during_state: failure
+    profile_id: service_unavailable
+    execution_node_id: claims_api_primary
+    continuous: false
+    description: >
+      A factual availability observation records that the primary Claims API
+      Service Instance is unavailable and claims intake is disrupted.
+
+  - source: resilience
+    behaviour_id: resilience_failure_replication_observed_at_claims_api_primary_to_claims_api_secondary
+    during_state: failure
+    profile_id: replication_observed
+    execution_node_id: claims_api_primary
+    continuous: false
+    resilience_replication:
+      to_execution_node_id: claims_api_secondary
+      replication_status: lagging
+      last_successful_replication_offset_seconds: 120
+    description: >
+      A factual replication observation records lagging replication from the
+      primary Claims API Service Instance toward the configured secondary
+      Service Instance. The last successful replication timestamp is
+      reconstructed as 120 seconds before this observation. This is source
+      evidence only and does not itself determine actual data loss or RPO
+      compliance.
+
+  - source: log
+    behaviour_id: log_failure_degradation_error_logs_at_claims_api_primary
+    during_state: failure
+    profile_id: degradation_error_logs
+    execution_node_id: claims_api_primary
+    description: >
+      Primary Claims API logs expose failed claims-intake requests and degraded
+      processing associated with the unavailable Service Instance.
+
+  - source: resilience
+    behaviour_id: resilience_remediation_failover_initiated_at_claims_api_primary_to_claims_api_secondary
+    during_state: remediation
+    profile_id: failover_initiated
+    execution_node_id: claims_api_primary
+    continuous: false
+    resilience_transition:
+      to_execution_node_id: claims_api_secondary
+    description: >
+      A factual resilience observation records initiation of failover from the
+      primary Claims API Service Instance toward the configured secondary
+      Service Instance.
+
+  - source: resilience
+    behaviour_id: resilience_remediation_traffic_switch_started_at_claims_api_primary_to_claims_api_secondary
+    during_state: remediation
+    profile_id: traffic_switch_started
+    execution_node_id: claims_api_primary
+    continuous: false
+    resilience_transition:
+      to_execution_node_id: claims_api_secondary
+    description: >
+      Claims intake traffic begins switching from the primary Claims API
+      Service Instance toward the secondary Service Instance.
+
+  - source: resilience
+    behaviour_id: resilience_remediation_traffic_switch_completed_at_claims_api_primary_to_claims_api_secondary
+    during_state: remediation
+    profile_id: traffic_switch_completed
+    execution_node_id: claims_api_primary
+    continuous: false
+    resilience_transition:
+      to_execution_node_id: claims_api_secondary
+    description: >
+      Claims intake traffic switching from the primary Claims API Service
+      Instance to the configured secondary Service Instance completes.
+
+  - source: resilience
+    behaviour_id: resilience_remediation_instance_activated_at_claims_api_secondary
+    during_state: remediation
+    profile_id: instance_activated
+    execution_node_id: claims_api_secondary
+    continuous: false
+    description: >
+      The secondary Claims API Service Instance is observed in an activated
+      state.
+
+  - source: resilience
+    behaviour_id: resilience_remediation_service_available_at_claims_api_secondary
+    during_state: remediation
+    profile_id: service_available
+    execution_node_id: claims_api_secondary
+    continuous: false
+    description: >
+      A factual availability observation records that the secondary Claims API
+      Service Instance is available. Availability alone does not prove that
+      claims intake traffic is being served.
+
+  - source: resilience
+    behaviour_id: resilience_remediation_instance_serving_at_claims_api_secondary
+    during_state: remediation
+    profile_id: instance_serving
+    execution_node_id: claims_api_secondary
+    continuous: false
+    description: >
+      The secondary Claims API Service Instance is observed serving production
+      claims intake traffic.
+
+  - source: resilience
+    behaviour_id: resilience_recovery_service_available_at_claims_api_primary
+    during_state: recovery
+    profile_id: service_available
+    execution_node_id: claims_api_primary
+    continuous: false
+    description: >
+      A factual availability observation records that the original primary
+      Claims API Service Instance is available again. This does not imply that
+      claims traffic failed back to the primary.
+
+  - source: infrastructure_test
+    behaviour_id: infrastructure_test_recovery_all_required_checks_pass_at_claims_api_primary
+    during_state: recovery
+    profile_id: all_required_checks_pass
+    execution_node_id: claims_api_primary
+    description: >
+      Required infrastructure validation observes recovery of the primary
+      Claims API Service Instance.
+
+  - source: metric
+    behaviour_id: metric_recovery_operational_recovery_at_claims_api_primary
+    during_state: recovery
+    profile_id: operational_recovery
+    execution_node_id: claims_api_primary
+    description: >
+      Primary Claims API operational telemetry returns to healthy reference
+      conditions after the original availability loss.
+
+  - source: metric
+    behaviour_id: metric_recovery_operational_recovery_at_claims_api_secondary
+    during_state: recovery
+    profile_id: operational_recovery
+    execution_node_id: claims_api_secondary
+    continuous: true
+    description: >
+      Secondary Claims API telemetry remains within healthy operational
+      reference conditions while claims intake continues on the secondary
+      Service Instance.
+
+  - source: log
+    behaviour_id: log_recovery_recovery_operational_logs_at_claims_api_secondary
+    during_state: recovery
+    profile_id: recovery_operational_logs
+    execution_node_id: claims_api_secondary
+    continuous: true
+    description: >
+      Secondary Claims API logs record restored and stable claims processing
+      while the secondary Service Instance remains the serving placement.
+
+expected_result:
+  scenario_id: INS-06
+
+  expected_outcome: successful
+
+  expected_blocking_conditions:
+    - primary_claims_api_unavailable
+
+  expected_evidence:
+    - primary_claims_api_healthy_baseline
+    - primary_claims_api_failure
+    - primary_claims_api_unavailable
+    - primary_to_secondary_claims_replication_lag
+    - claims_service_degradation
+    - claims_failover_initiated
+    - claims_traffic_switch_started
+    - claims_traffic_switch_completed
+    - secondary_claims_api_activated
+    - secondary_claims_api_available
+    - secondary_claims_api_serving
+    - claims_intake_restored
+    - primary_claims_api_recovered
+    - primary_claims_api_available_after_recovery
+    - secondary_claims_api_recovery_metrics
+    - secondary_claims_api_recovery_logs
+
+  expected_incident_attribution: false
+
+  expected_root_cause: claims_api_primary
+
+  expected_insight: >
+    The primary Claims API Service Instance became unavailable and replication
+    toward the configured secondary Service Instance was observed lagging.
+    Explicit failover and traffic-switch observations were followed by
+    activation, availability and serving observations from the secondary
+    Claims API Service Instance, restoring claims intake. The primary Claims
+    API subsequently became available again. These are factual observations
+    only; no actual data-loss, RTO, RPO or DR-success conclusion is generated,
+    and no failback observation is produced.
+
+assumptions:
+  - Required insurer enterprise, site and Service Instance references exist.
+  - Primary and secondary Claims API Service Instances represent distinct physical execution identities.
+  - The failover destination is explicitly configured and is not inferred from site role.
+  - Primary-instance failure does not by itself prove that failover occurred.
+  - Secondary activation does not by itself prove that claims intake is being served.
+  - Secondary availability does not by itself prove that claims intake is being served.
+  - Secondary serving is represented by an explicit factual resilience observation.
+  - Replication status and last-successful-replication time are factual source observations and do not by themselves determine actual data loss or RPO compliance.
+  - Primary recovery availability does not imply that traffic failed back to the primary Claims API Service Instance.
+  - Resilience observations remain bounded and are not scheduled continuously.
+  - Continuous recovery telemetry may continue from the secondary Claims API Service Instance.
+  - DR success, RTO/RPO compliance, resilience adequacy and residual risk are not generated as StreamOps source facts.
+  - No production Change identifier is generated for this Scenario.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - insurance
+  - claims
+  - resilience
+  - disaster_recovery
+  - failover
+  - service_instance
+  - site_failover
+  - claims_intake
+  - recovery
+  - no_change

@@ -116,6 +116,7 @@ def test_list_scenarios_returns_catalogue(
         "BANK-07",
         "INS-01",
         "INS-02",
+        "INS-06",
     ]
 
     assert (
