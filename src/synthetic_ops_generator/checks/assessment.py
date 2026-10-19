@@ -14,6 +14,10 @@ from synthetic_ops_generator.domain.operational_test import (
 from synthetic_ops_generator.reporting.evidence_row import (
     RunEvidenceRow,
 )
+from synthetic_ops_generator.temporal.eligibility import (
+    TemporalWindow,
+    assess_temporal_eligibility,
+)
 
 
 class RequirementAssessmentStatus(StrEnum):
@@ -166,6 +170,7 @@ def assess_check_requirement(
     requirement: CheckRequirement,
     scope: RequirementEvidenceScope,
     evidence_rows: Iterable[RunEvidenceRow],
+    temporal_window: TemporalWindow | None = None,
 ) -> RequirementAssessment:
     """
     Compare one operational check requirement with observed evidence.
@@ -178,8 +183,15 @@ def assess_check_requirement(
       4. evidence exists but cannot satisfy evaluation semantics
          -> INSUFFICIENT
 
-    Input ordering is preserved for audit lineage. This function does
-    not implement latest-attempt semantics or temporal validity.
+    Input ordering is preserved for audit lineage.
+
+    When temporal_window is supplied, only accepted executed evidence
+    inside that window may satisfy or fail the requirement. Scoped
+    evidence outside the window remains matched audit evidence and
+    therefore leads to INSUFFICIENT rather than MISSING when no
+    temporally eligible execution exists.
+
+    Latest-attempt semantics remain outside this assessment.
     """
 
     matched = tuple(
@@ -230,6 +242,17 @@ def assess_check_requirement(
             or status not in accepted_statuses
         ):
             continue
+
+        if temporal_window is not None:
+            temporal_eligibility = (
+                assess_temporal_eligibility(
+                    observed_at=row.event_time,
+                    window=temporal_window,
+                )
+            )
+
+            if not temporal_eligibility.is_eligible:
+                continue
 
         result = _result(
             row.operational_test_result
