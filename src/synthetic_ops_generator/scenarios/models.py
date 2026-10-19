@@ -123,6 +123,25 @@ class ScenarioMetricSelection(BaseModel):
         return self
 
 
+class ScenarioCheckSelection(BaseModel):
+    check_definition_ids: list[str] = Field(
+        min_length=1,
+    )
+
+    @model_validator(mode="after")
+    def validate_unique_check_definition_ids(
+        self,
+    ) -> "ScenarioCheckSelection":
+        if len(self.check_definition_ids) != len(
+            set(self.check_definition_ids)
+        ):
+            raise ValueError(
+                "Check selection cannot contain duplicate IDs."
+            )
+
+        return self
+
+
 class ScenarioBehaviour(BaseModel):
     behaviour_id: ScenarioBehaviourId
 

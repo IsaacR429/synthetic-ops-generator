@@ -133,6 +133,45 @@ INFRASTRUCTURE_DEPENDENCY_CONNECTIVITY = CheckDefinition(
 )
 
 
+
+INFRASTRUCTURE_DNS_RESOLUTION = CheckDefinition(
+    check_definition_id="infrastructure.dns_resolution",
+    category=TestCategory.INFRASTRUCTURE,
+    test_type="dns_resolution",
+    name="DNS resolution validation",
+    description=(
+        "Validate that an applicable service endpoint can be "
+        "resolved through the expected DNS path."
+    ),
+    applicability=CheckApplicability(
+        service_classes={
+            ServiceClass.BUSINESS_APPLICATION,
+            ServiceClass.BUSINESS_SERVICE,
+            ServiceClass.INFRASTRUCTURE_SERVICE,
+        },
+    ),
+)
+
+
+INFRASTRUCTURE_CERTIFICATE_VALIDATION = CheckDefinition(
+    check_definition_id="infrastructure.certificate_validation",
+    category=TestCategory.INFRASTRUCTURE,
+    test_type="certificate_validation",
+    name="Certificate validation",
+    description=(
+        "Validate the certificate presented by an applicable "
+        "service endpoint before operational use."
+    ),
+    applicability=CheckApplicability(
+        service_classes={
+            ServiceClass.BUSINESS_APPLICATION,
+            ServiceClass.BUSINESS_SERVICE,
+            ServiceClass.INFRASTRUCTURE_SERVICE,
+        },
+    ),
+)
+
+
 DEFAULT_APPLICATION_CHECKS = (
     CheckExecutionSpec(
         definition=APPLICATION_FUNCTIONAL_VALIDATION,
