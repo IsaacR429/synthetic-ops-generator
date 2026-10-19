@@ -168,3 +168,135 @@ class ResilienceObservation(BaseModel):
                 )
 
         return self
+
+class ServiceAvailabilityState(StrEnum):
+    """
+    Factual observed availability state for one concrete
+    service instance.
+    """
+
+    AVAILABLE = "available"
+    UNAVAILABLE = "unavailable"
+
+
+class ServiceAvailabilityObservation(BaseModel):
+    """
+    Factual availability observation for one service instance.
+
+    AVAILABLE does not imply that recovery objectives were met.
+    UNAVAILABLE does not determine cause, severity, or DR outcome.
+    """
+
+    observation_id: str = Field(min_length=1)
+
+    availability_state: ServiceAvailabilityState
+
+    service: str = Field(min_length=1)
+    component: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+    site_id: str = Field(min_length=1)
+    service_instance_id: str = Field(min_length=1)
+
+    observed_at: datetime
+
+    @field_validator("observed_at")
+    @classmethod
+    def validate_observed_at(
+        cls,
+        value: datetime,
+    ) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError(
+                "Service availability observation timestamps "
+                "must be timezone-aware."
+            )
+
+        return value
+
+
+class ReplicationStatus(StrEnum):
+    """
+    Factual observed replication state.
+    """
+
+    SYNCHRONIZED = "synchronized"
+    LAGGING = "lagging"
+    STOPPED = "stopped"
+    UNKNOWN = "unknown"
+
+
+class ReplicationObservation(BaseModel):
+    """
+    Factual replication observation between two service instances.
+
+    This model records observed replication state and, when known,
+    the most recent successful replication timestamp. It does not
+    determine RPO compliance, DR success, or residual risk.
+    """
+
+    observation_id: str = Field(min_length=1)
+
+    service: str = Field(min_length=1)
+    component: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+    from_site_id: str = Field(min_length=1)
+    from_service_instance_id: str = Field(min_length=1)
+
+    to_site_id: str = Field(min_length=1)
+    to_service_instance_id: str = Field(min_length=1)
+
+    replication_status: ReplicationStatus
+
+    last_successful_replication_at: datetime | None = None
+    observed_at: datetime
+
+    @field_validator(
+        "last_successful_replication_at",
+        "observed_at",
+    )
+    @classmethod
+    def validate_timestamps(
+        cls,
+        value: datetime | None,
+    ) -> datetime | None:
+        if value is None:
+            return None
+
+        if value.tzinfo is None:
+            raise ValueError(
+                "Replication observation timestamps "
+                "must be timezone-aware."
+            )
+
+        return value
+
+    @model_validator(mode="after")
+    def validate_replication_observation(
+        self,
+    ) -> "ReplicationObservation":
+        if (
+            self.from_service_instance_id
+            == self.to_service_instance_id
+        ):
+            raise ValueError(
+                "Replication source and destination "
+                "instances must differ."
+            )
+
+        if (
+            self.last_successful_replication_at is not None
+            and self.last_successful_replication_at
+            > self.observed_at
+        ):
+            raise ValueError(
+                "Last successful replication timestamp "
+                "cannot be after observation timestamp."
+            )
+
+        return self
