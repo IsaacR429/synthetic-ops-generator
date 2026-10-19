@@ -36,23 +36,30 @@ class ScenarioExecutionPlanEntry:
         ScenarioExecutionTarget | None
     ) = None
 
+    resilience_replication_target: (
+        ScenarioExecutionTarget | None
+    ) = None
+
 
 @dataclass(frozen=True)
 class ScenarioExecutionPlan:
     entries: tuple[ScenarioExecutionPlanEntry, ...]
 
 
-def _validate_resilience_transition_targets(
+def _validate_resilience_peer_targets(
     *,
     source: ScenarioExecutionTarget,
     destination: ScenarioExecutionTarget,
+    relationship_name: str,
 ) -> None:
+    label = f"Resilience {relationship_name}"
+
     if (
         source.service_instance_id is None
         or source.site_id is None
     ):
         raise ScenarioExecutionPlanningError(
-            "Resilience transition source must resolve to "
+            f"{label} source must resolve to "
             "a Service Instance execution target."
         )
 
@@ -61,7 +68,7 @@ def _validate_resilience_transition_targets(
         or destination.site_id is None
     ):
         raise ScenarioExecutionPlanningError(
-            "Resilience transition destination must resolve to "
+            f"{label} destination must resolve to "
             "a Service Instance execution target."
         )
 
@@ -70,20 +77,20 @@ def _validate_resilience_transition_targets(
         == destination.service_instance_id
     ):
         raise ScenarioExecutionPlanningError(
-            "Resilience transition source and destination "
+            f"{label} source and destination "
             "instances must differ."
         )
 
     if source.service != destination.service:
         raise ScenarioExecutionPlanningError(
-            "Resilience transition source and destination "
+            f"{label} source and destination "
             "must belong to the same Service: "
             f"{source.service} != {destination.service}."
         )
 
     if source.component != destination.component:
         raise ScenarioExecutionPlanningError(
-            "Resilience transition source and destination "
+            f"{label} source and destination "
             "must reference the same Component: "
             f"{source.component} != {destination.component}."
         )
@@ -129,6 +136,7 @@ def build_scenario_execution_plan(
             )
 
             resilience_transition_target = None
+            resilience_replication_target = None
 
             if behaviour.resilience_transition is not None:
                 resilience_transition_target = (
@@ -144,9 +152,30 @@ def build_scenario_execution_plan(
                     )
                 )
 
-                _validate_resilience_transition_targets(
+                _validate_resilience_peer_targets(
                     source=target,
                     destination=resilience_transition_target,
+                    relationship_name="transition",
+                )
+
+            if behaviour.resilience_replication is not None:
+                resilience_replication_target = (
+                    resolve_scenario_execution_target(
+                        topology=topology,
+                        node_id=(
+                            behaviour.resilience_replication
+                            .to_execution_node_id
+                        ),
+                        environment=(
+                            scenario.target.environment
+                        ),
+                    )
+                )
+
+                _validate_resilience_peer_targets(
+                    source=target,
+                    destination=resilience_replication_target,
+                    relationship_name="replication",
                 )
 
         except (
@@ -163,6 +192,9 @@ def build_scenario_execution_plan(
                 execution_target=target,
                 resilience_transition_target=(
                     resilience_transition_target
+                ),
+                resilience_replication_target=(
+                    resilience_replication_target
                 ),
             )
         )

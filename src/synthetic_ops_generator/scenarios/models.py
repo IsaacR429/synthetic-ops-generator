@@ -15,6 +15,9 @@ from synthetic_ops_generator.domain.enums import (
     RiskLevel,
     SourceDomain,
 )
+from synthetic_ops_generator.domain.resilience import (
+    ReplicationStatus,
+)
 from synthetic_ops_generator.oracle.models import ExpectedScenarioResult
 from synthetic_ops_generator.scenarios.continuous_contract import (
     supports_continuous_execution,
@@ -86,6 +89,19 @@ class ScenarioResilienceTransition(BaseModel):
     to_execution_node_id: ScenarioExecutionNodeId
 
 
+class ScenarioResilienceReplication(BaseModel):
+    to_execution_node_id: ScenarioExecutionNodeId
+
+    replication_status: ReplicationStatus
+
+    last_successful_replication_offset_seconds: (
+        float | None
+    ) = Field(
+        default=None,
+        ge=0,
+    )
+
+
 class ScenarioMetricSelection(BaseModel):
     metric_ids: list[ScenarioMetricId] | None = Field(
         default=None,
@@ -128,6 +144,10 @@ class ScenarioBehaviour(BaseModel):
         ScenarioResilienceTransition | None
     ) = None
 
+    resilience_replication: (
+        ScenarioResilienceReplication | None
+    ) = None
+
     @model_validator(mode="after")
     def validate_selection_source(
         self,
@@ -153,6 +173,28 @@ class ScenarioBehaviour(BaseModel):
                     "Resilience transition requires "
                     "execution_node_id."
                 )
+
+        if self.resilience_replication is not None:
+            if self.source != SourceDomain.RESILIENCE:
+                raise ValueError(
+                    "Resilience replication is only valid "
+                    "for Resilience behaviour."
+                )
+
+            if self.execution_node_id is None:
+                raise ValueError(
+                    "Resilience replication requires "
+                    "execution_node_id."
+                )
+
+        if (
+            self.resilience_transition is not None
+            and self.resilience_replication is not None
+        ):
+            raise ValueError(
+                "Resilience transition and replication "
+                "cannot be configured together."
+            )
 
         if (
             self.continuous
