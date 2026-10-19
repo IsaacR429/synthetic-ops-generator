@@ -1,0 +1,61 @@
+sources:
+  bank_dr_standard:
+    source_id: bank_dr_standard
+    source_type: enterprise_slo
+    source_name: Bank Alpha Disaster Recovery Standard
+    source_reference: "enterprise://bank_alpha/dr-standard"
+    version: "2026.1"
+    retrieved_on: 2026-10-01
+    rationale: >
+      Approved enterprise recovery objectives for critical
+      Bank Alpha production services.
+
+  insurer_dr_standard:
+    source_id: insurer_dr_standard
+    source_type: enterprise_slo
+    source_name: Insurer Alpha Disaster Recovery Standard
+    source_reference: "enterprise://insurer_alpha/dr-standard"
+    version: "2026.1"
+    retrieved_on: 2026-10-01
+    rationale: >
+      Approved enterprise recovery objectives for critical
+      Insurer Alpha production services.
+
+objectives:
+  RO-BANK-PAYMENTS-PROD:
+    objective_id: RO-BANK-PAYMENTS-PROD
+    scope:
+      enterprise_id: bank_alpha
+      service: payment_service
+      component: payment_api
+      environment: production
+
+    rto_target_seconds: 300
+    rpo_target_seconds: 120
+
+    provenance_source_id: bank_dr_standard
+
+    effective_from: 2026-01-01
+
+    description: >
+      Production recovery objectives for the Bank Alpha
+      Payment API.
+
+  RO-INS-CLAIMS-PROD:
+    objective_id: RO-INS-CLAIMS-PROD
+    scope:
+      enterprise_id: insurer_alpha
+      service: claims_service
+      component: claims_api
+      environment: production
+
+    rto_target_seconds: 600
+    rpo_target_seconds: 300
+
+    provenance_source_id: insurer_dr_standard
+
+    effective_from: 2026-01-01
+
+    description: >
+      Production recovery objectives for the Insurer Alpha
+      Claims API.
