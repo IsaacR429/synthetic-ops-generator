@@ -20,6 +20,7 @@ services:
     mission_criticality: mission_critical
     workload_class: interactive_transactional
     benchmark_profile_id: critical_interactive_transaction
+    baseline_profile_id: claims_payment_nominal
 
   - service_id: broker_portal
     name: Broker Portal

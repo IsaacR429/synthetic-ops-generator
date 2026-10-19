@@ -80,6 +80,24 @@ profiles:
           - aws_availability_design_goals
 
 
+
+      queue_depth:
+        metric_definition_id: queue_depth
+        reference_target: 20
+        warning_threshold: 50
+        blocking_threshold: 100
+        provenance:
+            source_id: synthetic_metric_policy_v1
+            source_type: synthetic_reference
+            source_name: Synthetic Ops Generator Metric Policy
+            source_reference: internal:metric-policy-v1
+            version: "1.0"
+            rationale: >
+              Synthetic queue-depth thresholds selected to create clearly
+              distinguishable nominal, warning and blocking operating regions
+              for critical interactive transactional services. These values
+              are configurable simulation policy and are not asserted as a
+              universal Banking or Insurance standard.
   business_critical_interactive:
     profile_id: business_critical_interactive
     name: Business Critical Interactive

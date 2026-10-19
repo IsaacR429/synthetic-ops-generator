@@ -1,0 +1,34 @@
+profile_id: claims_payment_nominal
+name: Claims Payment Nominal Baseline
+
+historical_window_minutes: 30
+sample_interval_seconds: 300
+
+metrics:
+  request_latency:
+    metric_definition_id: request_latency
+    center: 220
+    noise_stddev: 20
+    lower_bound: 120
+    upper_bound: 300
+
+  error_rate:
+    metric_definition_id: error_rate
+    center: 0.05
+    noise_stddev: 0.02
+    lower_bound: 0.0
+    upper_bound: 0.2
+
+  availability:
+    metric_definition_id: availability
+    center: 99.995
+    noise_stddev: 0.002
+    lower_bound: 99.99
+    upper_bound: 100.0
+
+  queue_depth:
+    metric_definition_id: queue_depth
+    center: 10
+    noise_stddev: 3
+    lower_bound: 0
+    upper_bound: 25

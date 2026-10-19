@@ -39,3 +39,14 @@ definitions:
     evaluation_statistic: rate
     direction: context_dependent
     aggregation_window_seconds: 60
+
+  queue_depth:
+    metric_definition_id: queue_depth
+    name: Queue Depth
+    description: >
+      Number of queued work items waiting for processing at
+      observation time.
+    unit: items
+    evaluation_statistic: gauge
+    direction: lower_is_better
+    aggregation_window_seconds: 60
