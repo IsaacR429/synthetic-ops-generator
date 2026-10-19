@@ -1,0 +1,198 @@
+scenario_id: INS-04
+
+name: Claims Payment Dependency Failure
+
+description: >
+  Simulates an operational degradation in the Insurer Alpha Claims
+  Payment dependency while Claims Processing itself remains healthy.
+  Claims Payment latency increases, its processing queue grows, and
+  the Claims API records downstream timeout and dependency-error
+  symptoms. Generated source events remain factual observations;
+  root-cause attribution remains isolated in the Test Oracle.
+
+family: root_cause_analysis
+
+industry: insurance
+
+target:
+  enterprise_id: insurer_alpha
+  business_stream_id: claims
+  service_id: claims_service
+
+  component_ids:
+    - claims_api
+
+  environment: production
+
+correlation:
+  change_required: false
+
+risk: high
+
+initial_conditions:
+  - Claims Processing is operating normally.
+  - Claims API request processing is healthy.
+  - Claims Payment is operating within its nominal baseline.
+  - The Claims Processing to Claims Payment dependency exists in enterprise topology.
+  - No production Change is associated with the degradation.
+  - Claims Payment metric baseline and benchmark configuration is valid.
+  - Operational metric and log monitoring are active.
+
+trigger:
+  source: metric
+
+  trigger_type: claims_payment_dependency_degradation
+
+  description: >
+    Claims Payment begins to exhibit increasing latency and queue
+    accumulation while Claims Processing remains operational.
+
+state_sequence:
+  - initialising
+  - normal
+  - warning
+  - degraded
+  - recovery
+  - completed
+
+behaviours:
+  - source: metric
+    behaviour_id: metric_normal_claims_processing_healthy
+    during_state: normal
+    profile_id: healthy_baseline
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Claims Processing begins from healthy operational conditions.
+
+  - source: metric
+    behaviour_id: metric_warning_claims_payment_warning
+    during_state: warning
+    profile_id: operational_warning
+    execution_node_id: claims_payment_api
+    selection:
+      metric_ids:
+        - request_latency
+        - queue_depth
+    description: >
+      Claims Payment latency and queue depth enter warning operating
+      conditions while the upstream Claims Processing service remains
+      available.
+
+  - source: metric
+    behaviour_id: metric_degraded_claims_processing_healthy
+    during_state: degraded
+    profile_id: healthy_baseline
+    selection:
+      metric_ids:
+        - request_latency
+        - error_rate
+        - availability
+    description: >
+      Claims Processing continues to exhibit healthy service-level
+      telemetry despite the downstream payment dependency problem.
+
+  - source: metric
+    behaviour_id: metric_degraded_claims_payment_degradation
+    during_state: degraded
+    profile_id: operational_degradation
+    execution_node_id: claims_payment_api
+    selection:
+      metric_ids:
+        - request_latency
+        - queue_depth
+    description: >
+      Claims Payment latency and queue depth reach blocking operational
+      conditions as payment processing becomes delayed.
+
+  - source: log
+    behaviour_id: log_degraded_claims_api_dependency_errors
+    during_state: degraded
+    profile_id: degradation_error_logs
+    execution_node_id: claims_api
+    description: >
+      Claims API logs record request timeouts and downstream dependency
+      errors while Claims Payment is degraded.
+
+  - source: metric
+    behaviour_id: metric_recovery_claims_payment_recovery
+    during_state: recovery
+    profile_id: operational_recovery
+    execution_node_id: claims_payment_api
+    selection:
+      metric_ids:
+        - request_latency
+        - queue_depth
+    description: >
+      Claims Payment latency and queue depth return to normal reference
+      conditions after the dependency degradation clears.
+
+  - source: log
+    behaviour_id: log_recovery_claims_api_dependency_recovery
+    during_state: recovery
+    profile_id: recovery_operational_logs
+    execution_node_id: claims_api
+    description: >
+      Claims API logs record successful downstream dependency access
+      after Claims Payment recovers.
+
+expected_result:
+  scenario_id: INS-04
+
+  expected_outcome: successful
+
+  expected_blocking_conditions:
+    - claims_payment_latency_blocking
+    - claims_payment_queue_depth_blocking
+
+  expected_evidence:
+    - healthy_claims_processing_baseline
+    - claims_payment_latency_warning
+    - claims_payment_queue_warning
+    - healthy_claims_processing_during_dependency_degradation
+    - claims_payment_latency_blocking
+    - claims_payment_queue_depth_blocking
+    - claims_api_request_timeouts
+    - claims_api_dependency_errors
+    - claims_payment_recovery_observation
+    - claims_api_dependency_recovery
+
+  expected_incident_attribution: false
+
+  expected_root_cause: claims_payment_service
+
+  expected_insight: >
+    Claims Processing remained healthy while Claims Payment developed
+    blocking latency and queue-depth conditions. Claims API logs showed
+    downstream timeout and dependency-error symptoms. The evidence
+    supports Claims Payment as the expected dependency-level root cause
+    rather than Claims Processing itself. Subsequent recovery observations
+    confirm restoration of Claims Payment and downstream dependency access.
+
+assumptions:
+  - Required enterprise and topology references exist.
+  - claims_api belongs to Claims Processing.
+  - claims_payment_api belongs to Claims Payment.
+  - Claims Processing depends on Claims Payment through existing topology.
+  - Claims Processing health metrics are factual observations and do not imply downstream payment health.
+  - Claims Payment latency and queue-depth metrics are factual observations.
+  - Claims API timeout and dependency-error logs represent downstream symptoms rather than root-cause conclusions.
+  - No Change identifier is generated for this Scenario.
+  - No Deployment event is generated for this Scenario.
+  - Recovery is represented only by explicit recovery telemetry and logs.
+  - Root-cause attribution remains isolated in the Test Oracle.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - insurance
+  - claims
+  - claims_payment
+  - dependency
+  - payment_delay
+  - queue_depth
+  - latency
+  - root_cause_analysis
+  - no_change
