@@ -157,6 +157,8 @@ class ScenarioBehaviour(BaseModel):
 
     selection: ScenarioMetricSelection | None = None
 
+    check_selection: ScenarioCheckSelection | None = None
+
     execution_node_id: ScenarioExecutionNodeId | None = None
 
     resilience_transition: (
@@ -178,6 +180,15 @@ class ScenarioBehaviour(BaseModel):
         ):
             raise ValueError(
                 "Metric selection is only valid for Metric behaviour."
+            )
+
+        if (
+            self.check_selection is not None
+            and self.source != SourceDomain.INFRASTRUCTURE_TEST
+        ):
+            raise ValueError(
+                "Check selection is only valid for "
+                "infrastructure-test behaviour."
             )
 
         if self.resilience_transition is not None:

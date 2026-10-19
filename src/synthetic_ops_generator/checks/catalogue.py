@@ -172,6 +172,56 @@ INFRASTRUCTURE_CERTIFICATE_VALIDATION = CheckDefinition(
 )
 
 
+
+
+INFRASTRUCTURE_CHECK_DEFINITIONS = (
+    INFRASTRUCTURE_CONNECTIVITY,
+    INFRASTRUCTURE_SERVICE_HEALTH,
+    INFRASTRUCTURE_DEPENDENCY_CONNECTIVITY,
+    INFRASTRUCTURE_DNS_RESOLUTION,
+    INFRASTRUCTURE_CERTIFICATE_VALIDATION,
+)
+
+
+def resolve_infrastructure_check_specs(
+    check_definition_ids: list[str],
+) -> tuple[CheckExecutionSpec, ...]:
+    """
+    Resolve an ordered Scenario selection to canonical
+    infrastructure check execution specifications.
+
+    Selection changes which canonical checks execute; it does not
+    change the canonical definitions or default infrastructure suite.
+    """
+
+    definitions_by_id = {
+        definition.check_definition_id: definition
+        for definition in INFRASTRUCTURE_CHECK_DEFINITIONS
+    }
+
+    specs: list[CheckExecutionSpec] = []
+
+    for check_definition_id in check_definition_ids:
+        try:
+            definition = definitions_by_id[
+                check_definition_id
+            ]
+        except KeyError as exc:
+            raise ValueError(
+                "Unknown Infrastructure Check Definition: "
+                f"{check_definition_id}"
+            ) from exc
+
+        specs.append(
+            CheckExecutionSpec(
+                definition=definition,
+                mandatory=True,
+            )
+        )
+
+    return tuple(specs)
+
+
 DEFAULT_APPLICATION_CHECKS = (
     CheckExecutionSpec(
         definition=APPLICATION_FUNCTIONAL_VALIDATION,

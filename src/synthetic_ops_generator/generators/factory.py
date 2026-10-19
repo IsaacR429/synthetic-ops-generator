@@ -1,6 +1,10 @@
 from collections.abc import Sequence
 from pathlib import Path
 
+from synthetic_ops_generator.checks.catalogue import (
+    DEFAULT_INFRASTRUCTURE_CHECKS,
+    resolve_infrastructure_check_specs,
+)
 from synthetic_ops_generator.core.identifiers import IdFactory
 from synthetic_ops_generator.core.randomness import SimulationRandom
 from synthetic_ops_generator.domain.enterprise import (
@@ -208,10 +212,21 @@ class GeneratorFactory:
                 behaviour.source
                 == SourceDomain.INFRASTRUCTURE_TEST
             ):
+                infrastructure_checks = (
+                    resolve_infrastructure_check_specs(
+                        behaviour
+                        .check_selection
+                        .check_definition_ids
+                    )
+                    if behaviour.check_selection is not None
+                    else DEFAULT_INFRASTRUCTURE_CHECKS
+                )
+
                 generators.append(
                     InfrastructureTestGenerator(
                         ids=ids,
                         behaviour=behaviour,
+                        checks=infrastructure_checks,
                     )
                 )
 
