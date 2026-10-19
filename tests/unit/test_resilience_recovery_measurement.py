@@ -484,4 +484,3 @@ def test_recovery_measurement_is_immutable() -> None:
         ValidationError,
     ):
         measurement.recovery_duration_seconds = 999.0
-
