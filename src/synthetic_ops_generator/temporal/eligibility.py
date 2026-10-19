@@ -230,4 +230,3 @@ def assess_operational_test_temporal_eligibility(
         observed_at=operational_test.executed_at,
         window=window,
     )
-
