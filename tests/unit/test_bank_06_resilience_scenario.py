@@ -1,4 +1,4 @@
-﻿from synthetic_ops_generator.config.enterprise_loader import (
+from synthetic_ops_generator.config.enterprise_loader import (
     load_enterprise,
 )
 from synthetic_ops_generator.domain.enums import SourceDomain
@@ -40,16 +40,31 @@ def test_bank_06_defines_explicit_payment_api_failover() -> None:
         behaviour.profile_id
         for behaviour in resilience_behaviours
     ] == [
+        "service_unavailable",
+        "replication_observed",
         "failover_initiated",
         "traffic_switch_started",
         "traffic_switch_completed",
         "instance_activated",
+        "service_available",
         "instance_serving",
+        "service_available",
     ]
 
-    transition_behaviours = (
-        resilience_behaviours[:3]
-    )
+    transition_behaviours = [
+        behaviour
+        for behaviour in resilience_behaviours
+        if behaviour.resilience_transition is not None
+    ]
+
+    assert [
+        behaviour.profile_id
+        for behaviour in transition_behaviours
+    ] == [
+        "failover_initiated",
+        "traffic_switch_started",
+        "traffic_switch_completed",
+    ]
 
     for behaviour in transition_behaviours:
         assert (
@@ -58,20 +73,31 @@ def test_bank_06_defines_explicit_payment_api_failover() -> None:
         )
         assert (
             behaviour.resilience_transition
-            is not None
-        )
-        assert (
-            behaviour.resilience_transition
             .to_execution_node_id
             == "payment_api_secondary"
         )
 
-    for behaviour in resilience_behaviours[3:]:
-        assert (
-            behaviour.execution_node_id
-            == "payment_api_secondary"
-        )
-        assert behaviour.resilience_transition is None
+    replication_behaviours = [
+        behaviour
+        for behaviour in resilience_behaviours
+        if behaviour.resilience_replication is not None
+    ]
+
+    assert len(replication_behaviours) == 1
+    assert (
+        replication_behaviours[0].profile_id
+        == "replication_observed"
+    )
+    assert (
+        replication_behaviours[0].execution_node_id
+        == "payment_api_primary"
+    )
+    assert (
+        replication_behaviours[0]
+        .resilience_replication
+        .to_execution_node_id
+        == "payment_api_secondary"
+    )
 
 
 def test_bank_06_resilience_observations_are_bounded() -> None:
@@ -131,9 +157,17 @@ def test_bank_06_plan_resolves_primary_to_secondary_transition() -> None:
         == SourceDomain.RESILIENCE
     ]
 
-    assert len(resilience_entries) == 5
+    assert len(resilience_entries) == 9
 
-    for entry in resilience_entries[:3]:
+    transition_entries = [
+        entry
+        for entry in resilience_entries
+        if entry.resilience_transition_target is not None
+    ]
+
+    assert len(transition_entries) == 3
+
+    for entry in transition_entries:
         assert entry.execution_target is not None
         assert (
             entry.execution_target.service_instance_id
@@ -142,11 +176,6 @@ def test_bank_06_plan_resolves_primary_to_secondary_transition() -> None:
         assert (
             entry.execution_target.site_id
             == "bank_primary"
-        )
-
-        assert (
-            entry.resilience_transition_target
-            is not None
         )
         assert (
             entry.resilience_transition_target
@@ -158,20 +187,26 @@ def test_bank_06_plan_resolves_primary_to_secondary_transition() -> None:
             == "bank_secondary"
         )
 
-    for entry in resilience_entries[3:]:
-        assert entry.execution_target is not None
-        assert (
-            entry.execution_target.service_instance_id
-            == "payment_api_secondary"
-        )
-        assert (
-            entry.execution_target.site_id
-            == "bank_secondary"
-        )
-        assert (
-            entry.resilience_transition_target
-            is None
-        )
+    replication_entries = [
+        entry
+        for entry in resilience_entries
+        if entry.resilience_replication_target is not None
+    ]
+
+    assert len(replication_entries) == 1
+
+    replication_entry = replication_entries[0]
+
+    assert (
+        replication_entry.execution_target
+        .service_instance_id
+        == "payment_api_primary"
+    )
+    assert (
+        replication_entry.resilience_replication_target
+        .service_instance_id
+        == "payment_api_secondary"
+    )
 
 
 def test_bank_06_primary_recovery_is_observed_without_failback() -> None:

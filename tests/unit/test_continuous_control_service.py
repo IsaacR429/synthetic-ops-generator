@@ -848,7 +848,7 @@ async def test_bank_06_managed_runtime_preserves_failover_evidence(
             }
 
             if (
-                len(resilience_events) == 5
+                len(resilience_events) == 9
                 and secondary_sources
                 == {
                     SourceDomain.METRIC,
@@ -867,14 +867,97 @@ async def test_bank_06_managed_runtime_preserves_failover_evidence(
             event.data["behaviour_profile_id"]
             for event in resilience_events
         ] == [
+            "service_unavailable",
+            "replication_observed",
             "failover_initiated",
             "traffic_switch_started",
             "traffic_switch_completed",
             "instance_activated",
+            "service_available",
             "instance_serving",
+            "service_available",
         ]
 
-        for event in resilience_events[:3]:
+        primary_unavailable = resilience_events[0]
+        replication = resilience_events[1]
+
+        transition_events = resilience_events[2:5]
+
+        secondary_activated = resilience_events[5]
+        secondary_available = resilience_events[6]
+        secondary_serving = resilience_events[7]
+
+        primary_recovered_available = resilience_events[8]
+
+        assert primary_unavailable.site_id == "bank_primary"
+        assert (
+            primary_unavailable.service_instance_id
+            == "payment_api_primary"
+        )
+
+        availability_observation = (
+            primary_unavailable.data[
+                "service_availability_observation"
+            ]
+        )
+
+        assert (
+            availability_observation["availability_state"]
+            == "unavailable"
+        )
+        assert (
+            availability_observation["site_id"]
+            == "bank_primary"
+        )
+        assert (
+            availability_observation[
+                "service_instance_id"
+            ]
+            == "payment_api_primary"
+        )
+
+        assert replication.site_id == "bank_primary"
+        assert (
+            replication.service_instance_id
+            == "payment_api_primary"
+        )
+
+        replication_observation = replication.data[
+            "replication_observation"
+        ]
+
+        assert (
+            replication_observation["from_site_id"]
+            == "bank_primary"
+        )
+        assert (
+            replication_observation[
+                "from_service_instance_id"
+            ]
+            == "payment_api_primary"
+        )
+        assert (
+            replication_observation["to_site_id"]
+            == "bank_secondary"
+        )
+        assert (
+            replication_observation[
+                "to_service_instance_id"
+            ]
+            == "payment_api_secondary"
+        )
+        assert (
+            replication_observation["replication_status"]
+            == "stopped"
+        )
+        assert (
+            replication_observation[
+                "last_successful_replication_at"
+            ]
+            is not None
+        )
+
+        for event in transition_events:
             assert event.site_id == "bank_primary"
             assert (
                 event.service_instance_id
@@ -906,7 +989,10 @@ async def test_bank_06_managed_runtime_preserves_failover_evidence(
                 == "payment_api_secondary"
             )
 
-        for event in resilience_events[3:]:
+        for event in (
+            secondary_activated,
+            secondary_serving,
+        ):
             assert event.site_id == "bank_secondary"
             assert (
                 event.service_instance_id
@@ -934,6 +1020,63 @@ async def test_bank_06_managed_runtime_preserves_failover_evidence(
                 ]
                 == "payment_api_secondary"
             )
+
+        assert secondary_available.site_id == "bank_secondary"
+        assert (
+            secondary_available.service_instance_id
+            == "payment_api_secondary"
+        )
+
+        availability_observation = (
+            secondary_available.data[
+                "service_availability_observation"
+            ]
+        )
+
+        assert (
+            availability_observation["availability_state"]
+            == "available"
+        )
+        assert (
+            availability_observation["site_id"]
+            == "bank_secondary"
+        )
+        assert (
+            availability_observation[
+                "service_instance_id"
+            ]
+            == "payment_api_secondary"
+        )
+
+        assert (
+            primary_recovered_available.site_id
+            == "bank_primary"
+        )
+        assert (
+            primary_recovered_available.service_instance_id
+            == "payment_api_primary"
+        )
+
+        availability_observation = (
+            primary_recovered_available.data[
+                "service_availability_observation"
+            ]
+        )
+
+        assert (
+            availability_observation["availability_state"]
+            == "available"
+        )
+        assert (
+            availability_observation["site_id"]
+            == "bank_primary"
+        )
+        assert (
+            availability_observation[
+                "service_instance_id"
+            ]
+            == "payment_api_primary"
+        )
 
         assert {
             event.source_domain
@@ -971,7 +1114,7 @@ async def test_bank_06_managed_runtime_preserves_failover_evidence(
 
         # Resilience facts are bounded even though the run
         # itself continues to produce operational telemetry.
-        assert len(final_resilience_events) == 5
+        assert len(final_resilience_events) == 9
 
     finally:
         await active_run_manager.shutdown()
