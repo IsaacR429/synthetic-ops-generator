@@ -1,6 +1,8 @@
 import asyncio
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -39,6 +41,20 @@ class SQLiteRunStore(RunStore):
             database_path
         )
         self._started = False
+
+    @contextmanager
+    def _connection(
+        self,
+    ) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(
+            self._database_path
+        )
+
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     async def start(self) -> None:
         if self._started:
@@ -155,9 +171,7 @@ class SQLiteRunStore(RunStore):
             exist_ok=True,
         )
 
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             self._create_runs_table(connection)
 
             self._ensure_execution_mode_column(
@@ -556,9 +570,7 @@ class SQLiteRunStore(RunStore):
         self,
         record: RunRecord,
     ) -> None:
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 INSERT INTO runs (
@@ -600,9 +612,7 @@ class SQLiteRunStore(RunStore):
         self,
         run_id: str,
     ) -> RunRecord | None:
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 """
                 SELECT
@@ -644,9 +654,7 @@ class SQLiteRunStore(RunStore):
     def _list_all_sync(
         self,
     ) -> tuple[RunRecord, ...]:
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 """
                 SELECT
@@ -688,9 +696,7 @@ class SQLiteRunStore(RunStore):
         self,
         status: RunStatus,
     ) -> tuple[RunRecord, ...]:
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 """
                 SELECT
@@ -734,9 +740,7 @@ class SQLiteRunStore(RunStore):
         self,
         record: RunRecord,
     ) -> bool:
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE runs
@@ -836,9 +840,7 @@ class SQLiteRunStore(RunStore):
         current_state: OperationalState,
         event_count: int,
     ) -> bool:
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE runs

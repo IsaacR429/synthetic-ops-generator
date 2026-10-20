@@ -1,6 +1,7 @@
 import asyncio
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,20 @@ class SQLiteEventStore(EventStore):
     ) -> None:
         self._database_path = Path(database_path)
         self._started = False
+
+    @contextmanager
+    def _connection(
+        self,
+    ) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(
+            self._database_path
+        )
+
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     async def start(self) -> None:
         if self._started:
@@ -185,9 +200,7 @@ class SQLiteEventStore(EventStore):
             exist_ok=True,
         )
 
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS generated_events (
@@ -352,9 +365,7 @@ class SQLiteEventStore(EventStore):
             event
         )
 
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 INSERT INTO generated_events (
@@ -395,9 +406,7 @@ class SQLiteEventStore(EventStore):
         self,
         run_id: str,
     ) -> tuple[GeneratedEvent, ...]:
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 """
                 SELECT payload
@@ -459,9 +468,7 @@ class SQLiteEventStore(EventStore):
             sql += "\nLIMIT ?"
             params.append(query.limit)
 
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 sql,
                 params,
@@ -509,9 +516,7 @@ class SQLiteEventStore(EventStore):
         WHERE {" AND ".join(where_clauses)}
         """
 
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 sql,
                 params,
@@ -549,9 +554,7 @@ class SQLiteEventStore(EventStore):
         ORDER BY bucket_index ASC
         """
 
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 sql,
                 (
@@ -582,9 +585,7 @@ class SQLiteEventStore(EventStore):
         self,
         cutoff_utc: str,
     ) -> int:
-        with sqlite3.connect(
-            self._database_path
-        ) as connection:
+        with self._connection() as connection:
             cursor = connection.execute(
                 """
                 DELETE FROM generated_events
