@@ -28,6 +28,11 @@ from synthetic_ops_generator.reporting.run_report import (
 from synthetic_ops_generator.scenarios.loader import (
     load_scenario,
 )
+from synthetic_ops_generator.scenarios.models import (
+    ScenarioFrequencyOverride,
+    ScenarioIntervalFrequencyOverride,
+    ScenarioLogFrequencyOverride,
+)
 
 
 def test_run_report_data_projects_run_scenario_and_target_context() -> None:
@@ -716,4 +721,263 @@ def test_run_report_data_preserves_behaviour_provenance() -> None:
     )
     assert row.raw_event["behaviour_id"] == (
         "metric_normal_healthy_baseline"
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "scenario_path",
+        "enterprise_path",
+    ),
+    [
+        (
+            "config/scenarios/banking/BANK-01.yaml",
+            "config/enterprises/bank_alpha",
+        ),
+        (
+            "config/scenarios/insurance/INS-03.yaml",
+            "config/enterprises/insurer_alpha",
+        ),
+        (
+            "config/scenarios/banking/BANK-06.yaml",
+            "config/enterprises/bank_alpha",
+        ),
+    ],
+)
+def test_run_report_data_preserves_scenario_generation_definition(
+    scenario_path: str,
+    enterprise_path: str,
+) -> None:
+    scenario = load_scenario(
+        scenario_path
+    )
+    enterprise = load_enterprise_configuration(
+        enterprise_path
+    )
+
+    run = _make_report_run(
+        scenario=scenario,
+        event_count=0,
+    )
+
+    report = build_run_report_data(
+        run=run,
+        scenario=scenario,
+        enterprise=enterprise,
+        events=(),
+        generated_at=datetime(
+            2026,
+            10,
+            20,
+            4,
+            30,
+            tzinfo=UTC,
+        ),
+    )
+
+    projected = report.scenario
+
+    assert projected.change_required == (
+        scenario.correlation.change_required
+    )
+
+    assert projected.trigger.source == (
+        scenario.trigger.source.value
+    )
+    assert projected.trigger.trigger_type == (
+        scenario.trigger.trigger_type
+    )
+    assert projected.trigger.description == (
+        scenario.trigger.description
+    )
+    assert projected.trigger.artifact == (
+        scenario.trigger.artifact
+    )
+    assert projected.trigger.version == (
+        scenario.trigger.version
+    )
+
+    assert len(projected.behaviours) == len(
+        scenario.behaviours
+    )
+
+    for source, result in zip(
+        scenario.behaviours,
+        projected.behaviours,
+        strict=True,
+    ):
+        assert result.behaviour_id == (
+            source.behaviour_id
+        )
+        assert result.source == source.source.value
+        assert result.during_state == (
+            source.during_state.value
+        )
+        assert result.profile_id == source.profile_id
+        assert result.description == source.description
+        assert result.continuous == source.continuous
+        assert result.execution_node_id == (
+            source.execution_node_id
+        )
+
+        expected_metric_ids = (
+            tuple(source.selection.metric_ids or ())
+            if source.selection is not None
+            else ()
+        )
+        assert result.metric_ids == (
+            expected_metric_ids
+        )
+
+        expected_check_ids = (
+            tuple(
+                source.check_selection.check_definition_ids
+            )
+            if source.check_selection is not None
+            else ()
+        )
+        assert result.check_definition_ids == (
+            expected_check_ids
+        )
+
+        transition = source.resilience_transition
+
+        assert (
+            result.resilience_transition_to_execution_node_id
+        ) == (
+            transition.to_execution_node_id
+            if transition is not None
+            else None
+        )
+
+        replication = source.resilience_replication
+
+        assert (
+            result.resilience_replication_to_execution_node_id
+        ) == (
+            replication.to_execution_node_id
+            if replication is not None
+            else None
+        )
+
+        assert (
+            result.resilience_replication_status
+        ) == (
+            replication.replication_status.value
+            if replication is not None
+            else None
+        )
+
+        assert (
+            result.resilience_last_successful_replication_offset_seconds
+        ) == (
+            replication.last_successful_replication_offset_seconds
+            if replication is not None
+            else None
+        )
+
+    if scenario.frequency is None:
+        assert projected.frequency is None
+    else:
+        assert projected.frequency is not None
+
+        frequency = projected.frequency
+
+        assert frequency.metric_interval_seconds == (
+            scenario.frequency.metrics.interval_seconds
+            if scenario.frequency.metrics is not None
+            else None
+        )
+
+        assert frequency.log_normal_per_second == (
+            scenario.frequency.logs.normal_per_second
+            if scenario.frequency.logs is not None
+            else None
+        )
+        assert frequency.log_warning_per_second == (
+            scenario.frequency.logs.warning_per_second
+            if scenario.frequency.logs is not None
+            else None
+        )
+        assert frequency.log_failure_per_second == (
+            scenario.frequency.logs.failure_per_second
+            if scenario.frequency.logs is not None
+            else None
+        )
+
+        assert (
+            frequency.infrastructure_test_interval_seconds
+        ) == (
+            scenario.frequency.infrastructure_tests.interval_seconds
+            if (
+                scenario.frequency.infrastructure_tests
+                is not None
+            )
+            else None
+        )
+
+    # Report generation context must never expose Test Oracle truth.
+    assert not hasattr(
+        projected,
+        "expected_result",
+    )
+
+
+def test_run_report_data_preserves_scenario_frequency_override() -> None:
+    enterprise = load_enterprise_configuration(
+        "config/enterprises/bank_alpha"
+    )
+
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-01.yaml"
+    ).model_copy(
+        update={
+            "frequency": ScenarioFrequencyOverride(
+                metrics=ScenarioIntervalFrequencyOverride(
+                    interval_seconds=2.5,
+                ),
+                logs=ScenarioLogFrequencyOverride(
+                    normal_per_second=3.0,
+                    warning_per_second=11.0,
+                    failure_per_second=29.0,
+                ),
+                infrastructure_tests=(
+                    ScenarioIntervalFrequencyOverride(
+                        interval_seconds=45.0,
+                    )
+                ),
+            )
+        }
+    )
+
+    run = _make_report_run(
+        scenario=scenario,
+        event_count=0,
+    )
+
+    report = build_run_report_data(
+        run=run,
+        scenario=scenario,
+        enterprise=enterprise,
+        events=(),
+        generated_at=datetime(
+            2026,
+            10,
+            20,
+            4,
+            45,
+            tzinfo=UTC,
+        ),
+    )
+
+    frequency = report.scenario.frequency
+
+    assert frequency is not None
+    assert frequency.metric_interval_seconds == 2.5
+    assert frequency.log_normal_per_second == 3.0
+    assert frequency.log_warning_per_second == 11.0
+    assert frequency.log_failure_per_second == 29.0
+    assert (
+        frequency.infrastructure_test_interval_seconds
+        == 45.0
     )

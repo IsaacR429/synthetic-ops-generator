@@ -22,6 +22,7 @@ from synthetic_ops_generator.reporting.evidence_row import (
     project_run_evidence_row,
 )
 from synthetic_ops_generator.scenarios.models import (
+    ScenarioBehaviour,
     ScenarioDefinition,
 )
 
@@ -49,6 +50,56 @@ class RunReportExecution:
 
 
 @dataclass(frozen=True)
+class RunReportTrigger:
+    source: str
+    trigger_type: str
+    description: str
+
+    artifact: str | None
+    version: str | None
+
+
+@dataclass(frozen=True)
+class RunReportBehaviour:
+    behaviour_id: str
+
+    source: str
+    during_state: str
+    profile_id: str
+
+    description: str | None
+    continuous: bool
+
+    metric_ids: tuple[str, ...]
+    check_definition_ids: tuple[str, ...]
+
+    execution_node_id: str | None
+
+    resilience_transition_to_execution_node_id: (
+        str | None
+    )
+
+    resilience_replication_to_execution_node_id: (
+        str | None
+    )
+    resilience_replication_status: str | None
+    resilience_last_successful_replication_offset_seconds: (
+        float | None
+    )
+
+
+@dataclass(frozen=True)
+class RunReportFrequency:
+    metric_interval_seconds: float | None
+
+    log_normal_per_second: float | None
+    log_warning_per_second: float | None
+    log_failure_per_second: float | None
+
+    infrastructure_test_interval_seconds: float | None
+
+
+@dataclass(frozen=True)
 class RunReportScenario:
     scenario_id: str
     name: str
@@ -57,6 +108,12 @@ class RunReportScenario:
     family: str
     industry: str
     risk: str
+
+    change_required: bool
+
+    trigger: RunReportTrigger
+    behaviours: tuple[RunReportBehaviour, ...]
+    frequency: RunReportFrequency | None
 
     initial_conditions: tuple[str, ...]
     state_sequence: tuple[str, ...]
@@ -114,6 +171,100 @@ class RunReportData:
         ReportMetricEvaluationExplanation,
         ...,
     ]
+
+
+def _project_report_behaviour(
+    behaviour: ScenarioBehaviour,
+) -> RunReportBehaviour:
+    metric_ids = (
+        tuple(behaviour.selection.metric_ids or ())
+        if behaviour.selection is not None
+        else ()
+    )
+
+    check_definition_ids = (
+        tuple(
+            behaviour.check_selection.check_definition_ids
+        )
+        if behaviour.check_selection is not None
+        else ()
+    )
+
+    transition = behaviour.resilience_transition
+    replication = behaviour.resilience_replication
+
+    return RunReportBehaviour(
+        behaviour_id=behaviour.behaviour_id,
+        source=behaviour.source.value,
+        during_state=behaviour.during_state.value,
+        profile_id=behaviour.profile_id,
+        description=behaviour.description,
+        continuous=behaviour.continuous,
+        metric_ids=metric_ids,
+        check_definition_ids=check_definition_ids,
+        execution_node_id=behaviour.execution_node_id,
+        resilience_transition_to_execution_node_id=(
+            transition.to_execution_node_id
+            if transition is not None
+            else None
+        ),
+        resilience_replication_to_execution_node_id=(
+            replication.to_execution_node_id
+            if replication is not None
+            else None
+        ),
+        resilience_replication_status=(
+            replication.replication_status.value
+            if replication is not None
+            else None
+        ),
+        resilience_last_successful_replication_offset_seconds=(
+            replication.last_successful_replication_offset_seconds
+            if replication is not None
+            else None
+        ),
+    )
+
+
+def _project_report_frequency(
+    scenario: ScenarioDefinition,
+) -> RunReportFrequency | None:
+    frequency = scenario.frequency
+
+    if frequency is None:
+        return None
+
+    metrics = frequency.metrics
+    logs = frequency.logs
+    infrastructure_tests = frequency.infrastructure_tests
+
+    return RunReportFrequency(
+        metric_interval_seconds=(
+            metrics.interval_seconds
+            if metrics is not None
+            else None
+        ),
+        log_normal_per_second=(
+            logs.normal_per_second
+            if logs is not None
+            else None
+        ),
+        log_warning_per_second=(
+            logs.warning_per_second
+            if logs is not None
+            else None
+        ),
+        log_failure_per_second=(
+            logs.failure_per_second
+            if logs is not None
+            else None
+        ),
+        infrastructure_test_interval_seconds=(
+            infrastructure_tests.interval_seconds
+            if infrastructure_tests is not None
+            else None
+        ),
+    )
 
 
 def _resolve_business_stream(
@@ -292,6 +443,23 @@ def build_run_report_data(
             family=scenario.family.value,
             industry=scenario.industry.value,
             risk=scenario.risk.value,
+            change_required=(
+                scenario.correlation.change_required
+            ),
+            trigger=RunReportTrigger(
+                source=scenario.trigger.source.value,
+                trigger_type=scenario.trigger.trigger_type,
+                description=scenario.trigger.description,
+                artifact=scenario.trigger.artifact,
+                version=scenario.trigger.version,
+            ),
+            behaviours=tuple(
+                _project_report_behaviour(behaviour)
+                for behaviour in scenario.behaviours
+            ),
+            frequency=_project_report_frequency(
+                scenario
+            ),
             initial_conditions=tuple(
                 scenario.initial_conditions
             ),
