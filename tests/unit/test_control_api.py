@@ -118,6 +118,7 @@ def test_list_scenarios_returns_catalogue(
         "INS-02",
         "INS-03",
         "INS-04",
+        "INS-05",
         "INS-06",
     ]
 

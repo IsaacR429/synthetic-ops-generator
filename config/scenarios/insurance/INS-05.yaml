@@ -1,0 +1,180 @@
+﻿scenario_id: INS-05
+
+name: Incomplete High-Risk Claims Change
+
+description: >
+  Simulates a high-risk production Change to the Insurer Alpha Claims
+  Processing Service. Required technical validations pass, deployment
+  succeeds, and post-change operational telemetry remains healthy, but
+  mandatory business validation has been requested and remains pending.
+  The operational outcome is successful while the validation decision
+  remains incomplete and requires review.
+
+family: change_validation
+
+industry: insurance
+
+target:
+  enterprise_id: insurer_alpha
+  business_stream_id: claims
+  service_id: claims_service
+
+  component_ids:
+    - claims_api
+    - claims_database
+
+  environment: production
+
+risk: high
+
+initial_conditions:
+  - Change exists and is approved.
+  - Claims Processing Service is operating normally before implementation.
+  - A valid pre-change operational baseline is available.
+  - Mandatory infrastructure validations are planned.
+  - Mandatory application validations are planned.
+  - Mandatory business validation is required after deployment.
+  - Implementation window is valid.
+
+trigger:
+  source: deployment
+
+  trigger_type: claims_service_release
+
+  description: >
+    Deploy a high-risk Claims API release during the approved production
+    implementation window.
+
+  artifact: claims-api
+  version: 1.2.0
+
+state_sequence:
+  - initialising
+  - normal
+  - implementing
+  - observing
+  - completed
+
+behaviours:
+  - source: itsm
+    behaviour_id: itsm_normal_approved_change
+    during_state: normal
+    profile_id: approved_change
+    description: >
+      Change exists with required approval and valid implementation
+      metadata.
+
+  - source: metric
+    behaviour_id: metric_normal_healthy_baseline
+    during_state: normal
+    profile_id: healthy_baseline
+    description: >
+      Pre-change operational Metrics remain within normal Claims
+      Service behaviour.
+
+  - source: infrastructure_test
+    behaviour_id: infrastructure_test_normal_all_required_checks_pass
+    during_state: normal
+    profile_id: all_required_checks_pass
+    description: >
+      Required infrastructure validations complete successfully.
+
+  - source: deployment
+    behaviour_id: deployment_implementing_successful_deployment
+    during_state: implementing
+    profile_id: successful_deployment
+    description: >
+      Claims API artifact is deployed successfully.
+
+  - source: application_test
+    behaviour_id: application_test_observing_all_mandatory_tests_pass
+    during_state: observing
+    profile_id: all_mandatory_tests_pass
+    description: >
+      Mandatory automated application validations pass after deployment.
+
+  - source: metric
+    behaviour_id: metric_observing_healthy_post_change
+    during_state: observing
+    profile_id: healthy_post_change
+    description: >
+      Post-change latency, error rate and availability remain healthy
+      relative to the effective Claims Service policy.
+
+  - source: log
+    behaviour_id: log_observing_normal_operational_logs
+    during_state: observing
+    profile_id: normal_operational_logs
+    description: >
+      No blocking or critical Change-attributable log condition
+      is generated.
+
+  - source: incident
+    behaviour_id: incident_observing_no_incident
+    during_state: observing
+    profile_id: no_incident
+    description: >
+      No Change-attributable operational Incident is created.
+
+  - source: manual_validation
+    behaviour_id: manual_validation_observing_required_business_validation_pending
+    during_state: observing
+    profile_id: required_business_validation_pending
+    description: >
+      Required business validation has been requested but has not yet
+      been completed. It remains pending with no validation result.
+
+  - source: evidence
+    behaviour_id: evidence_observing_pending_business_validation_evidence
+    during_state: observing
+    profile_id: pending_business_validation_evidence
+    description: >
+      Required technical and operational evidence is available together
+      with evidence that mandatory business validation was requested,
+      while no completed business-validation result exists.
+
+expected_result:
+  scenario_id: INS-05
+
+  expected_decision: incomplete
+  expected_action: review
+  expected_outcome: successful
+
+  expected_blocking_conditions:
+    - required_business_validation_pending
+
+  expected_evidence:
+    - change_approval
+    - infrastructure_validation
+    - deployment_result
+    - application_validation
+    - pre_change_baseline
+    - post_change_observation
+    - business_validation_request
+
+  expected_incident_attribution: false
+
+  expected_root_cause: null
+
+  expected_insight: >
+    The Claims Service release completed successfully and remained
+    operationally healthy, but mandatory business validation remains
+    pending. The validation decision is therefore incomplete and
+    requires review even though the operational outcome is successful.
+
+assumptions:
+  - Claims Service benchmark and baseline configuration is valid.
+  - Required enterprise and topology references exist.
+  - Required business validation is mandatory for this high-risk Change.
+  - A pending mandatory validation is not equivalent to a failed validation.
+  - Technical success does not satisfy an outstanding mandatory business validation.
+  - Successful operational outcome does not imply a Pass decision.
+  - The Test Oracle remains separate from generated source events.
+
+tags:
+  - insurance
+  - claims
+  - production_change
+  - high_risk
+  - business_validation
+  - incomplete_validation

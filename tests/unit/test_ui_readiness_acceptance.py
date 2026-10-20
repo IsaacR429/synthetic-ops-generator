@@ -114,6 +114,7 @@ def test_ui_can_discover_enterprises_and_scenarios(
         "INS-02",
         "INS-03",
         "INS-04",
+        "INS-05",
         "INS-06",
     }
 
