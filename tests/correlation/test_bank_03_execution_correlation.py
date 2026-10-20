@@ -292,8 +292,26 @@ def test_bank_03_operational_degradation_execution() -> None:
         )
     ]
 
+    payment_dependency_error_events = [
+        event
+        for event in publisher.events
+        if (
+            event.event_type == "log.observed"
+            and event.business_stream == "payments"
+            and event.service == "payment_service"
+            and event.component == "payment_api"
+            and event.data["behaviour_profile_id"]
+            == "degradation_error_logs"
+            and event.data["scenario_state"]
+            == "degraded"
+            and event.data["log"]["error_code"]
+            == "DEPENDENCY_ERROR"
+        )
+    ]
+
     assert authentication_failure_events
     assert payment_blocking_events
+    assert payment_dependency_error_events
     assert authentication_recovery_events
     assert payment_recovery_events
 
