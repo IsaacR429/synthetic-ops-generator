@@ -36,6 +36,9 @@ AUTHENTICATION_RECOVERY_LOGS = "authentication_recovery_logs"
 ALL_REQUIRED_VALIDATIONS_PASS = (
     "all_required_validations_pass"
 )
+REQUIRED_BUSINESS_VALIDATION_PENDING = (
+    "required_business_validation_pending"
+)
 
 NO_INCIDENT = "no_incident"
 INCIDENT_CREATED = "incident_created"
@@ -116,6 +119,7 @@ SUPPORTED_PROFILES_BY_SOURCE: dict[
     SourceDomain.MANUAL_VALIDATION: frozenset(
         {
             ALL_REQUIRED_VALIDATIONS_PASS,
+            REQUIRED_BUSINESS_VALIDATION_PENDING,
         }
     ),
     SourceDomain.INCIDENT: frozenset(

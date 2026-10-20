@@ -16,6 +16,7 @@ from synthetic_ops_generator.scenarios.models import (
 )
 from synthetic_ops_generator.scenarios.profile_contracts import (
     ALL_REQUIRED_VALIDATIONS_PASS,
+    REQUIRED_BUSINESS_VALIDATION_PENDING,
 )
 
 
@@ -95,14 +96,70 @@ class ManualValidationGenerator(SourceGenerator):
             )
 
         if (
-
             self._behaviour.profile_id
-            != ALL_REQUIRED_VALIDATIONS_PASS
+            not in {
+                ALL_REQUIRED_VALIDATIONS_PASS,
+                REQUIRED_BUSINESS_VALIDATION_PENDING,
+            }
         ):
             raise ValueError(
                 "Unsupported Manual Validation behaviour profile: "
                 f"{self._behaviour.profile_id}"
             )
+
+        if (
+            self._behaviour.profile_id
+            == REQUIRED_BUSINESS_VALIDATION_PENDING
+        ):
+            business_validations = tuple(
+                definition
+                for definition in self._validations
+                if (
+                    definition.validation_type
+                    == "business_validation"
+                    and definition.mandatory
+                )
+            )
+
+            if not business_validations:
+                raise ValueError(
+                    "Pending business validation profile "
+                    "requires a mandatory "
+                    "business_validation definition."
+                )
+
+            for definition in business_validations:
+                validation_id = self._ids.validation_id()
+
+                component = (
+                    context.component
+                    if definition.component_scoped
+                    else None
+                )
+
+                requested = ManualValidation(
+                    validation_id=validation_id,
+                    chg_id=context.chg_id,
+                    validation_type=(
+                        definition.validation_type
+                    ),
+                    name=definition.name,
+                    service=context.service,
+                    component=component,
+                    mandatory=definition.mandatory,
+                    status=ManualValidationStatus.PENDING,
+                    requested_at=context.simulation_time,
+                )
+
+                yield self._event(
+                    context=context,
+                    event_type=(
+                        "manual_validation.requested"
+                    ),
+                    validation=requested,
+                )
+
+            return
 
         for definition in self._validations:
             validation_id = self._ids.validation_id()

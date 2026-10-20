@@ -466,3 +466,109 @@ def test_manual_validation_events_preserve_service_instance_execution_lineage(
         event.service_instance_id
         for event in events
     } == {"payment_api_secondary"}
+
+
+def test_required_business_validation_pending_profile_is_supported() -> None:
+    from synthetic_ops_generator.scenarios.profile_contracts import (
+        SUPPORTED_PROFILES_BY_SOURCE,
+    )
+
+    assert (
+        "required_business_validation_pending"
+        in SUPPORTED_PROFILES_BY_SOURCE[
+            SourceDomain.MANUAL_VALIDATION
+        ]
+    )
+
+
+def test_required_business_validation_pending_remains_uncompleted() -> None:
+    generator = ManualValidationGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(
+            profile_id=(
+                "required_business_validation_pending"
+            ),
+        ),
+    )
+
+    events = asyncio.run(
+        collect_events(
+            generator,
+            build_context(),
+        )
+    )
+
+    assert len(events) == 1
+
+    event = events[0]
+
+    assert (
+        event.event_type
+        == "manual_validation.requested"
+    )
+
+    assert event.source_domain == (
+        SourceDomain.MANUAL_VALIDATION
+    )
+
+    validation = event.data["validation"]
+
+    assert (
+        validation["validation_type"]
+        == "business_validation"
+    )
+
+    assert (
+        validation["name"]
+        == "Business workflow validation"
+    )
+
+    assert validation["mandatory"] is True
+
+    assert validation["status"] == "pending"
+    assert validation["result"] is None
+    assert validation["completed_at"] is None
+    assert validation["validated_by"] is None
+
+    assert event.component is None
+
+    assert {
+        item.data["validation"]["validation_type"]
+        for item in events
+    } == {
+        "business_validation",
+    }
+
+
+def test_pending_profile_requires_mandatory_business_validation() -> None:
+    validations = (
+        ManualValidationDefinition(
+            validation_type="business_validation",
+            name="Optional business validation",
+            mandatory=False,
+        ),
+    )
+
+    generator = ManualValidationGenerator(
+        ids=IdFactory(),
+        behaviour=build_behaviour(
+            profile_id=(
+                "required_business_validation_pending"
+            ),
+        ),
+        validations=validations,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "requires a mandatory "
+            "business_validation definition"
+        ),
+    ):
+        asyncio.run(
+            collect_events(
+                generator,
+                build_context(),
+            )
+        )
