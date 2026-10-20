@@ -14,6 +14,7 @@ from synthetic_ops_generator.scenarios.models import (
 from synthetic_ops_generator.scenarios.profile_contracts import (
     COMPLETE_VALIDATION_EVIDENCE,
     INCOMPLETE_VALIDATION_EVIDENCE,
+    PENDING_BUSINESS_VALIDATION_EVIDENCE,
     ROLLBACK_VALIDATION_EVIDENCE,
 )
 
@@ -66,6 +67,16 @@ DEFAULT_INCOMPLETE_VALIDATION_EVIDENCE = tuple(
     definition
     for definition in DEFAULT_COMPLETE_VALIDATION_EVIDENCE
     if definition.evidence_type != "change_approval"
+)
+
+DEFAULT_PENDING_BUSINESS_VALIDATION_EVIDENCE = (
+    *DEFAULT_COMPLETE_VALIDATION_EVIDENCE,
+    EvidenceDefinition(
+        evidence_type="business_validation_request",
+        title="Required business validation request evidence",
+        event_types=("manual_validation.requested",),
+        source_state=OperationalState.OBSERVING,
+    ),
 )
 
 DEFAULT_ROLLBACK_VALIDATION_EVIDENCE = (
@@ -184,6 +195,12 @@ class EvidenceGenerator(SourceGenerator):
             == INCOMPLETE_VALIDATION_EVIDENCE
         ):
             return DEFAULT_INCOMPLETE_VALIDATION_EVIDENCE
+
+        if (
+            self._behaviour.profile_id
+            == PENDING_BUSINESS_VALIDATION_EVIDENCE
+        ):
+            return DEFAULT_PENDING_BUSINESS_VALIDATION_EVIDENCE
 
         if (
             self._behaviour.profile_id

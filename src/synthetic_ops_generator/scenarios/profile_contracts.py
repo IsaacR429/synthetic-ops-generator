@@ -59,6 +59,9 @@ COMPLETE_VALIDATION_EVIDENCE = (
 INCOMPLETE_VALIDATION_EVIDENCE = (
     "incomplete_validation_evidence"
 )
+PENDING_BUSINESS_VALIDATION_EVIDENCE = (
+    "pending_business_validation_evidence"
+)
 ROLLBACK_VALIDATION_EVIDENCE = (
     "rollback_validation_evidence"
 )
@@ -145,6 +148,7 @@ SUPPORTED_PROFILES_BY_SOURCE: dict[
         {
             COMPLETE_VALIDATION_EVIDENCE,
             INCOMPLETE_VALIDATION_EVIDENCE,
+            PENDING_BUSINESS_VALIDATION_EVIDENCE,
             ROLLBACK_VALIDATION_EVIDENCE,
         }
     ),
