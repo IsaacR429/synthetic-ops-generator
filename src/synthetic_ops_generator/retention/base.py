@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 
 from synthetic_ops_generator.events.envelope import GeneratedEvent
@@ -8,6 +9,19 @@ from synthetic_ops_generator.retention.query import (
     EventActivityQuery,
     EventQuery,
 )
+
+
+@dataclass(frozen=True)
+class RunEventWindow:
+    """
+    One internally consistent retained-event snapshot for a Run.
+
+    Events are returned in canonical Run sequence order even when
+    the storage implementation selects the latest bounded window.
+    """
+
+    total_event_count: int
+    events: tuple[GeneratedEvent, ...]
 
 
 class EventStore(ABC):
@@ -34,6 +48,15 @@ class EventStore(ABC):
         self,
         run_id: str,
     ) -> Sequence[GeneratedEvent]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_latest_run_event_window(
+        self,
+        run_id: str,
+        *,
+        limit: int,
+    ) -> RunEventWindow:
         raise NotImplementedError
 
     @abstractmethod

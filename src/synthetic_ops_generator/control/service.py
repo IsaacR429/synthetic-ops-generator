@@ -61,6 +61,11 @@ from synthetic_ops_generator.publishers.retention import (
 from synthetic_ops_generator.replay.service import (
     ReplayService,
 )
+from synthetic_ops_generator.reporting.run_report import (
+    DEFAULT_RUN_REPORT_EVENT_LIMIT,
+    RunReportData,
+    build_run_report_data,
+)
 from synthetic_ops_generator.retention.base import EventStore
 from synthetic_ops_generator.retention.query import (
     EventActivityBucket,
@@ -842,6 +847,56 @@ class ControlService:
         )
 
         return tuple(events)
+
+    async def get_run_report_data(
+        self,
+        run_id: str,
+    ) -> RunReportData:
+        run = await self.get_run(
+            run_id
+        )
+
+        scenario = self._catalogue.get_scenario(
+            run.scenario_id
+        )
+
+        if scenario is None:
+            raise ScenarioNotFoundError(
+                "Scenario "
+                f"'{run.scenario_id}' referenced by "
+                f"Run '{run.run_id}' was not found."
+            )
+
+        if run.target is None:
+            raise ValueError(
+                "Run report requires a Run target snapshot."
+            )
+
+        enterprise = load_enterprise_configuration(
+            self._enterprise_root
+            / run.target.enterprise_id
+        )
+
+        event_window = (
+            await self._store.get_latest_run_event_window(
+                run.run_id,
+                limit=DEFAULT_RUN_REPORT_EVENT_LIMIT,
+            )
+        )
+
+        return build_run_report_data(
+            run=run,
+            scenario=scenario,
+            enterprise=enterprise,
+            events=event_window.events,
+            generated_at=datetime.now(UTC),
+            total_retained_event_count=(
+                event_window.total_event_count
+            ),
+            maximum_event_count=(
+                DEFAULT_RUN_REPORT_EVENT_LIMIT
+            ),
+        )
 
     async def query_run_events(
         self,

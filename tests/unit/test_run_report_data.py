@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -981,3 +982,182 @@ def test_run_report_data_preserves_scenario_frequency_override() -> None:
         frequency.infrastructure_test_interval_seconds
         == 45.0
     )
+
+
+def test_run_report_data_describes_latest_250_event_window() -> None:
+    enterprise = load_enterprise_configuration(
+        "config/enterprises/bank_alpha"
+    )
+
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-01.yaml"
+    )
+
+    run = _make_report_run(
+        scenario=scenario,
+        event_count=300,
+    )
+
+    events = tuple(
+        _make_report_event(
+            run_id=run.run_id,
+            scenario_id=run.scenario_id,
+            sequence_number=sequence_number,
+        )
+        for sequence_number in range(
+            51,
+            301,
+        )
+    )
+
+    report = build_run_report_data(
+        run=run,
+        scenario=scenario,
+        enterprise=enterprise,
+        events=events,
+        generated_at=datetime(
+            2026,
+            10,
+            21,
+            1,
+            30,
+            tzinfo=UTC,
+        ),
+        total_retained_event_count=300,
+        maximum_event_count=250,
+    )
+
+    assert report.scope.selection == "latest"
+    assert report.scope.maximum_event_count == 250
+
+    assert (
+        report.scope.total_retained_event_count
+        == 300
+    )
+    assert report.scope.included_event_count == 250
+
+    assert report.scope.first_sequence_number == 51
+    assert report.scope.last_sequence_number == 300
+
+    assert report.scope.complete_run_represented is False
+
+    assert len(report.evidence_rows) == 250
+    assert (
+        report.evidence_rows[0].sequence_number
+        == 51
+    )
+    assert (
+        report.evidence_rows[-1].sequence_number
+        == 300
+    )
+
+
+def test_run_report_data_marks_complete_retained_run() -> None:
+    enterprise = load_enterprise_configuration(
+        "config/enterprises/bank_alpha"
+    )
+
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-01.yaml"
+    )
+
+    run = _make_report_run(
+        scenario=scenario,
+        event_count=2,
+    )
+
+    events = tuple(
+        _make_report_event(
+            run_id=run.run_id,
+            scenario_id=run.scenario_id,
+            sequence_number=sequence_number,
+        )
+        for sequence_number in (
+            1,
+            2,
+        )
+    )
+
+    report = build_run_report_data(
+        run=run,
+        scenario=scenario,
+        enterprise=enterprise,
+        events=events,
+        generated_at=datetime(
+            2026,
+            10,
+            21,
+            1,
+            31,
+            tzinfo=UTC,
+        ),
+        total_retained_event_count=2,
+        maximum_event_count=250,
+    )
+
+    assert report.scope.selection == "complete"
+    assert report.scope.included_event_count == 2
+    assert report.scope.first_sequence_number == 1
+    assert report.scope.last_sequence_number == 2
+
+    assert report.scope.complete_run_represented is True
+
+
+
+def test_run_report_data_does_not_mark_running_snapshot_as_complete_run(
+) -> None:
+    enterprise = load_enterprise_configuration(
+        "config/enterprises/bank_alpha"
+    )
+
+    scenario = load_scenario(
+        "config/scenarios/banking/BANK-01.yaml"
+    )
+
+    run = replace(
+        _make_report_run(
+            scenario=scenario,
+            event_count=2,
+        ),
+        status=RunStatus.RUNNING,
+        completed_at=None,
+        validation_passed=None,
+    )
+
+    events = tuple(
+        _make_report_event(
+            run_id=run.run_id,
+            scenario_id=run.scenario_id,
+            sequence_number=sequence_number,
+        )
+        for sequence_number in (
+            1,
+            2,
+        )
+    )
+
+    report = build_run_report_data(
+        run=run,
+        scenario=scenario,
+        enterprise=enterprise,
+        events=events,
+        generated_at=datetime(
+            2026,
+            10,
+            21,
+            1,
+            40,
+            tzinfo=UTC,
+        ),
+        total_retained_event_count=2,
+        maximum_event_count=250,
+    )
+
+    # All evidence retained at this instant is represented.
+    assert report.scope.selection == "complete"
+    assert report.scope.total_retained_event_count == 2
+    assert report.scope.included_event_count == 2
+
+    # But the Run itself is still active, so this is only a
+    # complete snapshot, not a complete final Run history.
+    assert report.scope.complete_run_represented is False

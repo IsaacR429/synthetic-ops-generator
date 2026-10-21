@@ -11,7 +11,10 @@ from synthetic_ops_generator.events.serialization import (
     deserialize_generated_event,
     serialize_generated_event,
 )
-from synthetic_ops_generator.retention.base import EventStore
+from synthetic_ops_generator.retention.base import (
+    EventStore,
+    RunEventWindow,
+)
 from synthetic_ops_generator.retention.query import (
     EventActivityBucket,
     EventActivityQuery,
@@ -84,6 +87,30 @@ class SQLiteEventStore(EventStore):
         return await asyncio.to_thread(
             self._get_run_events_sync,
             run_id,
+        )
+
+    async def get_latest_run_event_window(
+        self,
+        run_id: str,
+        *,
+        limit: int,
+    ) -> RunEventWindow:
+        self._require_started()
+
+        if not run_id.strip():
+            raise ValueError(
+                "Run ID is required."
+            )
+
+        if limit <= 0:
+            raise ValueError(
+                "Run event window limit must be greater than zero."
+            )
+
+        return await asyncio.to_thread(
+            self._get_latest_run_event_window_sync,
+            run_id,
+            limit,
         )
 
     async def query_events(
@@ -422,6 +449,61 @@ class SQLiteEventStore(EventStore):
                 row[0]
             )
             for row in rows
+        )
+
+    def _get_latest_run_event_window_sync(
+        self,
+        run_id: str,
+        limit: int,
+    ) -> RunEventWindow:
+        with self._connection() as connection:
+            # Establish one read transaction so the retained count and
+            # selected latest-event window describe the same snapshot.
+            connection.execute("BEGIN")
+
+            count_row = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM generated_events
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            ).fetchone()
+
+            total_event_count = (
+                int(count_row[0])
+                if count_row is not None
+                else 0
+            )
+
+            rows = connection.execute(
+                """
+                SELECT payload
+                FROM generated_events
+                WHERE run_id = ?
+                ORDER BY sequence_number DESC
+                LIMIT ?
+                """,
+                (
+                    run_id,
+                    limit,
+                ),
+            ).fetchall()
+
+        latest_descending = tuple(
+            deserialize_generated_event(
+                row[0]
+            )
+            for row in rows
+        )
+
+        return RunEventWindow(
+            total_event_count=total_event_count,
+            events=tuple(
+                reversed(
+                    latest_descending
+                )
+            ),
         )
 
     def _query_events_sync(

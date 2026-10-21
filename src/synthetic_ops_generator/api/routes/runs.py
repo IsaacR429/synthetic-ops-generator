@@ -38,6 +38,9 @@ from synthetic_ops_generator.reporting.csv_export import (
 from synthetic_ops_generator.reporting.evidence_row import (
     project_run_evidence_row,
 )
+from synthetic_ops_generator.reporting.pdf_report import (
+    render_run_report_pdf,
+)
 
 router = APIRouter(
     prefix="/runs",
@@ -316,6 +319,39 @@ async def export_run_events_csv(
             "Content-Disposition": (
                 "attachment; "
                 f'filename="streamops-{run_id}-events.csv"'
+            ),
+        },
+    )
+
+
+@router.get(
+    "/{run_id}/report.pdf",
+)
+async def export_run_report_pdf(
+    run_id: str,
+    service: ControlServiceDependency,
+) -> Response:
+    try:
+        report = await service.get_run_report_data(
+            run_id
+        )
+    except RunNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    content = render_run_report_pdf(
+        report
+    )
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                "attachment; "
+                f'filename="streamops-{run_id}-report.pdf"'
             ),
         },
     )

@@ -1127,7 +1127,7 @@ async def test_aggregate_event_activity_rejects_naive_start_time(
         ):
             await store.aggregate_event_activity(
                 EventActivityQuery(
-                    start_time=datetime(
+                    start_time=datetime(  # noqa: DTZ001
                         2026,
                         8,
                         13,
@@ -1174,7 +1174,7 @@ async def test_aggregate_event_activity_rejects_naive_end_time(
                         0,
                         tzinfo=UTC,
                     ),
-                    end_time=datetime(
+                    end_time=datetime(  # noqa: DTZ001
                         2026,
                         8,
                         13,
@@ -1636,3 +1636,69 @@ async def test_store_preserves_service_instance_execution_lineage(
         restored[0].service_instance_id
         == "payment_api_secondary"
     )
+
+
+@pytest.mark.asyncio
+async def test_latest_run_event_window_returns_latest_events_in_sequence_order(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    events = tuple(
+        make_event(
+            event_id=f"EVT{sequence_number:07d}",
+            sequence_number=sequence_number,
+            source_domain=SourceDomain.METRIC,
+        )
+        for sequence_number in range(1, 7)
+    )
+
+    try:
+        for event in events:
+            await store.append(event)
+
+        window = await store.get_latest_run_event_window(
+            "RUN0000001",
+            limit=3,
+        )
+    finally:
+        await store.stop()
+
+    assert window.total_event_count == 6
+    assert window.events == events[-3:]
+
+    assert tuple(
+        event.sequence_number
+        for event in window.events
+    ) == (
+        4,
+        5,
+        6,
+    )
+
+
+@pytest.mark.asyncio
+async def test_latest_run_event_window_rejects_non_positive_limit(
+    tmp_path,
+) -> None:
+    store = SQLiteEventStore(
+        database_path=tmp_path / "events.db"
+    )
+
+    await store.start()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="greater than zero",
+        ):
+            await store.get_latest_run_event_window(
+                "RUN0000001",
+                limit=0,
+            )
+    finally:
+        await store.stop()

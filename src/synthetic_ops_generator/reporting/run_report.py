@@ -6,6 +6,7 @@ from datetime import datetime
 
 from synthetic_ops_generator.control.models import (
     RunRecord,
+    RunStatus,
 )
 from synthetic_ops_generator.domain.enterprise import (
     Enterprise,
@@ -24,6 +25,16 @@ from synthetic_ops_generator.reporting.evidence_row import (
 from synthetic_ops_generator.scenarios.models import (
     ScenarioBehaviour,
     ScenarioDefinition,
+)
+
+DEFAULT_RUN_REPORT_EVENT_LIMIT = 250
+
+TERMINAL_RUN_STATUSES = frozenset(
+    {
+        RunStatus.COMPLETED,
+        RunStatus.FAILED,
+        RunStatus.STOPPED,
+    }
 )
 
 
@@ -158,6 +169,27 @@ class RunReportTarget:
 
 
 @dataclass(frozen=True)
+class RunReportScope:
+    """
+    Evidence-window metadata for one generated report.
+
+    selection describes whether the report contains the complete
+    retained Run event set or only the latest bounded window.
+    """
+
+    selection: str
+    maximum_event_count: int
+
+    total_retained_event_count: int
+    included_event_count: int
+
+    first_sequence_number: int | None
+    last_sequence_number: int | None
+
+    complete_run_represented: bool
+
+
+@dataclass(frozen=True)
 class RunReportData:
     generated_at: datetime
     context_resolution: str
@@ -165,6 +197,7 @@ class RunReportData:
     execution: RunReportExecution
     scenario: RunReportScenario
     target: RunReportTarget
+    scope: RunReportScope
 
     evidence_rows: tuple[RunEvidenceRow, ...]
     metric_evaluation_explanations: tuple[
@@ -359,6 +392,8 @@ def build_run_report_data(
     enterprise: Enterprise,
     events: Iterable[GeneratedEvent],
     generated_at: datetime,
+    total_retained_event_count: int | None = None,
+    maximum_event_count: int = DEFAULT_RUN_REPORT_EVENT_LIMIT,
 ) -> RunReportData:
     target = run.target
 
@@ -396,6 +431,36 @@ def build_run_report_data(
 
     report_events = tuple(events)
 
+    if maximum_event_count <= 0:
+        raise ValueError(
+            "Run report maximum event count "
+            "must be greater than zero."
+        )
+
+    if len(report_events) > maximum_event_count:
+        raise ValueError(
+            "Run report evidence exceeds the "
+            f"{maximum_event_count}-event limit."
+        )
+
+    resolved_retained_event_count = (
+        len(report_events)
+        if total_retained_event_count is None
+        else total_retained_event_count
+    )
+
+    if resolved_retained_event_count < 0:
+        raise ValueError(
+            "Run report retained event count "
+            "cannot be negative."
+        )
+
+    if resolved_retained_event_count < len(report_events):
+        raise ValueError(
+            "Run report retained event count cannot be "
+            "smaller than the included evidence count."
+        )
+
     for event in report_events:
         if event.run_id != run.run_id:
             raise ValueError(
@@ -412,6 +477,44 @@ def build_run_report_data(
     evidence_rows = tuple(
         project_run_evidence_row(event)
         for event in report_events
+    )
+
+    included_event_count = len(
+        evidence_rows
+    )
+
+    complete_retained_selection = (
+        included_event_count
+        == resolved_retained_event_count
+    )
+
+    report_scope = RunReportScope(
+        selection=(
+            "complete"
+            if complete_retained_selection
+            else "latest"
+        ),
+        maximum_event_count=maximum_event_count,
+        total_retained_event_count=(
+            resolved_retained_event_count
+        ),
+        included_event_count=included_event_count,
+        first_sequence_number=(
+            evidence_rows[0].sequence_number
+            if evidence_rows
+            else None
+        ),
+        last_sequence_number=(
+            evidence_rows[-1].sequence_number
+            if evidence_rows
+            else None
+        ),
+        complete_run_represented=(
+            run.status in TERMINAL_RUN_STATUSES
+            and complete_retained_selection
+            and resolved_retained_event_count
+            == run.event_count
+        ),
     )
 
     return RunReportData(
@@ -506,6 +609,7 @@ def build_run_report_data(
             components=components,
             environment=target.environment.value,
         ),
+        scope=report_scope,
         evidence_rows=evidence_rows,
         metric_evaluation_explanations=(
             build_metric_evaluation_explanations(

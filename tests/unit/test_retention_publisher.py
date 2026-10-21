@@ -7,7 +7,10 @@ from synthetic_ops_generator.events.envelope import GeneratedEvent
 from synthetic_ops_generator.publishers.retention import (
     RetentionPublisher,
 )
-from synthetic_ops_generator.retention.base import EventStore
+from synthetic_ops_generator.retention.base import (
+    EventStore,
+    RunEventWindow,
+)
 from synthetic_ops_generator.retention.query import (
     EventActivityBucket,
     EventActivityQuery,
@@ -47,6 +50,33 @@ class RecordingEventStore(EventStore):
             event
             for event in self.events
             if event.run_id == run_id
+        )
+
+    async def get_latest_run_event_window(
+        self,
+        run_id: str,
+        *,
+        limit: int,
+    ) -> RunEventWindow:
+        if limit <= 0:
+            raise ValueError(
+                "Run event window limit must be greater than zero."
+            )
+
+        matching = tuple(
+            sorted(
+                (
+                    event
+                    for event in self.events
+                    if event.run_id == run_id
+                ),
+                key=lambda event: event.sequence_number,
+            )
+        )
+
+        return RunEventWindow(
+            total_event_count=len(matching),
+            events=matching[-limit:],
         )
 
     async def query_events(
