@@ -135,20 +135,24 @@ def test_export_run_report_pdf_contains_real_run_evidence(
         b"%PDF"
     )
 
-    text = extract_pdf_text(
-        response.content
+    text = " ".join(
+        extract_pdf_text(
+            response.content
+        ).split()
     )
 
-    assert "StreamOps Run Evidence Report" in text
+    assert "STREAMOPS" in text
+    assert "Run Evidence Report" in text
 
     assert run_id in text
     assert "INS-04" in text
     assert scenario["name"] in text
 
     assert "Report Scope" in text
-    assert "maximum_event_count" in text
-    assert "total_retained_event_count" in text
-    assert "included_event_count" in text
+    assert "Maximum events" in text
+    assert "Retained events" in text
+    assert "Included events" in text
+    assert "Complete run" in text
 
     assert "Scenario Definition" in text
     assert "Generation Behaviours" in text
