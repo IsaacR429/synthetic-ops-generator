@@ -5,7 +5,12 @@ import {
 } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
-import { ApiError, getRun, stopRun } from '../api/client'
+import {
+  ApiError,
+  buildRunReportPdfUrl,
+  getRun,
+  stopRun,
+} from '../api/client'
 import type { RunResponse, RunStatus } from '../types/api'
 import {
   EXECUTION_VALIDATION_LABEL,
@@ -280,6 +285,14 @@ export function RunDetailPage() {
                     : 'Stop Run'}
                 </button>
               )}
+
+              <a
+                href={buildRunReportPdfUrl(run.run_id)}
+                download
+                className="rounded-lg border border-cyan-400/20 bg-cyan-500/[0.06] px-4 py-2.5 text-[10px] font-medium text-cyan-100 transition-all hover:border-cyan-400/30 hover:bg-cyan-500/[0.10]"
+              >
+                Download PDF
+              </a>
 
               <button
                 type="button"

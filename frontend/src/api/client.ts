@@ -221,6 +221,12 @@ export function buildRunEventsExportUrl(
   )
 }
 
+export function buildRunReportPdfUrl(
+  runId: string,
+): string {
+  return `/api/runs/${encodeURIComponent(runId)}/report.pdf`
+}
+
 export function stopRun(
   runId: string,
 ): Promise<StopRunResponse> {
